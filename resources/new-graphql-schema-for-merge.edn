@@ -1,0 +1,650 @@
+{:enums
+ {:GeneDosageScore
+  {:description "The score assigned to a Gene Dosage curation.",
+   :values
+   [:ASSOCIATED_WITH_AUTOSOMAL_RECESSIVE_PHENOTYPE
+    :MINIMAL_EVIDENCE
+    :MODERATE_EVIDENCE
+    :NO_EVIDENCE
+    :SUFFICIENT_EVIDENCE
+    :DOSAGE_SENSITIVITY_UNLIKELY]},
+  :CurationActivity
+  {:description
+   "The curation activities within ClinGen. Each curation is associated with a curation activity.",
+   :values [:ALL :ACTIONABILITY :GENE_VALIDITY :GENE_DOSAGE]},
+  :SEPIOClass
+  {:description
+   "Classes in SEPIO; will typically be used to filter results of a field listing items with a SEPIO type.",
+   :values [:ProbandWithVariantEvidenceItem :ProbandEvidenceLine]},
+  :Direction {:description "Sort direction.", :values [:ASC :DESC]},
+  :GeneDosageSortField
+  {:description "Gene dosage sort fields.",
+   :values
+   [:GENE_REGION
+    :LOCATION
+    :MORBID
+    :OMIM
+    :HAPLO_EVIDENCE
+    :TRIPLO_EVIDENCE
+    :HI_PCT
+    :PLI
+    :REVIEWED_DATE]},
+  :GeneDosageAssertionType
+  {:description
+   "The type of gene dosage assertion, either haploinsufficiency or triplosensitivity",
+   :values
+   [:HAPLOINSUFFICIENCY_ASSERTION :TRIPLOSENSITIVITY_ASSERTION]},
+  :GeneValidityClassification
+  {:description
+   "The final classification given to a Gene Validity assertion.",
+   :values
+   [:DEFINITIVE
+    :LIMITED
+    :MODERATE
+    :NO_KNOWN_DISEASE_RELATIONSHIP
+    :STRONG
+    :DISPUTED
+    :REFUTED]},
+  :SortField
+  {:description
+   "Sort fields for gene, disease lists and search results.",
+   :values [:GENE_LABEL :DISEASE_LABEL :REPORT_DATE]},
+  :Role
+  {:description
+   "Role an agent realizes in the context of a qualified contribution",
+   :values [:ANY :APPROVER :SECONDARY_CONTRIBUTOR]},
+  :Build
+  {:description "Genomic build identifier.",
+   :values [:GRCH37 :GRCH38]},
+  :Chromosome
+  {:description "Chromosomes.",
+   :values
+   [:CHR1
+    :CHR2
+    :CHR3
+    :CHR4
+    :CHR5
+    :CHR6
+    :CHR7
+    :CHR8
+    :CHR9
+    :CHR10
+    :CHR11
+    :CHR12
+    :CHR13
+    :CHR14
+    :CHR15
+    :CHR16
+    :CHR17
+    :CHR18
+    :CHR19
+    :CHR20
+    :CHR21
+    :CHR22
+    :CHRX
+    :CHRY]}},
+ :interfaces
+ {:GenomicCoordinate
+  {:description "Genomic coordinate of a Gene or Region",
+   :fields
+   {:build {:type String, :description "The build name"},
+    :assembly {:type String, :description "The assembly name"},
+    :chromosome {:type String, :description "The chromosome name"},
+    :start_pos {:type Int, :description "Start coordinate"},
+    :end_pos {:type Int, :description "End coordinate"},
+    :strand
+    {:type String, :description "Strand the feature appears on."}}},
+  :GenomicFeature
+  {:description "Genomic feature represented by a Gene or Region",
+   :fields {:coordinates {:type (list :GenomicCoordinate)}}}},
+ :objects
+ {:GeneticCondition
+  {:description
+   "A condition described by some combination of gene, disease, and mode of inheritance (usually at least gene and disease).",
+   :fields
+   {:gene
+    {:type :Gene,
+     :resolve :genetic-condition/gene,
+     :description "The gene associated with this genetic condition."},
+    :disease
+    {:type :Disease,
+     :resolve :genetic-condition/disease,
+     :description
+     "The disease associated with this genetic condition."},
+    :mode_of_inheritance
+    {:type :ModeOfInheritance,
+     :resolve :genetic-condition/mode-of-inheritance,
+     :description
+     "The mode of inheritance associated with this genetic condition."},
+    :actionability_assertions
+    {:type (list :ActionabilityAssertion),
+     :resolve :genetic-condition/actionability-assertions,
+     :description
+     "Actionability assertions associated with this genetic condition. Unlike gene_validity and dosage, there may be more than one per genetic condition, as the condition may be curated in both pediatric and adult contexts."},
+    :gene_validity_assertions
+    {:type (list :GeneValidityAssertion),
+     :resolve :genetic-condition/gene-validity-curation,
+     :description
+     "Gene Validity curation associated with this genetic condition."},
+    :gene_dosage_assertions
+    {:type (list :DosageAssertion),
+     :resolve :genetic-condition/gene-dosage-curation,
+     :description
+     "Dosage sensitivity curation associated with this genetic condition."}}},
+  :Classification
+  {:description "The result of an assertion relative to a proposition",
+   :fields
+   {:iri
+    {:type String,
+     :resolve :resource/iri,
+     :description "IRI identifying this classification"},
+    :curie
+    {:type String,
+     :resolve :resource/curie,
+     :description "CURIE of the IRI identifying this resource"},
+    :label
+    {:type String,
+     :resolve :resource/label,
+     :description "Label for this resourcce"}}},
+  :ActionabilityAssertion
+  {:description
+   "An assertion regarding the Actionability of a gene-disease pair.",
+   :fields
+   {:report_date {:type String, :resolve :ac-assertion/report-date},
+    :source {:type String, :resolve :ac-assertion/source},
+    :report_label {:type String, :resolve :ac-assertion/report-label},
+    :classification
+    {:type :Classification,
+     :resolve :ac-assertion/classification,
+     :description
+     "Classification for this Actionability assertion. Members of the value set Actionability Assertion Value Set (SEPIO_0003534) are valid values for this field."},
+    :attributed_to
+    {:type :Agent, :resolve :ac-assertion/attributed-to}}},
+  :Criteria
+  {:description "Criteria used to perform curation.",
+   :fields
+   {:iri
+    {:type String,
+     :resolve :resource/iri,
+     :description "IRI identifying this resource"},
+    :curie
+    {:type String,
+     :resolve :resource/curie,
+     :description "CURIE of the IRI identifying this resource"},
+    :label
+    {:type String,
+     :resolve :resource/label,
+     :description "Label for this resourcce"}}},
+  :Genes
+  {:description "A collection of genes.",
+   :fields {:gene_list {:type (list :Gene)}, :count {:type Int}}},
+  :ValidityContribution
+  {:fields
+   {:agent {:type :Agent, :resolve :gv-contribution/agent},
+    :realizes {:type :Class, :resolve :gv-contribution/realizes}}},
+  :Gene
+  {:description
+   "A genomic feature (a gene or a region). Along with conditions, one of the basic units of curation.",
+   :fields
+   {:last_curated_date
+    {:type String,
+     :resolve :gene/last-curated-date,
+     :description
+     "Most recent date a curation (of any kind) has been performed on this gene."},
+    :chromosome_band
+    {:type String,
+     :resolve :gene/chromosome-band,
+     :description "Cytogenetic band of gene."},
+    :hgnc_id
+    {:type String,
+     :resolve :gene/hgnc-id,
+     :description "HGNC ID of gene"},
+    :alternative_label
+    {:type String,
+     :resolve :resource/alternative-label,
+     :description "Full name of gene"},
+    :genetic_conditions
+    {:type (list :GeneticCondition),
+     :resolve :gene/conditions,
+     :description
+     "Genetic conditions associated with gene. These represent gene-disease pairs for which a curation exists associated with the given gene."},
+    :curation_activities
+    {:type (list :CurationActivity),
+     :description
+     "The curation activities that have published reports on the gene",
+     :resolve :gene/curation-activities},
+    :curie
+    {:type String,
+     :resolve :resource/curie,
+     :description "CURIE of the IRI representing this resource."},
+    :label
+    {:type String,
+     :resolve :resource/label,
+     :description "Gene symbol"},
+    :iri
+    {:type String,
+     :resolve :resource/iri,
+     :description
+     "IRI representing the gene. Uses NCBI gene identifiers"},
+    :dosage_curation
+    {:type :GeneDosageCuration,
+     :resolve :gene/dosage-curation,
+     :description
+     "Gene Dosage curation associated with the gene or region."}}},
+  :GeneDosageCuration
+  {:description
+   "A complete gene dosage curation containing one or more dosage propositions",
+   :fields
+   {:triplosensitivity_assertion
+    {:type :DosageAssertion,
+     :resolve :gene-dosage/triplo,
+     :description "Triplosensitivity"},
+    :report_date
+    {:type String,
+     :resolve :gene-dosage/report-date,
+     :description "The date of the report."},
+    :curie
+    {:type String,
+     :resolve :resource/curie,
+     :description "Local identifier for the Dosage curation."},
+    :iri
+    {:type String,
+     :resolve :resource/iri,
+     :description "IRI for the Dosage curation."},
+    :haploinsufficiency_assertion
+    {:type :DosageAssertion,
+     :resolve :gene-dosage/haplo,
+     :description "Haploinsufficiency"}}},
+  :Statistics
+  {:fields
+   {:actionability_tot_adult_gene_disease_pairs
+    {:type Int,
+     :resolve :actionability/tot-adult-gene-disease-pairs,
+     :description "Total number of adult context gene-disease pairs."},
+    :actionability_tot_updated_reports
+    {:type Int,
+     :resolve :actionability/tot-actionability-updated-reports,
+     :description "Total number of updated Actionability reports."},
+    :actionability_tot_gene_disease_pairs
+    {:type Int,
+     :resolve :actionability/tot-gene-disease-pairs,
+     :description "Total number of gene-disease pairs."},
+    :actionability_tot_outcome_intervention_pairs
+    {:type Int,
+     :resolve :actionability/tot-outcome-intervention-pairs,
+     :description "Total number of outcome-intervention pairs."},
+    :actionability_tot_pediatric_score_counts
+    {:type String,
+     :resolve :actionability/tot-pediatric-score-counts,
+     :description "Histogram of pediatric context scores."},
+    :actionability_tot_adult_failed_early_rule_out
+    {:type Int,
+     :resolve :actionability/tot-adult-failed-early-rule-out,
+     :description
+     "Total number of adult context records that failed stage 1 curation."},
+    :actionability_tot_adult_outcome_intervention_pairs
+    {:type Int,
+     :resolve :actionability/tot-adult-outcome-intervention-pairs,
+     :description
+     "Total number of adult context outcome-intervention pairs."},
+    :actionability_tot_reports
+    {:type Int,
+     :resolve :actionability/tot-actionability-reports,
+     :description "Total number of Actionability reports."},
+    :actionability_tot_pediatric_failed_early_rule_out
+    {:type Int,
+     :resolve :actionability/tot-pediatric-failed-early-rule-out,
+     :description
+     "Total number of pediatric context records that failed stage 1 curation."},
+    :actionability_tot_adult_score_counts
+    {:type String,
+     :resolve :actionability/tot-adult-score-counts,
+     :description "Histogram of adult context scores."},
+    :actionability_tot_pediatric_gene_disease_pairs
+    {:type Int,
+     :resolve :actionability/tot-pediatric-gene-disease-pairs,
+     :description
+     "Total number of pediatric context gene-disease pairs."},
+    :actionability_tot_pediatric_outcome_intervention_pairs
+    {:type Int,
+     :resolve :actionability/tot-pediatric-outcome-intervention-pairs,
+     :description
+     "Total number of pedicatric context outcome-intervention pairs."}}},
+  :DosageAssertion
+  {:description
+   "An individual dosage proposition, either a Haplo Insufficiency proposition or a Triplo Sensitivity proposition",
+   :fields
+   {:report_date
+    {:type String,
+     :resolve :dosage-proposition/report-date,
+     :description
+     "Date the report was last issued by the working group."},
+    :assertion_type
+    {:type :GeneDosageAssertionType,
+     :resolve :dosage-proposition/assertion-type,
+     :description
+     "Type of assertion (haploinsufficiency/triplosensitivity"},
+    :curie
+    {:type String,
+     :resolve :resource/curie,
+     :description "Local identifier for the curation"},
+    :label
+    {:type String,
+     :resolve :resource/label,
+     :description "Curation label"},
+    :iri
+    {:type String,
+     :resolve :resource/iri,
+     :description "Identifier for the curation"},
+    :dosage_classification
+    {:type :DosageClassification,
+     :resolve :dosage-proposition/dosage-classification,
+     :description
+     "Classification for a gene dosage assertion that mirrors the scores in the gene dosage process."},
+    :disease
+    {:type :Disease,
+     :resolve :dosage-proposition/disease,
+     :description "Disease associated with this assertion"}}},
+  :ActionabilityCuration
+  {:fields
+   {:curie {:type String, :resolve :resource/curie},
+    :label {:type String, :resolve :resource/label},
+    :iri {:type String, :resolve :resource/iri}}},
+  :Disease
+  {:description
+   "A disease or condition. May be a genetic condition, linked to a specific disease or mode of inheritance. Along with gene, one of the basic units of curation.",
+   :fields
+   {:description
+    {:type String,
+     :resolve :condition/description,
+     :description "Disease description name."},
+    :last_curated_date
+    {:type String,
+     :resolve :condition/last-curated-date,
+     :description
+     "Most recent date a curation (of any kind) has been performed on this condition."},
+    :genetic_conditions
+    {:type (list :GeneticCondition),
+     :resolve :condition/genetic-conditions,
+     :description
+     "Curated genetic conditions associated with the disease"},
+    :synonyms
+    {:type (list String),
+     :resolve :condition/synonyms,
+     :description "Disease synonyms"},
+    :curation_activities
+    {:type (list :CurationActivity),
+     :description
+     "The curation activities that have published reports on the disease",
+     :resolve :condition/curation-activities},
+    :curie
+    {:type String,
+     :resolve :resource/curie,
+     :description "CURIE of the IRI representing this resource."},
+    :label
+    {:type String,
+     :resolve :resource/label,
+     :description "Label for the condition."},
+    :iri
+    {:type String,
+     :resolve :resource/iri,
+     :description
+     "IRI for the condition. Currently MONDO ids are supported."}}},
+  :GeneValidityAssertions
+  {:description "A collection of gene validity curations.",
+   :fields
+   {:curation_list {:type (list :GeneValidityAssertion)},
+    :count {:type Int}}},
+  :Diseases
+  {:description "A collection of diseases.",
+   :fields
+   {:disease_list {:type (list :Disease)}, :count {:type Int}}},
+  :GeneValidityAssertion
+  {:fields
+   {:report_date
+    {:type String,
+     :resolve :gene-validity/report-date,
+     :description "Date gene validity report was issued."},
+    :specified_by
+    {:type :Criteria,
+     :description
+     "Criteria used by the curators to create the gene validity assertion",
+     :resolve :gene-validity/specified-by},
+    :mode_of_inheritance
+    {:type :ModeOfInheritance,
+     :description "Mode of inheritance associated with this curation",
+     :resolve :gene-validity/mode-of-inheritance},
+    :legacy_json
+    {:type String,
+     :description "Legacy JSON from the GCI.",
+     :resolve :gene-validity/legacy-json},
+    :report_id
+    {:type String,
+     :description "The report ID.",
+     :resolve :gene-validity/report-id},
+    :classification
+    {:type :Classification,
+     :description
+     "Final classification of this gene validity curation.",
+     :resolve :gene-validity/classification},
+    :animal_model
+    {:type Boolean,
+     :description "Animal modely flag.",
+     :resolve :gene-validity/animal-model},
+    :curie
+    {:type String,
+     :resolve :resource/curie,
+     :description
+     "CURIE of the IRI identifying this gene validity curation."},
+    :contributions
+    {:type (list :ValidityContribution),
+     :resolve :gene-validity/contributions,
+     :description
+     "All contributions related to this gene validity curation."},
+    :label
+    {:type String,
+     :resolve :resource/label,
+     :description "Label identifying this gene validity curation."},
+    :gene
+    {:type :Gene,
+     :description "Gene associated with this curation",
+     :resolve :gene-validity/gene},
+    :iri
+    {:type String,
+     :resolve :resource/iri,
+     :description "IRI identifying this gene validity curation."},
+    :disease
+    {:type :Disease,
+     :description "Disease associated with this curation",
+     :resolve :gene-validity/disease},
+    :description
+    {:type String
+     :resolve :resource/description}
+    :attributed_to
+    {:type :Agent,
+     :description "Primary affiliation responsible for this curation",
+     :resolve :gene-validity/attributed-to}}},
+  :ModeOfInheritance
+  {:description "Mode of inheritance for a genetic condition.",
+   :fields
+   {:iri
+    {:type String,
+     :resolve :resource/iri,
+     :description
+     "IRI for the condition. Currently MONDO ids are supported."},
+    :curie
+    {:type String,
+     :resolve :resource/curie,
+     :description "CURIE of the IRI representing this resource."},
+    :label
+    {:type String,
+     :resolve :resource/label,
+     :description "Label for the resource."},
+    :website_display_label
+    {:type String,
+     :resolve :resource/website-display-label,
+     :description
+     "Label used to display resource on the ClinGen Website. In general will correspond with the standard label for the resource, but may include overrides based on the specific display needs of the website."}}},
+  :Class
+  {:description "The class of a resource",
+   :fields
+   {:iri
+    {:type String,
+     :resolve :resource/iri,
+     :description "IRI identifying this resource"},
+    :curie
+    {:type String,
+     :resolve :resource/curie,
+     :description "CURIE of the IRI identifying this resource"},
+    :label
+    {:type String,
+     :resolve :resource/label,
+     :description "Label for this resourcce"}}},
+  :DosageClassification
+  {:description
+   "Classification for a gene dosage assertion that mirrors the scores in the gene dosage process. Reflects a reasoning on the SEPIO structure, and not the SEPIO assertion itself.",
+   :fields
+   {:label {:type String},
+    :ordinal {:type Int},
+    :enum_value {:type :GeneDosageScore}}},
+  :Agent
+  {:description
+   "A person or group. In this context, generally a ClinGen Domain Working Group responsible for producing one or more curations.",
+   :fields
+   {:gene_validity_assertions
+    {:type :GeneValidityAssertions,
+     :resolve :affiliation/gene-validity-assertions,
+     :args
+     {:limit
+      {:type Int,
+       :default-value 10,
+       :description "Number of records to return"},
+      :offset
+      {:type Int,
+       :default-value 0,
+       :description "Index to begin returning records from"},
+      :text
+      {:type String,
+       :description
+       "Filter list including text in gene, disease and synonyms."},
+      :sort
+      {:type :Sort,
+       :description
+       "Order in which to sort genes. Supported fields: GENE_LABEL"},
+      :role
+      {:type :Role,
+       :description "Filter assertions by role played by agent",
+       :default-value :APPROVER}}}}},
+  :Agents
+  {:description
+   "A list of agents, with a possible limit, and a count of the total number matching the query",
+   :fields {:agent_list {:type (list :Agent)}, :count {:type Int}}}},
+ :input-objects
+ {:filters
+  {:fields
+   {:ti_score {:type String},
+    :pli_range {:type :range},
+    :location_contained {:type Boolean},
+    :clinical_actionability {:type Boolean},
+    :gene_disease_validity {:type Boolean},
+    :chomo_location {:type :chromo_locus},
+    :regions {:type (list String)},
+    :genes {:type (list String)},
+    :morbid {:type Boolean},
+    :hi_score {:type String},
+    :haplo_desc {:type (list String)},
+    :diseases {:type (list String)},
+    :genomic_location {:type :genomic_locus},
+    :hi_range {:type :range},
+    :protein_coding {:type Boolean},
+    :reviewed_range {:type :date_range},
+    :omim {:type Boolean},
+    :location_overlap {:type Boolean}}},
+  :Sort
+  {:fields
+   {:field {:type :SortField, :default-value :GENE_LABEL},
+    :direction {:type :Direction, :default-value :ASC}}},
+  :sort_spec
+  {:fields
+   {:sort_field {:type :GeneDosageSortField},
+    :direction {:type :Direction, :default-value :ASC}}},
+  :paging {:fields {:limit {:type Int}, :offset {:type Int}}},
+  :date_range {:fields {:start {:type String}, :end {:type String}}},
+  :genomic_locus
+  {:fields
+   {:build {:type :Build},
+    :chr {:type :Chromosome},
+    :start {:type Int},
+    :end {:type Int}}},
+  :sorting {:fields {:sort_fields {:type (list :sort_spec)}}},
+  :range {:fields {:start {:type Int}, :end {:type Int}}},
+  :chromo_locus
+  {:fields
+   {:build {:type :Build}, :genomic_feature_location {:type String}}}},
+ :queries
+ {:gene {:type (non-null :Gene)
+         :args {:iri {:type String}}
+         :resolve :gene/gene-query}
+  :genes {:type :Genes
+          :resolve :gene/genes
+          :args {:limit {:type Int
+                         :default-value 10
+                         :description "Number of records to return"}
+                 :offset {:type Int
+                          :default-value 0
+                          :description "Index to begin returning records from"}
+                 :text {:type String
+                        :description "Filter list for genes including text in symbol previous symbols, names, or previous names."}
+                 :curation_activity {:type :CurationActivity
+                                     :description
+                                     "Limit genes returned to those that have a curation, or a curation of a specific type."}
+                 :sort {:type :Sort
+                        :description "Order in which to sort genes."}}}
+  :disease {:type (non-null :Disease)
+            :args {:iri {:type String}}
+            :resolve :condition/condition-query}
+  :diseases {:type :Diseases
+             :args {:limit {:type Int
+                            :default-value 10
+                            :description "Number of records to return"}
+                    :offset {:type Int
+                             :default-value 0
+                             :description "Index to begin returning records from"}
+                    :curation_activity {:type :CurationActivity
+                                        :description
+                                        "Limit genes returned to those that have a curation, or a curation of a specific type."}
+                    :text {:type String
+                           :description "Filter list for genes including text in name and synonyms."}
+                    :sort {:type :Sort
+                           :description "Order in which to sort diseases"}}
+             :resolve :condition/diseases}
+  :affiliations {:type :Agents
+                 :args {:limit {:type Int
+                                :default-value 10
+                                :description "Number of records to return"}
+                        :offset {:type Int
+                                 :default-value 0
+                                 :description "Index to begin returning records from"}
+                        :text {:type String
+                               :description "Filter list for genes including text in name and synonyms."}}
+                 :resolve :affiliation/affiliations}
+  :affiliation {:type :Agent
+                :args {:iri {:type String}}
+                :resolve :affiliation/affiliation-query}
+  :gene_validity_assertions {:type :GeneValidityAssertions
+                             :resolve :gene-validity/gene-validity-curations
+                             :args {:limit {:type Int
+                                            :default-value 10
+                                            :description "Number of records to return"}
+                                    :offset {:type Int
+                                             :default-value 0
+                                             :description "Index to begin returning records from"}
+                                    :text {:type String
+                                           :description "Filter list including text in gene, disease and synonyms."}
+                                    :sort {:type :Sort
+                                           :description "Order in which to sort genes. Supported fields: GENE_LABEL"}}}
+  :gene_validity_assertion {:type :GeneValidityAssertion
+                            :resolve :gene-validity/gene-validity-assertion-query
+                            :args {:iri {:type String}}}
+  :statistics {:type :Statistics
+               :resolve :actionability/statistics-query}}}

@@ -1,0 +1,791 @@
+<http://dx.clinicalgenome.org/entities/ISCA-1625>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002016> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-1625x3-2018-10-17T17:18:46Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-1625-2018-10-17T17:18:46Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-1625x3> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002008> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-1625x3>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/54903> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "3"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0000001> .
+
+<http://dx.clinicalgenome.org/entities/contribution-ISCA-1625-2018-10-17T17:18:46Z>
+        <http://purl.obolibrary.org/obo/BFO_0000055>
+                <http://purl.obolibrary.org/obo/SEPIO_0000331> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000160>
+                "2016-08-22T17:50:20Z" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-1625-2018-10-17T17:18:46Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002015> ;
+        <http://purl.obolibrary.org/obo/BFO_0000051>
+                <http://dx.clinicalgenome.org/entities/ISCA-1625x3-2018-10-17T17:18:46Z> , <http://dx.clinicalgenome.org/entities/ISCA-1625x1-2018-10-17T17:18:46Z> ;
+        <http://purl.obolibrary.org/obo/IAO_0000136>
+                <https://www.ncbi.nlm.nih.gov/gene/54903> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-1625-2018-10-17T17:18:46Z> ;
+        <http://purl.org/dc/terms/isVersionOf>
+                <http://dx.clinicalgenome.org/entities/ISCA-1625> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-1625x1-2018-10-17T17:18:46Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002014> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-1625-2018-10-17T17:18:46Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-1625x1> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0002505> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002502> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-1625x1>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/54903> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "1"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0000001> .
+<http://dx.clinicalgenome.org/entities/ISCA-9293>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002016> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-9293x3>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/55553> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "3"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0000001> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-9293x1>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/55553> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "1"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0000001> .
+
+<http://dx.clinicalgenome.org/entities/contribution-ISCA-9293-2021-06-18T19:35:08Z>
+        <http://purl.obolibrary.org/obo/BFO_0000055>
+                <http://purl.obolibrary.org/obo/SEPIO_0000331> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000160>
+                "2012-03-22T18:31:22Z" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-9293x1-2021-06-18T19:35:08Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-9293-2021-06-18T19:35:08Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-9293x1> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002008> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-9293x3-2021-06-18T19:35:08Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-9293-2021-06-18T19:35:08Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-9293x3> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002008> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-9293-2021-06-18T19:35:08Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002015> ;
+        <http://purl.obolibrary.org/obo/BFO_0000051>
+                <http://dx.clinicalgenome.org/entities/ISCA-9293x1-2021-06-18T19:35:08Z> , <http://dx.clinicalgenome.org/entities/ISCA-9293x3-2021-06-18T19:35:08Z> ;
+        <http://purl.obolibrary.org/obo/IAO_0000136>
+                <https://www.ncbi.nlm.nih.gov/gene/55553> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-9293-2021-06-18T19:35:08Z> ;
+        <http://purl.org/dc/terms/isVersionOf>
+                <http://dx.clinicalgenome.org/entities/ISCA-9293> .
+<http://dx.clinicalgenome.org/entities/ISCA-25281>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002016> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-25281x1>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/6473> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "1"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0007481> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-25281x3>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/6473> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "3"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0000001> .
+
+<http://dx.clinicalgenome.org/entities/contribution-ISCA-25281-2020-11-24T15:01:53Z>
+        <http://purl.obolibrary.org/obo/BFO_0000055>
+                <http://purl.obolibrary.org/obo/SEPIO_0000331> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000160>
+                "2015-10-15T18:27:04Z" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-25281-2020-11-24T15:01:53Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002015> ;
+        <http://purl.obolibrary.org/obo/BFO_0000051>
+                <http://dx.clinicalgenome.org/entities/ISCA-25281x3-2020-11-24T15:01:53Z> , <http://dx.clinicalgenome.org/entities/ISCA-25281x1-2020-11-24T15:01:53Z> ;
+        <http://purl.obolibrary.org/obo/IAO_0000136>
+                <https://www.ncbi.nlm.nih.gov/gene/6473> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-25281-2020-11-24T15:01:53Z> ;
+        <http://purl.org/dc/terms/isVersionOf>
+                <http://dx.clinicalgenome.org/entities/ISCA-25281> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-25281x3-2020-11-24T15:01:53Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-25281-2020-11-24T15:01:53Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-25281x3> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002008> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-25281x1-2020-11-24T15:01:53Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-25281-2020-11-24T15:01:53Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000189>
+                [ a       <http://purl.obolibrary.org/obo/SEPIO_0000173> ;
+                  <http://purl.org/dc/terms/description>
+                          "Huber et al. (2001) analyzed SHOX in 8 families (22 patients) with dyschondrosteosis and found 3 deletions and 5 point mutations (including 4 nonsense changes)." ;
+                  <http://purl.org/dc/terms/source>
+                          "PMID:11403039"
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000189>
+                [ a       <http://purl.obolibrary.org/obo/SEPIO_0000173> ;
+                  <http://purl.org/dc/terms/description>
+                          "Rappold et al. (2002) analyzed SHOX in 900 patients with short stature. They found 9 intragenic mutations and 3 whole gene deletions." ;
+                  <http://purl.org/dc/terms/source>
+                          "PMID:11889216"
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000189>
+                [ a       <http://purl.obolibrary.org/obo/SEPIO_0000173> ;
+                  <http://purl.org/dc/terms/description>
+                          "Niesler et al. (2002) describe an online database (www.shox.uni-hd.de) that contains 29 mutations in SHOX from individuals with short stature phenotypes. The most common nonsense mutation reported is R195X, seen in 7 patients. This database does not include SHOX deletions." ;
+                  <http://purl.org/dc/terms/source>
+                          "PMID:12402330"
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-25281x1> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002006> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+<http://dx.clinicalgenome.org/entities/ISCA-21830>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002016> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-21830x1>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/9677> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "1"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0011364> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-21830x3>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/9677> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "3"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0000001> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-21830x1-2021-01-14T20:11:26Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002014> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-21830-2021-01-14T20:11:26Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-21830x1> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0002505> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002502> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+
+<http://dx.clinicalgenome.org/entities/contribution-ISCA-21830-2021-01-14T20:11:26Z>
+        <http://purl.obolibrary.org/obo/BFO_0000055>
+                <http://purl.obolibrary.org/obo/SEPIO_0000331> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000160>
+                "2012-08-27T00:33:04Z" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-21830x3-2021-01-14T20:11:26Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-21830-2021-01-14T20:11:26Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-21830x3> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002008> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-21830-2021-01-14T20:11:26Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002015> ;
+        <http://purl.obolibrary.org/obo/BFO_0000051>
+                <http://dx.clinicalgenome.org/entities/ISCA-21830x1-2021-01-14T20:11:26Z> , <http://dx.clinicalgenome.org/entities/ISCA-21830x3-2021-01-14T20:11:26Z> ;
+        <http://purl.obolibrary.org/obo/IAO_0000136>
+                <https://www.ncbi.nlm.nih.gov/gene/9677> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-21830-2021-01-14T20:11:26Z> ;
+        <http://purl.org/dc/terms/isVersionOf>
+                <http://dx.clinicalgenome.org/entities/ISCA-21830> .
+<http://dx.clinicalgenome.org/entities/ISCA-12789>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002016> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-12789x3>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/7681> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "3"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0000001> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-12789x1>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/7681> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "1"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0000001> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-12789x3-2020-12-29T17:48:37Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-12789-2020-12-29T17:48:37Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-12789x3> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002008> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+
+<http://dx.clinicalgenome.org/entities/contribution-ISCA-12789-2020-12-29T17:48:37Z>
+        <http://purl.obolibrary.org/obo/BFO_0000055>
+                <http://purl.obolibrary.org/obo/SEPIO_0000331> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000160>
+                "2012-04-25T01:46:53Z" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-12789-2020-12-29T17:48:37Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002015> ;
+        <http://purl.obolibrary.org/obo/BFO_0000051>
+                <http://dx.clinicalgenome.org/entities/ISCA-12789x3-2020-12-29T17:48:37Z> , <http://dx.clinicalgenome.org/entities/ISCA-12789x1-2020-12-29T17:48:37Z> ;
+        <http://purl.obolibrary.org/obo/IAO_0000136>
+                <https://www.ncbi.nlm.nih.gov/gene/7681> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-12789-2020-12-29T17:48:37Z> ;
+        <http://purl.org/dc/terms/isVersionOf>
+                <http://dx.clinicalgenome.org/entities/ISCA-12789> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-12789x1-2020-12-29T17:48:37Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-12789-2020-12-29T17:48:37Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000189>
+                [ a       <http://purl.obolibrary.org/obo/SEPIO_0000173> ;
+                  <http://purl.org/dc/terms/description>
+                          "Kanber et al. (2009) report on 2 patients with PWS that have atypical 15q11 deletions including SNRPN, but that do not include MKRN3, MAGEL2 and NDN, suggesting that deletion of these 3 genes do not cause the PWS phenotype." ;
+                  <http://purl.org/dc/terms/source>
+                          "PMID:19066619"
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000189>
+                [ a       <http://purl.obolibrary.org/obo/SEPIO_0000173> ;
+                  <http://purl.org/dc/terms/description>
+                          "Nicholls et al. (1998) review the IC regions of PWS. MKRN3 is not included." ;
+                  <http://purl.org/dc/terms/source>
+                          "PMID:31636607"
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-12789x1> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002008> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+<http://dx.clinicalgenome.org/entities/ISCA-24399>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002016> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-24399x1>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/5631> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "1"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0000001> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-24399x3>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/5631> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "3"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0000001> .
+
+<http://dx.clinicalgenome.org/entities/contribution-ISCA-24399-2020-12-09T20:02:08Z>
+        <http://purl.obolibrary.org/obo/BFO_0000055>
+                <http://purl.obolibrary.org/obo/SEPIO_0000331> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000160>
+                "2012-05-17T19:10:54Z" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-24399x3-2020-12-09T20:02:08Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-24399-2020-12-09T20:02:08Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-24399x3> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002008> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-24399-2020-12-09T20:02:08Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002015> ;
+        <http://purl.obolibrary.org/obo/BFO_0000051>
+                <http://dx.clinicalgenome.org/entities/ISCA-24399x3-2020-12-09T20:02:08Z> , <http://dx.clinicalgenome.org/entities/ISCA-24399x1-2020-12-09T20:02:08Z> ;
+        <http://purl.obolibrary.org/obo/IAO_0000136>
+                <https://www.ncbi.nlm.nih.gov/gene/5631> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-24399-2020-12-09T20:02:08Z> ;
+        <http://purl.org/dc/terms/isVersionOf>
+                <http://dx.clinicalgenome.org/entities/ISCA-24399> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-24399x1-2020-12-09T20:02:08Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-24399-2020-12-09T20:02:08Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-24399x1> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002006> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+<http://dx.clinicalgenome.org/entities/ISCA-10681>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002016> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-10681x1>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/8452> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "1"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0030994> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-10681x3>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/8452> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "3"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0000001> .
+
+<http://dx.clinicalgenome.org/entities/contribution-ISCA-10681-2021-04-24T13:40:42Z>
+        <http://purl.obolibrary.org/obo/BFO_0000055>
+                <http://purl.obolibrary.org/obo/SEPIO_0000331> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000160>
+                "2018-01-24T17:47:57Z" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-10681x3-2021-04-24T13:40:42Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-10681-2021-04-24T13:40:42Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-10681x3> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002008> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-10681x1-2021-04-24T13:40:42Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-10681-2021-04-24T13:40:42Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000189>
+                [ a       <http://purl.obolibrary.org/obo/SEPIO_0000173> ;
+                  <http://purl.org/dc/terms/description>
+                          "Nakashima M et al., 2020 2 de novo frameshift mutations (NM_003590.4 c.137delG, p.Arg46LeufsTer32, c.1239del p. Asp413GlufsTer42, and one de novo missense variaint (NM_003590.4 c.854T>C p.(Val285Ala)  in the CUL3 gene by trio WES. The missense variant showed significantly weaker interaction to the BTB domain proteins than wild-type CUL3. The two patients who carries the missense variant, p.Val285Ala and frameshift variant, p.ARg46LeufsTer32 were ascertained with childhood-onset epilepsy in addition to neuropsychiatric disorders. \r\n" ;
+                  <http://purl.org/dc/terms/source>
+                          "PMID:32341456"
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000189>
+                [ a       <http://purl.obolibrary.org/obo/SEPIO_0000173> ;
+                  <http://purl.org/dc/terms/description>
+                          "Da Silva Montenegr, EM et al., (2020) found a  de novo heterozygous nonsense mutation in the CUL3 gene (NM_001257197 c.398C > G:p.Ser133Ter) by trio WES in a 12 year old Brazilian girl with neurodevelopmental disorder with autism but without seizures from a Brazilian cohort of 30 Autism Spectrum Disorder trios. \r\n" ;
+                  <http://purl.org/dc/terms/source>
+                          "PMID:31696658"
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000189>
+                [ a       <http://purl.obolibrary.org/obo/SEPIO_0000173> ;
+                  <http://purl.org/dc/terms/description>
+                          "Iwafuchi S et al., 2021  identified a de novo heterozygous frameshift variant ( NM_003590.5 c.1758_1759insTG p. Thr587Ter, in the CUL3 gene by trio WES. This variant is predicted to lead to nonsense-mediated mRNA decay (NMD) and haploinsufficiency. This female patient presented at age 21 months with status epilepticus and thereafter showed developmental regression with loss of eye contact, autistic features, and features of Rett syndrome (RTT). \r\n" ;
+                  <http://purl.org/dc/terms/source>
+                          "PMID:33097317"
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-10681x1> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002006> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-10681-2021-04-24T13:40:42Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002015> ;
+        <http://purl.obolibrary.org/obo/BFO_0000051>
+                <http://dx.clinicalgenome.org/entities/ISCA-10681x3-2021-04-24T13:40:42Z> , <http://dx.clinicalgenome.org/entities/ISCA-10681x1-2021-04-24T13:40:42Z> ;
+        <http://purl.obolibrary.org/obo/IAO_0000136>
+                <https://www.ncbi.nlm.nih.gov/gene/8452> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-10681-2021-04-24T13:40:42Z> ;
+        <http://purl.org/dc/terms/isVersionOf>
+                <http://dx.clinicalgenome.org/entities/ISCA-10681> .
+<http://dx.clinicalgenome.org/entities/ISCA-20454>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002016> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-20454x3>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/3052> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "3"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0000001> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-20454x1>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/3052> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "1"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0024552> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-20454x3-2021-02-08T14:11:30Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-20454-2021-02-08T14:11:30Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-20454x3> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002008> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+
+<http://dx.clinicalgenome.org/entities/contribution-ISCA-20454-2021-02-08T14:11:30Z>
+        <http://purl.obolibrary.org/obo/BFO_0000055>
+                <http://purl.obolibrary.org/obo/SEPIO_0000331> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000160>
+                "2012-05-10T19:12:47Z" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-20454-2021-02-08T14:11:30Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002015> ;
+        <http://purl.obolibrary.org/obo/BFO_0000051>
+                <http://dx.clinicalgenome.org/entities/ISCA-20454x3-2021-02-08T14:11:30Z> , <http://dx.clinicalgenome.org/entities/ISCA-20454x1-2021-02-08T14:11:30Z> ;
+        <http://purl.obolibrary.org/obo/IAO_0000136>
+                <https://www.ncbi.nlm.nih.gov/gene/3052> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-20454-2021-02-08T14:11:30Z> ;
+        <http://purl.org/dc/terms/isVersionOf>
+                <http://dx.clinicalgenome.org/entities/ISCA-20454> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-20454x1-2021-02-08T14:11:30Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-20454-2021-02-08T14:11:30Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000189>
+                [ a       <http://purl.obolibrary.org/obo/SEPIO_0000173> ;
+                  <http://purl.org/dc/terms/description>
+                          "Van Rahden et al. (2014) investigated 6 female probands with a clinical diagnosis of microphthalmia with linear skin defects (MLS). Genetic analysis revealed a confirmed de novo nonsense variant in one patient and a confirmed de novo frameshift variant in another, where both patients had ocular and skin defects. While the position of the nonsense variant (<50 nucleotides from the 3’ end of the penultimate exon) suggests transcripts containing this variant may not undergo nonsense-mediated decay, the protein is predicted to be truncated by >10%. This nonsense mutation was previously reported by Wimplinger et al. (2006) in an unrelated patient (PMID 17033964). The frameshift variant is predicted to undergo nonsense-mediated decay. Larger deletions encompassing HCCS and additional neighboring genes were detected in the remaining four patients." ;
+                  <http://purl.org/dc/terms/source>
+                          "PMID:24735900"
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000189>
+                [ a       <http://purl.obolibrary.org/obo/SEPIO_0000173> ;
+                  <http://purl.org/dc/terms/description>
+                          "Wimplinger et al. (2006) examined members from 3 families with microphthalmia with linear skin defects (MLS). One family included two sisters with MLS (one sister previously described in PMID 16059943; one with both ocular and skin defects and the other with only ocular defects), associated with a deletion that included exons 1-3 of HCCS and the 5’ untranslated exons 1a and 1b of MID1. Follow-up analysis by Qidwai et al. (PMID 20503342) determined a portion of AC073529.1, a processed transcript with no protein product, is deleted rather than a portion of MID1. In a second family, one female presenting with both ocular and skin defects was found to carry a de novo nonsense variant in HCCS. However, transcript containing this variant may not undergo nonsense-mediated decay due to the proximity of the variant to the end of the penultimate exon (<50 nucleotides from the 3’ end). Truncation would result in a loss of >10% of the protein." ;
+                  <http://purl.org/dc/terms/source>
+                          "PMID:17033964"
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000189>
+                [ a       <http://purl.obolibrary.org/obo/SEPIO_0000173> ;
+                  <http://purl.org/dc/terms/description>
+                          "Weh et al. (2014) sequenced the whole exomes of 27 patients with either isolated or syndromic Peters anomaly. One patient, a female presenting with bilateral Peters anomaly and unilateral microphthalmia with no skin defects, was found to be heterozygous for a de novo nonsense variant in HCCS. However, this variant occurs in the last exon (truncation of >10% of the protein) and so it is unclear if transcript containing this variant undergoes nonsense-mediated decay. " ;
+                  <http://purl.org/dc/terms/source>
+                          "PMID:25182519"
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-20454x1> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002006> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+<http://dx.clinicalgenome.org/entities/ISCA-31361>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002016> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-31361x3>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/8573> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "3"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0000001> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-31361x1>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002003> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                [ a       <http://purl.obolibrary.org/obo/GENO_0000963> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000903>
+                          <https://www.ncbi.nlm.nih.gov/gene/8573> ;
+                  <http://purl.obolibrary.org/obo/GENO_0000917>
+                          "1"^^<http://www.w3.org/2001/XMLSchema#long>
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/GENO_0000840> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/MONDO_0010417> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-31361-2021-04-14T16:25:36Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002015> ;
+        <http://purl.obolibrary.org/obo/BFO_0000051>
+                <http://dx.clinicalgenome.org/entities/ISCA-31361x3-2021-04-14T16:25:36Z> , <http://dx.clinicalgenome.org/entities/ISCA-31361x1-2021-04-14T16:25:36Z> ;
+        <http://purl.obolibrary.org/obo/IAO_0000136>
+                <https://www.ncbi.nlm.nih.gov/gene/8573> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-31361-2021-04-14T16:25:36Z> ;
+        <http://purl.org/dc/terms/isVersionOf>
+                <http://dx.clinicalgenome.org/entities/ISCA-31361> .
+
+<http://dx.clinicalgenome.org/entities/ISCA-31361x3-2021-04-14T16:25:36Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-31361-2021-04-14T16:25:36Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-31361x3> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002008> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+
+<http://dx.clinicalgenome.org/entities/ISCA-31361x1-2021-04-14T16:25:36Z>
+        a       <http://purl.obolibrary.org/obo/SEPIO_0002001> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000041>
+                <http://purl.obolibrary.org/obo/SEPIO_0002002> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000159>
+                <http://dx.clinicalgenome.org/entities/contribution-ISCA-31361-2021-04-14T16:25:36Z> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000189>
+                [ a       <http://purl.obolibrary.org/obo/SEPIO_0000173> ;
+                  <http://purl.org/dc/terms/description>
+                          "Moog et al (2011) report female patients with intellectual disability, hypotonia, microcephaly, optic nerve hypoplasia, dysmorphic features, and diffuse brainstem and cerebellar hypoplasia who had loss of function mutations in CASK. Mutations include 3 intragenic deletions, 4 nonsense, 1 frameshift, and one intragenic duplications involving exons 2-8.  Additionally, some patients had larger deletions or duplications involving other genes, missense and splicing mutations. All mutations were found to be de novo if parents were available for testing. Most patients had random X-inactivation." ;
+                  <http://purl.org/dc/terms/source>
+                          "PMID:21954287"
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000189>
+                [ a       <http://purl.obolibrary.org/obo/SEPIO_0000173> ;
+                  <http://purl.org/dc/terms/description>
+                          "Hayashi et al (2012) report female patients with intellectual disability, microcephaly, dysmorphic features, and pontocerebellar hypoplasia.  Mutations include 3 nonsense, 1 frameshift, 2 invariant splice site, 2 intragenic duplications resulting in aberrant transcripts, and two large deletions (1.1 and 3 Mb). All mutations were found to be de novo if parents were available for testing." ;
+                  <http://purl.org/dc/terms/source>
+                          "PMID:21735175"
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000189>
+                [ a       <http://purl.obolibrary.org/obo/SEPIO_0000173> ;
+                  <http://purl.org/dc/terms/description>
+                          "Burglen et al (2012) report female patients with intellectual disability and pontocerebellar hypoplasia who had de novo mutations including 1 focal deletion, 5 nonsense, 1 frameshift, and 3 invariant splice site).  They also report a very severely affected male with a splice site mutation and a mildly affected male who had a mosaic nonsense mutation (both de novo)." ;
+                  <http://purl.org/dc/terms/source>
+                          "PMID:22452838"
+                ] ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000388>
+                <http://dx.clinicalgenome.org/entities/ISCA-31361x1> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000389>
+                <http://purl.obolibrary.org/obo/SEPIO_0000146> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000390>
+                <http://purl.obolibrary.org/obo/SEPIO_0002006> ;
+        <http://purl.org/dc/terms/description>
+                "" .
+
+<http://dx.clinicalgenome.org/entities/contribution-ISCA-31361-2021-04-14T16:25:36Z>
+        <http://purl.obolibrary.org/obo/BFO_0000055>
+                <http://purl.obolibrary.org/obo/SEPIO_0000331> ;
+        <http://purl.obolibrary.org/obo/SEPIO_0000160>
+                "2012-06-28T19:09:55Z" .

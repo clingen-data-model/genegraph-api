@@ -1,0 +1,24 @@
+prefix gci: <http://dataexchange.clinicalgenome.org/gci/>
+prefix gcixform: <http://dataexchange.clinicalgenome.org/gcixform/>
+
+construct {
+  
+  ?classification :sepio/qualified-contribution ?publishContribution .
+
+  ?publishContribution :sepio/has-agent ?affiliation ;
+  :bfo/realizes :cg/UnpublisherRole ;
+  :sepio/activity-date ?publishTime .
+
+}
+where {
+  
+  ?classification a gci:provisionalClassification ;
+
+  FILTER NOT EXISTS {
+    ?classification  gci:approvedClassification true ;
+    gci:publishClassification true .
+  }
+
+  BIND(IRI(CONCAT(STR(?classification), "_publish_contrib")) AS ?publishContribution ) .
+  
+}
