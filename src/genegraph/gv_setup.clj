@@ -2,8 +2,7 @@
   "Functions and procedures generally intended to be run from the REPL
   for the purpose of configuring and maintaining a genegraph gene validity
   instance."
-  (:require [genegraph.gene-validity :as gv]
-            [genegraph.framework.app :as app]
+  (:require [genegraph.framework.app :as app]
             [genegraph.framework.protocol :as p]
             [genegraph.framework.event.store :as event-store]
             [genegraph.framework.event :as event]

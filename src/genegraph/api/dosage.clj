@@ -11,14 +11,14 @@
 
 
 
-(def evidence-levels {"3" :sepio/DosageSufficientEvidence
-                      "2" :sepio/DosageModerateEvidence
-                      "1" :sepio/DosageMinimalEvidence
-                      "0" :sepio/DosageNoEvidence
+(def evidence-levels {"3" :cg/DosageSufficientEvidence
+                      "2" :cg/DosageModerateEvidence
+                      "1" :cg/DosageMinimalEvidence
+                      "0" :cg/DosageNoEvidence
                       "30: Gene associated with autosomal recessive phenotype"
-                      :sepio/GeneAssociatedWithAutosomalRecessivePhenotype
+                      :cg/DosageAutosomalRecessive
                       ;; assume moderate evidence for dosage sensitivity unlikely
-                      "40: Dosage sensitivity unlikely" :sepio/DosageSufficientEvidence})
+                      "40: Dosage sensitivity unlikely" :cg/DosageSensitivityUnlikely})
 
 (spec/def ::status #(= "Closed" (:name %)))
 
@@ -30,60 +30,60 @@
                                        ::status
                                        ::resolution]))
 
-(def cg-prefix "http://dx.clinicalgenome.org/entities/")
+(def cg-prefix "http://dataexchange.clinicalgenome.org/dci/")
 (def region-prefix (str cg-prefix "region-"))
 
-(def chr-to-ref {:grch37 {"1" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000001.10"
-                          "2" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000002.11"
-                          "3" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000003.11"
-                          "4" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000004.11"
-                          "5" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000005.9"
-                          "6" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000006.11"
-                          "7" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000007.13"
-                          "8" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000008.10"
-                          "9" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000009.11"
-                          "10" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000010.10"
-                          "11" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000011.9"
-                          "12" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000012.11"
-                          "13" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000013.10"
-                          "14" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000014.8"
-                          "15" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000015.9"
-                          "16" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000016.9"
-                          "17" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000017.10"
-                          "18" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000018.9"
-                          "19" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000019.9"
-                          "20" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000020.10"
-                          "21" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000021.8"
-                          "22" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000022.10"
-                          "X" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000023.10"
-                          "Y" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000024.9"}
-                 :grch38 {"1" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000001.11"
-                          "2" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000002.12"
-                          "3" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000003.12"
-                          "4" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000004.12"
-                          "5" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000005.10"
-                          "6" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000006.12"
-                          "7" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000007.14"
-                          "8" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000008.11"
-                          "9" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000009.12"
-                          "10" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000010.11"
-                          "11" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000011.10"
-                          "12" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000012.12"
-                          "13" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000013.11"
-                          "14" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000014.9"
-                          "15" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000015.10"
-                          "16" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000016.10"
-                          "17" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000017.11"
-                          "18" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000018.10"
-                          "19" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000019.10"
-                          "20" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000020.11"
-                          "21" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000021.9"
-                          "22" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000022.11"
-                          "X" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000023.11"
-                          "Y" "https://www.ncbi.nlm.nih.gov/nuccore/NC_000024.10"}})
+(def chr-to-ref {:grch37 {"1" "https://identifiers.org/refseq:NC_000001.10"
+                          "2" "https://identifiers.org/refseq:NC_000002.11"
+                          "3" "https://identifiers.org/refseq:NC_000003.11"
+                          "4" "https://identifiers.org/refseq:NC_000004.11"
+                          "5" "https://identifiers.org/refseq:NC_000005.9"
+                          "6" "https://identifiers.org/refseq:NC_000006.11"
+                          "7" "https://identifiers.org/refseq:NC_000007.13"
+                          "8" "https://identifiers.org/refseq:NC_000008.10"
+                          "9" "https://identifiers.org/refseq:NC_000009.11"
+                          "10" "https://identifiers.org/refseq:NC_000010.10"
+                          "11" "https://identifiers.org/refseq:NC_000011.9"
+                          "12" "https://identifiers.org/refseq:NC_000012.11"
+                          "13" "https://identifiers.org/refseq:NC_000013.10"
+                          "14" "https://identifiers.org/refseq:NC_000014.8"
+                          "15" "https://identifiers.org/refseq:NC_000015.9"
+                          "16" "https://identifiers.org/refseq:NC_000016.9"
+                          "17" "https://identifiers.org/refseq:NC_000017.10"
+                          "18" "https://identifiers.org/refseq:NC_000018.9"
+                          "19" "https://identifiers.org/refseq:NC_000019.9"
+                          "20" "https://identifiers.org/refseq:NC_000020.10"
+                          "21" "https://identifiers.org/refseq:NC_000021.8"
+                          "22" "https://identifiers.org/refseq:NC_000022.10"
+                          "X" "https://identifiers.org/refseq:NC_000023.10"
+                          "Y" "https://identifiers.org/refseq:NC_000024.9"}
+                 :grch38 {"1" "https://identifiers.org/refseq:NC_000001.11"
+                          "2" "https://identifiers.org/refseq:NC_000002.12"
+                          "3" "https://identifiers.org/refseq:NC_000003.12"
+                          "4" "https://identifiers.org/refseq:NC_000004.12"
+                          "5" "https://identifiers.org/refseq:NC_000005.10"
+                          "6" "https://identifiers.org/refseq:NC_000006.12"
+                          "7" "https://identifiers.org/refseq:NC_000007.14"
+                          "8" "https://identifiers.org/refseq:NC_000008.11"
+                          "9" "https://identifiers.org/refseq:NC_000009.12"
+                          "10" "https://identifiers.org/refseq:NC_000010.11"
+                          "11" "https://identifiers.org/refseq:NC_000011.10"
+                          "12" "https://identifiers.org/refseq:NC_000012.12"
+                          "13" "https://identifiers.org/refseq:NC_000013.11"
+                          "14" "https://identifiers.org/refseq:NC_000014.9"
+                          "15" "https://identifiers.org/refseq:NC_000015.10"
+                          "16" "https://identifiers.org/refseq:NC_000016.10"
+                          "17" "https://identifiers.org/refseq:NC_000017.11"
+                          "18" "https://identifiers.org/refseq:NC_000018.10"
+                          "19" "https://identifiers.org/refseq:NC_000019.10"
+                          "20" "https://identifiers.org/refseq:NC_000020.11"
+                          "21" "https://identifiers.org/refseq:NC_000021.9"
+                          "22" "https://identifiers.org/refseq:NC_000022.11"
+                          "X" "https://identifiers.org/refseq:NC_000023.11"
+                          "Y" "https://identifiers.org/refseq:NC_000024.10"}})
 
-(def build-location {:grch38 :customfield-10532
-                     :grch37 :customfield-10160})
+(def build-location {:grch38 :customfield_10532
+                     :grch37 :customfield_10160})
 
 
 
@@ -114,44 +114,61 @@
   (when-let [gene (get-in curation [:fields :customfield_10157])]
     (rdf/resource gene)))
 
-(defn- region-iri [curation]
-  (rdf/resource (str region-prefix (:key curation))))
+(defn region-iri
+  ([curation]
+   (rdf/resource (str region-prefix (:key curation))))
+  ([curation suffix]
+   (rdf/resource (str region-prefix (:key curation) suffix))))
 
 (defn- subject-iri [curation]
   (if-let [gene (gene-iri curation)]
-    gene
+    (s/replace gene
+               "https://www.ncbi.nlm.nih.gov/gene/"
+               "https://identifiers.org/ncbigene:")
     (region-iri curation)))
 
-(defn- sequence-location [curation build]
+
+;; Identifier -- currently generated
+;; Label :customfield_10202
+;; DefiningFeature
+;; IncludedFeature
+
+
+(defn sequence-location [curation build]
   (when-let [loc-str (get-in curation [:fields (build-location build)])]
-    (let [[_ chr start-coord end-coord] (re-find #"(\w+):(.+)-(.+)$" loc-str)
-          iri (rdf/blank-node)
+    #_(tap> {:loc-str loc-str
+           :build build
+           :curation (:key curation)
+           :bindings (re-find #"(\w+):(.+)[-_–](.+)$" loc-str)})
+    (let [[_ chr start-coord end-coord] (re-find #"(\w+):(.+)[-_–](.+)$" loc-str)
+          iri (region-iri curation (name build))
           interval-iri (rdf/blank-node)
           reference-sequence (get-in chr-to-ref
                                      [build
                                       (subs chr 3)])]
-      [iri [[iri :rdf/type :geno/SequenceFeatureLocation]
-            [iri :geno/has-reference-sequence (rdf/resource reference-sequence)]
-            [iri :geno/has-interval interval-iri]
-            [interval-iri :rdf/type :geno/SequenceInterval]
-            [interval-iri :geno/start-position (-> start-coord (s/replace #"\D" "") Integer.)]
-            [interval-iri :geno/end-position (-> end-coord (s/replace #"\D" "") Integer.)]]])))
+      [iri [[iri :rdf/type :ga4gh/SequenceLocation]
+            [iri :ga4gh/sequenceReference (rdf/resource reference-sequence)]
+            [iri :ga4gh/start (-> start-coord (s/replace #"\D" "") Integer.)]
+            [iri :ga4gh/end (-> end-coord (s/replace #"\D" "") Integer.)]]])))
 
-(defn- location [curation]
+
+(defn location [curation]
   (let [iri (region-iri curation)
         locations (->> (keys build-location)
                        (map #(sequence-location curation %))
-                       (remove nil?))]
-    (concat (map (fn [l] [iri :geno/has-location (first l)]) locations)
-            (mapcat second locations)
-            [[iri :rdfs/label (get-in curation [:fields :customfield_10202])]
-             [iri :rdf/type :so/SequenceFeature]])))
-
-(defn- topic [report-iri curation]
-  (if-let [gene (gene-iri curation)]
-    [[report-iri :iao/is-about gene]]
-    (conj (location curation)
-     [report-iri :iao/is-about (region-iri curation)])))
+                       (remove nil?)
+                       (sort-by #(str (first %)))
+                       reverse)] ; use latest build as defining location
+    (if-not (gene-iri curation) ; only represent location for region curations
+      (concat (map (fn [l] [iri :ga4gh/location (first l)]) locations)
+              (mapcat second locations)
+              [[iri :ga4gh/definingLocation (-> locations first first)]
+               [iri :rdfs/label (get-in curation
+                                        [:fields :customfield_10202]
+                                        "")]
+               [iri :rdf/type :so/SequenceFeature]
+               [iri :rdf/type :ga4gh/CanonicalLocation]])
+      [])))
 
 (defn- contribution-iri
   [curation]
@@ -159,8 +176,8 @@
 
 (defn- contribution
   [iri curation]
-  [[iri :sepio/activity-date (resolution-date curation)]
-   [iri :bfo/realizes :sepio/InterpreterRole]])
+  [[iri :cg/date (resolution-date curation)]
+   [iri :cg/role :cg/Publisher]])
 
 (defn- assertion-iri [curation dosage]
   (rdf/resource (str cg-prefix (:key curation) "x" dosage "-" (updated-date curation))))
@@ -171,10 +188,16 @@
 (def evidence-field-map
   {1 [[:customfield_10183 :customfield_10184]
       [:customfield_10185 :customfield_10186]
-      [:customfield_10187 :customfield_10188]]
+      [:customfield_10187 :customfield_10188]
+      [:customfield_12231 :customfield_12237]
+      [:customfield_12232 :customfield_12238]
+      [:customfield_12233 :customfield_12239]]
    3 [[:customfield_10189 :customfield_10190]
       [:customfield_10191 :customfield_10192]
-      [:customfield_10193 :customfield_10194]]})
+      [:customfield_10193 :customfield_10194]
+      [:customfield_12234 :customfield_12240]
+      [:customfield_12235 :customfield_12241]
+      [:customfield_12236 :customfield_12242]]})
 
 (defn- finding-data [curation dosage]
   (->> (get evidence-field-map dosage)
@@ -186,17 +209,17 @@
   (let [findings (finding-data curation dosage)]
     (mapcat (fn [[pmid description]]
               (let [finding-iri (rdf/blank-node)]
-                [[assertion-iri :sepio/has-evidence finding-iri]
-                 [finding-iri :rdf/type :sepio/StudyFinding]
+                [[assertion-iri :cg/evidence finding-iri]
+                 [finding-iri :rdf/type :cg/EvidenceLine]
                  [finding-iri
                   :dc/source
                   (rdf/resource
-                   (str "https://pubmed.ncbi.nlm.nih.gov/"
+                   (str "https://identifiers.org/pubmed:"
                         (re-find #"\d+" pmid)))]
                  [finding-iri :dc/description (or description "")]]))
             findings)))
 
-(defn- dosage-proposition-object [curation dosage]
+(defn dosage-proposition-object [curation dosage]
   (let [legacy-mondo-field (if (= 1 dosage) :customfield_11631 :customfield_11633)
         legacy-mondo (some->> curation
                               :fields
@@ -204,13 +227,11 @@
                               (re-find #"MONDO:\d*")
                               rdf/resource)
         phenotype-field (if (= 1 dosage) :customfield_10200 :customfield_10201)
-        phenotype (get-in curation [:fields phenotype-field])
-        ;; Bad IRIs prevent Jena restore. Remove spaces where an IRI is concerned
-        object (or (when phenotype (rdf/resource (s/replace phenotype " " "")))
-                   legacy-mondo
-                   (rdf/resource "http://purl.obolibrary.org/obo/MONDO_0000001"))
-        iri (proposition-iri curation dosage)]
-    [[iri :sepio/has-object object]]))
+        phenotype (get-in curation [:fields phenotype-field])]
+    ;; Bad IRIs prevent Jena restore. Remove spaces in IRIs
+    (or (when phenotype (rdf/resource (s/replace phenotype " " "")))
+        legacy-mondo
+        (rdf/resource "http://purl.obolibrary.org/obo/MONDO_0000001"))))
 
 (defn- gene-dosage-variant [iri curation dosage]
   [[iri :rdf/type :geno/FunctionalCopyNumberComplement]
@@ -225,18 +246,23 @@
       :geno/BenignForCondition
       :geno/PathogenicForCondition)))
 
-(defn- proposition [curation dosage]
+(def dosage->mechanism
+  {3 :cg/Triplosensitivity
+   1 :cg/Haploinsufficiency})
+
+(defn proposition [curation dosage]
   (let [iri (proposition-iri curation dosage)
         variant-iri (rdf/blank-node)]
-    (concat [[iri :rdf/type :sepio/DosageSensitivityProposition]
-             [iri :sepio/has-predicate (proposition-predicate curation dosage)]
-             [iri :sepio/has-subject variant-iri]]
-            (dosage-proposition-object curation dosage)
-            (gene-dosage-variant variant-iri curation dosage))))
+    [[iri :rdf/type :cg/GeneticConditionMechanismProposition]
+     [iri :cg/feature (subject-iri curation)]
+     [iri :cg/mechanism (dosage->mechanism dosage)]
+     [iri :cg/condition (dosage-proposition-object curation dosage)]]))
 
 (defn- dosage-assertion-value [curation dosage]
   (let [assertion-field (if (= 1 dosage) :customfield_10165 :customfield_10166)]
-      (evidence-levels (get-in curation [:fields assertion-field :value]))))
+    (get evidence-levels
+         (get-in curation [:fields assertion-field :value])
+         :cg/NoAssertion)))
 
 (defn- dosage-assertion-description [curation dosage]
   (let [description-field (if (= 1 dosage) :customfield_10198 :customfield_10199)]
@@ -273,36 +299,43 @@
 (defn- report-iri [curation]
   (rdf/resource (str (base-iri curation) "-" (updated-date curation))))
 
-(defn- assertion [curation dosage]
-  (if (dosage-assertion-value curation dosage)
-    (conj
-     (if (and (= 1 dosage)
-              (= "30: Gene associated with autosomal recessive phenotype"
-                 (get-in curation [:fields :customfield_10165 :value])))
-       (scope-assertion curation dosage)
-       (evidence-strength-assertion curation dosage))
-     [(report-iri curation) :bfo/has-part (assertion-iri curation dosage)])
-    []))
+(defn assertion [curation dosage]
+  (let [iri (assertion-iri curation dosage)]
+    (concat
+     [[iri :cg/specifiedBy :cg/DosageSensitivityEvaluationGuideline]
+      [iri :cg/contributions (contribution-iri curation)]
+      [iri :cg/subject (proposition-iri curation dosage)]
+      [iri :dc/description (dosage-assertion-description curation dosage)]
+      [iri :rdf/type :cg/EvidenceStrengthAssertion]
+      [iri :cg/evidenceStrength (dosage-assertion-value curation dosage)]
+      [(report-iri curation) :bfo/has-part iri]]
+     (study-findings iri curation dosage)
+     (proposition curation dosage))))
 
 (defn gene-dosage-report
   [curation]
   (let [base-iri (str cg-prefix (:key curation))
         report-iri (report-iri curation)
         contribution-iri (contribution-iri curation)
-        result (concat [[report-iri :rdf/type :sepio/GeneDosageReport]
+        result (concat [[report-iri :rdf/type :cg/GeneDosageReport]
                         [report-iri :dc/isVersionOf (rdf/resource base-iri)]
-                        [report-iri :sepio/qualified-contribution contribution-iri]
-                        [base-iri :rdf/type :sepio/GeneDosageRecord]]
+                        [report-iri :cg/contributions contribution-iri]]
                        (contribution contribution-iri curation)
                        (assertion curation 1)
                        (assertion curation 3)
-                       (topic report-iri curation))]
+                       (location curation))]
+    #_(tap> result)
     result))
 
 (defn add-dosage-model-fn [event]
   (if (spec/invalid? (spec/conform ::fields (get-in event [::event/data :fields])))
     (assoc event ::spec/invalid true)
-    (assoc event ::model (-> event ::event/data gene-dosage-report rdf/statements->model))))
+    (assoc event
+           ::model
+           (-> event
+               ::event/data
+               gene-dosage-report
+               rdf/statements->model))))
 
 (def add-dosage-model
   (interceptor/interceptor
@@ -312,7 +345,7 @@
 (defn write-dosage-model-to-db-fn [event]
   (if-let [model (::model event)]
     (event/store event
-                 :gv-tdb
+                 :api-tdb
                  (base-iri (::event/data event))
                  model)
     event))

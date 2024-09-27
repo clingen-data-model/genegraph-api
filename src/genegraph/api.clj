@@ -5,14 +5,9 @@
             [genegraph.framework.storage :as storage]
             [genegraph.framework.storage.rdf :as rdf]
             [genegraph.framework.env :as env]
-            [genegraph.api.gci-model :as gci-model]
-            [genegraph.api.sepio-model :as sepio-model]
-            [genegraph.api.actionability :as actionability]
-            [genegraph.api.gene-validity-legacy-report :as legacy-report]
             [genegraph.api.dosage :as dosage] 
             [genegraph.api.base :as base]
             [genegraph.api.graphql.schema :as gql-schema]
-            [genegraph.api.versioning :as versioning]
             [genegraph.api.graphql.response-cache :as response-cache]
             [com.walmartlabs.lacinia.pedestal2 :as lacinia-pedestal]
             [com.walmartlabs.lacinia.pedestal.internal :as internal]
@@ -41,7 +36,7 @@
 (def admin-env
   (if (or (System/getenv "DX_JAAS_CONFIG_DEV")
           (System/getenv "DX_JAAS_CONFIG")) ; prevent this in cloud deployments
-    {:platform "prod"
+    {:platform "local"
      :dataexchange-genegraph (System/getenv "DX_JAAS_CONFIG")
      :local-data-path "data/"}
     {}))
@@ -149,11 +144,11 @@
 
 ;; Jena methods mutate the model, will use this behavior 😱
 (defn replace-hgnc-with-ncbi-gene-fn [event]
-  (rdf/tx (get-in event [::storage/storage :gv-tdb])
+  (rdf/tx (get-in event [::storage/storage :api-tdb])
       (let [m (::event/data event)
             prop (first (prop-query m))
             hgnc-gene (rdf/ld1-> prop [:sepio/has-subject])
-            ncbi-gene (first (same-as-query (get-in event [::storage/storage :gv-tdb])
+            ncbi-gene (first (same-as-query (get-in event [::storage/storage :api-tdb])
                                             {:y hgnc-gene}))]
         (.remove m (rdf/construct-statement [prop :sepio/has-subject hgnc-gene]))
         (.add m (rdf/construct-statement [prop :sepio/has-subject ncbi-gene]))))
@@ -169,8 +164,8 @@
 
 (defn store-curation-fn [event]
   (if (has-publish-action (::event/data event))
-    (event/store event :gv-tdb (::event/key event) (::event/data event))
-    (event/delete event :gv-tdb (::event/key event))))
+    (event/store event :api-tdb (::event/key event) (::event/data event))
+    (event/delete event :api-tdb (::event/key event))))
 
 (def store-curation
   (interceptor/interceptor
@@ -181,14 +176,14 @@
   (interceptor/interceptor
    {:name ::jena-transaction-interceptor
     :enter (fn [context]
-             (let [gv-tdb (get-in context [::storage/storage :gv-tdb])]
-               (.begin gv-tdb ReadWrite/READ)
-               (assoc-in context [:request :lacinia-app-context :db] gv-tdb)))
+             (let [api-tdb (get-in context [::storage/storage :api-tdb])]
+               (.begin api-tdb ReadWrite/READ)
+               (assoc-in context [:request :lacinia-app-context :db] api-tdb)))
     :leave (fn [context]
-             (.end (get-in context [::storage/storage :gv-tdb]))
+             (.end (get-in context [::storage/storage :api-tdb]))
              context)
     :error (fn [context ex]
-             (.end (get-in context [::storage/storage :gv-tdb]))
+             (.end (get-in context [::storage/storage :api-tdb]))
              context)}))
 
 (defn init-graphql-processor [p]
@@ -265,11 +260,23 @@
 
 ;;;; GraphQL
 
-(def gv-tdb
+(def api-tdb
   {:type :rdf
-   :name :gv-tdb
-   :snapshot-handle (assoc (:fs-handle env) :path "gv-tdb-v12.nq.gz")
-   :path (str (:local-data-path env) "/gv-tdb")})
+   :name :api-tdb
+   :snapshot-handle (assoc (:fs-handle env) :path "api-tdb-v12.nq.gz")
+   :path (str (:local-data-path env) "/api-tdb")})
+
+(def object-db
+  {:type :rocksdb
+   :name :object-db
+   :snapshot-handle (assoc (:fs-handle env) :path "object-db.lz4")
+   :path (str (:local-data-path env) "/object-db")})
+
+(def sequence-feature-db
+  {:type :rocksdb
+   :name :sequence-feature-db
+   :snapshot-handle (assoc (:fs-handle env) :path "sequence-feature-db.lz4")
+   :path (str (:local-data-path env) "/sequence-feature-db")})
 
 (def response-cache-db
   {:type :rocksdb
@@ -280,10 +287,11 @@
   {:name :import-base-file
    :type :processor
    :subscribe :base-data
-   :backing-store :gv-tdb
+   :backing-store :api-tdb
    :interceptors [publish-record-to-system-topic
-                  base/read-base-data
-                  base/store-model
+                  #_base/read-base-data
+                  #_base/store-model
+                  base/base-event
                   response-cache/invalidate-cache]})
 
 (def genes-graph-name
@@ -306,7 +314,7 @@
               ::genes-atom (atom false)}))))
 
 (defn graph-initialized? [e graph-name]
-  (let [db (get-in e [::storage/storage :gv-tdb])]
+  (let [db (get-in e [::storage/storage :api-tdb])]
     (rdf/tx db
       (-> (storage/read db graph-name)
           .size
@@ -333,7 +341,7 @@
   {:type :processor
    :subscribe :gene-validity-sepio
    :name :gene-validity-sepio-reader
-   :backing-store :gv-tdb
+   :backing-store :api-tdb
    :init-fn (init-await-genes ::import-gv-curations-await-genes)
    :interceptors [await-genes
                   replace-hgnc-with-ncbi-gene
@@ -344,7 +352,7 @@
   {:type :processor
    :subscribe :dosage
    :name :import-dosage-curations
-   :backing-store :gv-tdb
+   :backing-store :api-tdb
    :interceptors [dosage/add-dosage-model
                   dosage/write-dosage-model-to-db
                   response-cache/invalidate-cache]})
@@ -414,7 +422,7 @@
   (rdf/create-query "select ?x where { ?x a ?type . } "))
 
 (defn gv-ready-fn [e]
-  (let [tdb (get-in e [::storage/storage :gv-tdb])
+  (let [tdb (get-in e [::storage/storage :api-tdb])
         type-count (fn [t]
                      (count (type-query tdb {:type t})))
         in-tx (.isInTransaction tdb)]
@@ -523,7 +531,7 @@
 (def gv-graphql-endpoint-def
   {:type :genegraph-app
    :kafka-clusters {:data-exchange data-exchange}
-   :storage {:gv-tdb (assoc gv-tdb :load-snapshot true)
+   :storage {:api-tdb (assoc api-tdb :load-snapshot true)
              :response-cache-db response-cache-db}
    :topics {:gene-validity-sepio
             (assoc gene-validity-sepio-topic

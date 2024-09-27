@@ -11,6 +11,7 @@
             [hato.client :as hc]
             ;; may not need instance
             [genegraph.framework.storage.rdf.instance :as tdb-instance]
+            [genegraph.api.protocol :as ap]
             [genegraph.api.base.gene :as gene]
             [genegraph.api.base.affiliations]
             [genegraph.api.base.features]
@@ -66,15 +67,6 @@
    {:name ::publish-base-file
     :enter (fn [e] (publish-base-file-fn e))}))
 
-(def fs-handle
-  {:type :file
-   :base "/users/tristan/data/genegraph-neo/new-base/"})
-
-(def gcs-handle
-  {:type :gcs
-   :bucket "genegraph-framework-dev"
-   :base "new-base/"})
-
 (defn read-base-data-fn [event]
   (assoc event ::model (rdf/as-model (::event/data event))))
 
@@ -85,7 +77,7 @@
 
 (defn store-model-fn [event]
   (event/store event
-               :gv-tdb
+               :api-tdb
                (get-in event [::event/data :name])
                (::model event)))
 
@@ -94,117 +86,19 @@
    {:name ::store-model
     :enter (fn [e] (store-model-fn e))}))
 
-(comment
-  ;; publish all rdf-serialized
-  (->> (-> "base.edn" io/resource slurp edn/read-string)
-       (filter #(isa? (:format %) ::rdf/rdf-serialization))
-       (filter #(= "http://purl.obolibrary.org/obo/sepio.owl" (:name %)))
-       (map (fn [x] {::event/data x
-                     ::handle fs-handle}))
-       (run! #(p/publish (get-in test-app [:topics :fetch-base-events]) %)))
+(defmethod ap/process-base-event :default
+  [event]
+  (-> event
+      read-base-data-fn
+      store-model-fn))
 
-  (->> (-> "base.edn" io/resource slurp edn/read-string)
-       (filter #(isa? (:format %) ::hgnc))
-       (map (fn [x] {::event/data x
-                     ::handle fs-handle}))
-       (run! #(p/publish (get-in test-app [:topics :fetch-base-events]) %)))
+(defn base-event-fn [event]
+  (log/info :fn ::base-event-fn)
+  (ap/process-base-event event))
 
-  (->> (-> "base.edn" io/resource slurp edn/read-string)
-       (filter #(isa? (:format %) ::ucsc-cytoband))
-       (map (fn [x] {::event/data x
-                     ::handle fs-handle}))
-       (run! #(p/publish (get-in test-app [:topics :fetch-base-events]) %)))
-
-  (->> (-> "base.edn" io/resource slurp edn/read-string)
-       (filter #(isa? (:format %) ::affiliations))
-       (map (fn [x] {::event/data x
-                     ::handle fs-handle}))
-       (run! #(p/publish (get-in test-app [:topics :fetch-base-events]) %)))
-
-  (->> (-> "base.edn" io/resource slurp edn/read-string)
-       (filter #(isa? (:format %) ::features))
-       (map (fn [x] {::event/data x
-                     ::handle fs-handle}))
-       (run! #(p/publish (get-in test-app [:topics :fetch-base-events]) %)))
-
-  (def test-app
-    (p/init
-     {:type :genegraph-app
-      :topics {:fetch-base-events
-               {:name :fetch-base-events
-                :type :simple-queue-topic}
-               :base-data
-               {:name :base-data
-                :type :simple-queue-topic}}
-      :storage {:gv-tdb
-                {:type :rdf
-                 :name :gv-tdb
-                 :path "/users/tristan/data/genegraph-neo/gv_tdb"}}
-      :processors {:fetch-base-file
-                   {:name :fetch-base-file
-                    :type :processor
-                    :subscribe :fetch-base-events
-                    :interceptors `[fetch-file
-                                    publish-base-file]}
-                   :import-base-file
-                   {:name :import-base-file
-                    :type :processor
-                    :subscribe :base-data
-                    :interceptors `[read-base-data
-                                    store-model]}}}))
-
-  (p/start test-app)
-  (p/stop test-app)
-
-  (def test-event
-    {::event/data
-     {:name "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-      :source "http://www.w3.org/1999/02/22-rdf-syntax-ns.ttl",
-      :target "rdf.ttl",
-      :format ::rdf/turtle}
-     ::handle fs-handle})
-
-  (def test-base-event
-    {::event/data {:name "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-                   :source (assoc fs-handle :path "rdf.ttl")
-                   :format ::rdf/turtle}})
-
-  (p/publish (get-in test-app [:topics :fetch-base-events]) test-event)
-
-  (.size
-   (rdf/as-model {:source (assoc fs-handle :path "ucsc_cytoband_hg38.txt.gz")
-                  :format ::ucsc-cytoband
-                  :name
-                  "http://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/cytoBand.txt.gz"
-                  :genegraph.api.base.ucsc-cytoband/assembly :hg38}))
-
-  (let [db @(get-in test-app [:storage :gv-tdb :instance])]
-    db
-    (rdf/tx db
-            ((rdf/create-query "select ?x where { ?x a :so/Gene } limit 5")
-             db)))
-
-  (let [db @(get-in test-app [:storage :gv-tdb :instance])]
-    db
-    (rdf/tx db
-            ((rdf/create-query "select ?x where { ?x a :so/SequenceFeature } limit 5")
-             db)))
-
-  (let [db @(get-in test-app [:storage :gv-tdb :instance])]
-    db
-    (rdf/tx db
-            ((rdf/create-query "select ?x where { ?x a :cg/Affiliation } limit 5")
-             db)))
-
-  (let [db @(get-in test-app [:storage :gv-tdb :instance])]
-    db
-    (rdf/tx db
-            ((rdf/create-query "select ?x where { ?x a :geno/SequenceFeatureLocation } limit 5")
-             db)))
-
-  (processor/process-event (get-in test-app [:processors :import-base-file])
-                           test-base-event)
-
-  )
+(def base-event
+  (interceptor/interceptor
+   {:name ::base-event
+    :enter (fn [e] (base-event-fn e))}))
 
 

@@ -1,8 +1,4 @@
-{:mvn/repos 
- {"central"
-  {:url "https://repo1.maven.org/maven2/"}
-  "clojars"
-  {:url "https://repo.clojars.org/"}}
+{:mvn/repos {"redplanetlabs" {:url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}}
 
  :paths ["src" "resources" "config"]
  
@@ -12,28 +8,27 @@
                       {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
          :main-opts ["-m" "cognitect.test-runner"]
          :exec-fn cognitect.test-runner.api/test}
-  :build {:deps {io.github.clojure/tools.build {:git/tag "v0.9.6"
-                                                :git/sha "8e78bcc"}}
+  :build {:deps {io.github.clojure/tools.build {:git/tag "v0.10.5"
+                                                :git/sha "2a21b7a"}}
           :ns-default build}
-  :dev {:extra-deps {djblue/portal {:mvn/version "0.51.1"}
-                     io.github.nextjournal/clerk {:mvn/version "0.15.957"}
-                     generateme/fastmath {:mvn/version "2.4.0"
-                                          :exclusions [com.github.haifengl/smile-mkl]}}
-        :jvm-opts ["-agentpath:/Applications/YourKit-Java-Profiler-2024.3.app/Contents/Resources/bin/mac/libyjpagent.dylib=disablestacktelemetry,exceptions=disable,delay=10000"
+  :dev {:extra-deps {djblue/portal {:mvn/version "0.57.3"}}
+        #_#_:jvm-opts ["-agentpath:/Applications/YourKit-Java-Profiler-2024.3.app/Contents/Resources/bin/mac/libyjpagent.dylib=disablestacktelemetry,exceptions=disable,delay=10000"
                    "-XX:+UseZGC" "-XX:+ZGenerational" "-XX:MaxRAMPercentage=50"]}}
 
  :jvm-opts ["-XX:+UseZGC" "-XX:+ZGenerational" "-XX:MaxRAMPercentage=75"]
  
  :deps
  {ch.qos.logback/logback-classic                    {:mvn/version "1.5.0"}
-  org.clojure/clojure                               {:mvn/version "1.11.2"}
-  io.github.clingen-data-model/genegraph-framework  {:git/tag "0.1-alpha.29"
-                                                     :git/sha "5f72f54"}
-  com.walmartlabs/lacinia-pedestal                  {:mvn/version "1.2"}
+  org.clojure/clojure                               {:mvn/version "1.12.0"}
+  io.github.clingen-data-model/genegraph-framework
+  {:git/sha "bc4c8984ecb4cd6ae4cdec96b28a69b9eed46e83"}
+  com.walmartlabs/lacinia-pedestal
+  {:git/sha "075bcdcbb0969fe4dbd15770f29b7273ff872b78"
+   :git/url "https://github.com/walmartlabs/lacinia-pedestal.git"}
   hato/hato                                         {:mvn/version "0.9.0"}
   org.clojure/data.csv                              {:mvn/version "1.0.1"}
-
-  
-  
-}}
+  org.clojure/data.zip {:mvn/version "1.0.0"}
+  org.clojure/data.xml {:mvn/version "0.0.8"}
+  }
+ }
 

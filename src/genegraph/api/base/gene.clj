@@ -33,7 +33,8 @@
                   "RNA, misc" "http://purl.obolibrary.org/obo/SO_0000356"})
 
 (defn gene-as-triple [gene]
-  (let [uri (str "https://www.ncbi.nlm.nih.gov/gene/" (:entrez_id gene))
+  (let [uri #_(str "https://www.ncbi.nlm.nih.gov/gene/" (:entrez_id gene))
+        (keyword "ncbigene" (:entrez_id gene))
         hgnc-id (:hgnc_id gene)
         hgnc-iri (rdf/resource
                   (s/replace (:hgnc_id gene)
@@ -49,6 +50,7 @@
                      (when-let [locus-type (locus-types (:locus_type gene))]
                        [uri :rdf/type (rdf/resource locus-type)])
                      [uri :rdf/type :so/Gene]
+                     [uri :rdf/type :so/SequenceFeature]
                      [uri :owl/sameAs (rdf/resource hgnc-id)]
                      [hgnc-id :dc/source (rdf/resource hgnc)]
                      [uri :owl/sameAs ensembl-iri]

@@ -8,7 +8,9 @@
             [genegraph.framework.storage.rdf :as rdf]
             [genegraph.framework.storage.rdf.jsonld :as jsonld]
             [genegraph.framework.event.store :as event-store]
-            [genegraph.api :as gv]
+            [genegraph.api :as api]
+            [genegraph.api.protocol :as ap]
+            [genegraph.api.dosage :as dosage]
             [genegraph.api.graphql.response-cache :as response-cache]
             [portal.api :as portal]
             [clojure.data.json :as json]
@@ -21,21 +23,9 @@
             [clojure.edn :as edn]
             [clojure.walk :as walk]
             [clojure.spec.alpha :as spec])
-  (:import [java.time Instant LocalDate]
-           [ch.qos.logback.classic Logger Level]
+  (:import [ch.qos.logback.classic Logger Level]
            [org.slf4j LoggerFactory]
-           [org.apache.jena.riot RDFDataMgr Lang]
-           [org.apache.jena.riot.system JenaTitanium]
-           [org.apache.jena.rdf.model Model Statement]
-           [org.apache.jena.query Dataset DatasetFactory]
-           [org.apache.jena.sparql.core DatasetGraph]
-           [com.apicatalog.jsonld.serialization RdfToJsonld]
-           [com.apicatalog.jsonld.document Document RdfDocument]
-           [com.apicatalog.rdf Rdf]
-           [com.apicatalog.rdf.spi RdfProvider]
-           [jakarta.json JsonObjectBuilder Json]
-           [java.io StringWriter PushbackReader File]
-           [java.util.concurrent Semaphore]))
+           [java.time Instant LocalDate]))
 
 ;; Portal
 (comment
@@ -68,9 +58,9 @@
    :subscribe :api-log
    :interceptors [log-api-event]})
 
-(def gv-test-app-def
+(def api-test-app-def
   {:type :genegraph-app
-   :kafka-clusters {:data-exchange gv/data-exchange}
+   :kafka-clusters {:data-exchange api/data-exchange}
    :topics {:gene-validity-sepio
             {:name :gene-validity-sepio
              :type :simple-queue-topic}
@@ -86,24 +76,25 @@
             :api-log
             {:name :api-log
              :type :simple-queue-topic}}
-   :storage {:gv-tdb gv/gv-tdb
-             :gene-validity-version-store gv/gene-validity-version-store
-             :response-cache-db gv/response-cache-db}
-   :processors {:fetch-base-file gv/fetch-base-processor
-                :import-base-file gv/import-base-processor
-                :import-gv-curations gv/import-gv-curations
-                :graphql-api (assoc gv/graphql-api
+   :storage {:api-tdb api/api-tdb
+             :response-cache-db api/response-cache-db
+             :sequence-feature-db api/sequence-feature-db
+             :object-db api/object-db}
+   :processors {:fetch-base-file api/fetch-base-processor
+                :import-base-file api/import-base-processor
+                :import-gv-curations api/import-gv-curations
+                :graphql-api (assoc api/graphql-api
                                     ::event/metadata
                                     {::response-cache/skip-response-cache true})
-                :graphql-ready gv/graphql-ready
-                :import-dosage-curations gv/import-dosage-curations
+                :graphql-ready api/graphql-ready
+                :import-dosage-curations api/import-dosage-curations
                 :read-api-log read-api-log}
-   :http-servers gv/gv-http-server})
+   :http-servers api/gv-http-server})
 
 (comment
-  (def gv-test-app (p/init gv-test-app-def))
-  (p/start gv-test-app)
-  (p/stop gv-test-app)
+  (def api-test-app (p/init api-test-app-def))
+  (p/start api-test-app)
+  (p/stop api-test-app)
   )
 
 ;; Downloading events
@@ -118,7 +109,7 @@
   (kafka/topic->event-file
    (assoc topic
           :type :kafka-reader-topic
-          :kafka-cluster gv/data-exchange)
+          :kafka-cluster api/data-exchange)
    (str root-data-dir
         (:kafka-topic topic)
         "-"
@@ -130,12 +121,132 @@
 
 (comment
 
-  (get-events-from-topic gv/actionability-topic)
-  (time (get-events-from-topic gv/gene-validity-complete-topic))
-  (get-events-from-topic gv/gene-validity-raw-topic)
-  (time (get-events-from-topic gv/gene-validity-legacy-complete-topic))
+  (get-events-from-topic api/actionability-topic)
+  (time (get-events-from-topic api/gene-validity-complete-topic))
+  (get-events-from-topic api/gene-validity-raw-topic)
+  (time (get-events-from-topic api/gene-validity-legacy-complete-topic))
+  (time (get-events-from-topic api/dosage-topic))
 
-  (time (get-events-from-topic gv/gene-validity-sepio-topic))
+  (time (get-events-from-topic api/gene-validity-sepio-topic))
 
 )
 
+
+;; restructuring base, adding ClinVar
+(comment
+  (->> (-> "base.edn" io/resource slurp edn/read-string)
+       (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+                   (:name %)))
+       (run! #(p/publish (get-in api-test-app
+                                 [:topics :fetch-base-events])
+                         {::event/data %
+                          ::event/key (:name %)})))
+
+  (->> (-> "base.edn" io/resource slurp edn/read-string)
+       (filter #(= "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+                   (:name %)))
+       (run! #(p/publish (get-in api-test-app
+                                 [:topics :fetch-base-events])
+                         {::event/data %
+                          ::event/key (:name %)})))
+  (tap>
+   (p/process
+    (get-in api-test-app [:processors :import-base-file])
+    (-> (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+                    (:name %))
+                (-> "base.edn" io/resource slurp edn/read-string))
+        first
+        (assoc :genegraph.api.base/handle
+               {:type :file
+                :base "data/base"
+                :file "clinvar.xml.gz"}))))
+  
+  (tap>
+   (storage/scan @(get-in api-test-app [:storage :object-db :instance])
+                 ["clinvar"]))
+  
+  )
+
+;; Dosage modifications
+
+;; gene_dosage_raw-2024-09-18.edn.gz
+
+;; Should also deal with dosage records throwing exceptions
+;; though possibly the work done for this will handle that issue
+(comment
+  (time
+   (def recent-dosage-records
+     (event-store/with-event-reader [r (str root-data-dir "gene_dosage_raw-2024-09-18.edn.gz")]
+       (->> (event-store/event-seq r)
+            (take-last 100)
+            (into [])))))
+
+  (def chr16p13
+    (event-store/with-event-reader [r (str root-data-dir "gene_dosage_raw-2024-09-18.edn.gz")]
+      (->> (event-store/event-seq r)
+           #_(filter #(re-find #"ISCA-37415" (::event/value %)))
+           (filter #(= "ISCA-37415" (::event/key %)))
+           (into []))))
+
+  (count chr16p13)
+
+  (defn process-dosage [event]
+    (try
+      (p/process (get-in api-test-app [:processors
+                                       :import-dosage-curations])
+                 (assoc event
+                        ::event/skip-local-effects true
+                        ::event/skip-publish-effects true))
+      (catch Exception e (assoc event ::error e))))
+  
+  (def errors
+    (event-store/with-event-reader [r (str root-data-dir "gene_dosage_raw-2024-09-27.edn.gz")]
+      (->> (event-store/event-seq r)
+           #_(take 100)
+           (map process-dosage)
+           (filter ::error)
+           (into []))))
+  
+  (count errors)
+
+  (mapv ::event/key errors)
+
+  (-> errors
+      first
+      event/deserialize
+      ::event/data
+      dosage/gene-dosage-report
+      tap>)
+
+  (tap> (mapv process-dosage errors))
+  (->> recent-dosage-records
+       (map process-dosage)
+       (remove ::spec/invalid)
+       (take 1)
+       (into [])
+       #_tap>
+       (run! #(rdf/pp-model (:genegraph.api.dosage/model %))))
+
+  (->> chr16p13
+       (map process-dosage)
+       (remove ::spec/invalid)
+       (take-last 1)
+       (into [])
+       #_tap>
+       (run! #(rdf/pp-model (:genegraph.api.dosage/model %))))
+  (->> chr16p13
+       (map process-dosage)
+       (remove ::spec/invalid)
+       (take-last 1)
+       (into [])
+       (map #(-> %
+                 ::event/data
+                 dosage/location
+                 rdf/statements->model
+                 rdf/pp-model))
+
+       #_(run! #(rdf/pp-model (:genegraph.api.dosage/model %))))
+
+  #_(get-in chr16p13data [:fields :customfield_10532])
+  
+  )
