@@ -513,6 +513,20 @@
                               :source
                               {:type :file
                                :base "data/base/"
-                               :path "clinvar.xml.gz"})}))))x
+                               :path "clinvar.xml.gz"})}))))
+
+  (let [object-db @(get-in api-test-app [:storage :object-db :instance])
+        tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        var-query (rdf/create-query "select ?x where { ?x a :cg/CanonicalVariant }")]
+    #_(storage/read object-db [:objects "https://identifiers.org/clinvar:536"])
+    (rdf/tx tdb
+      (into [] (var-query tdb)))
+    )
+
+  #_(rdf/statements->model '(["https://identifiers.org/clinvar:536"
+                              :cg/CompleteOverlap
+                              :cg/Bupkis]))
+
+  
   )
 

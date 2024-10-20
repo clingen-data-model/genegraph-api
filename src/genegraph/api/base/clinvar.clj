@@ -638,12 +638,23 @@
                           (conj stmts
                                 [(:iri canonical-variant)
                                  overlap
-                                 g])
+                                 (rdf/resource g)])
                           stmts)))
                     %
                     (gene-ids-for-bundle db variant-bundle)))))
 
-(defn write-variant-bundle [rocksdb tdb variant-bundle])
+(defn write-variant-bundle [object-db tdb variant-bundle]
+  (let [model (rdf/statements->model (:statements variant-bundle))]
+    (rdf/pp-model model)
+    (tap> model)
+    (tap> variant-bundle)
+    (run! #(storage/write object-db
+                          [:objects (:iri %)]
+                          %)
+          (:objects variant-bundle))
+    (storage/write tdb
+                     (:iri (get-canonical-variant variant-bundle))
+                     (rdf/statements->model (:statements variant-bundle)))))
 
 (defmethod ap/process-base-event :genegraph.api.base/load-clinvar
   [event]
@@ -656,8 +667,12 @@
                      storage/as-handle
                      io/input-stream
                      GZIPInputStream.)]
-    (let [add-gene-overlaps-with-db
-          #(add-gene-overlaps-for-variant (get-in event [::storage/storage :object-db]) %)]
+    (let [object-db (get-in event [::storage/storage :object-db])
+          tdb (get-in event [::storage/storage :api-tdb])
+          add-gene-overlaps-with-db
+          #(add-gene-overlaps-for-variant object-db  %)
+          write-variant-bundle-with-db
+          #(write-variant-bundle object-db tdb %)]
       (->> (:content (xml/parse is))
            (take 10000)
            (map clinvar-xml->intermediate-model)
@@ -665,8 +680,10 @@
            (map variant->statements-and-objects)
            (map add-gene-overlaps-with-db)
            (take 1)
-           (into [])
-           tap>)))
+           (run! write-variant-bundle-with-db)
+           #_(into [])
+           #_tap>))
+    (Thread/sleep 500))
   (log/info :fn ::ap/process-base-event
             :msg "clinvar complete")
   event)
