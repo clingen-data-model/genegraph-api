@@ -162,6 +162,14 @@
   :target "clinvar.xml.gz"
   :format :genegraph.api.base/clinvar
   :action :genegraph.api.base/load-clinvar}
- 
- ]
+ {:name "https://ncbi.nlm.nih.gov/genomes/GCF_000001405.25_GRCh37.p13_genomic.gff"
+  :source "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz"
+  :target "GRCh37.gff.gz"
+  :format :genegraph.api.base/gff
+  :action :genegraph.api.base/load-gff}
+ {:name "https://ncbi.nlm.nih.gov/genomes/GCF_000001405.40_GRCh38.p14_genomic.gff"
+  :source "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.gff.gz"
+  :target "GRCh38.gff.gz"
+  :format :genegraph.api.base/gff
+  :action :genegraph.api.base/load-gff}]
 

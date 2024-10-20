@@ -7,6 +7,7 @@
             [genegraph.framework.storage :as storage]
             [genegraph.framework.storage.rdf :as rdf]
             [genegraph.framework.storage.rdf.jsonld :as jsonld]
+            [genegraph.framework.storage.rocksdb :as rocksdb]
             [genegraph.framework.event.store :as event-store]
             [genegraph.api :as api]
             [genegraph.api.protocol :as ap]
@@ -25,12 +26,14 @@
             [clojure.spec.alpha :as spec])
   (:import [ch.qos.logback.classic Logger Level]
            [org.slf4j LoggerFactory]
-           [java.time Instant LocalDate]))
+           [java.time Instant LocalDate]
+           [java.io PushbackReader]))
 
 ;; Portal
 (comment
-  (def p (portal/open))
-  (add-tap #'portal/submit)
+  (do
+    (def p (portal/open))
+    (add-tap #'portal/submit))
   (portal/close)
   (portal/clear)
   )
@@ -149,21 +152,26 @@
                                  [:topics :fetch-base-events])
                          {::event/data %
                           ::event/key (:name %)})))
+  
   (tap>
    (p/process
     (get-in api-test-app [:processors :import-base-file])
-    (-> (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
-                    (:name %))
-                (-> "base.edn" io/resource slurp edn/read-string))
-        first
-        (assoc :genegraph.api.base/handle
-               {:type :file
-                :base "data/base"
-                :file "clinvar.xml.gz"}))))
+    {::event/data
+     (assoc (first (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+                                   (:name %))
+                               (-> "base.edn" io/resource slurp edn/read-string)))
+                :source
+                {:type :file
+                 :base "data/base"
+                 :file "clinvar.xml.gz"})}))
   
   (tap>
-   (storage/scan @(get-in api-test-app [:storage :object-db :instance])
-                 ["clinvar"]))
+   (count (storage/scan @(get-in api-test-app [:storage :object-db :instance])
+                       ["clinvar"])))
+  (count
+   (rocksdb/range-get @(get-in api-test-app [:storage :object-db :instance])
+                      {:prefix ["clinvar"]
+                       :return :ref}))
   
   )
 
@@ -206,6 +214,12 @@
            (map process-dosage)
            (filter ::error)
            (into []))))
+
+  (event-store/with-event-reader [r (str root-data-dir "gene_dosage_raw-2024-09-27.edn.gz")]
+      (->> (event-store/event-seq r)
+           (run! #(p/publish (get-in api-test-app
+                                    [:topics :dosage])
+                             %))))
   
   (count errors)
 
@@ -250,3 +264,255 @@
   #_(get-in chr16p13data [:fields :customfield_10532])
   
   )
+
+;; clinvar transform
+(comment
+  (count
+   (rocksdb/range-get @(get-in api-test-app [:storage :object-db :instance])
+                      {:prefix ["clinvar"]
+                       :return :ref}))
+
+  (->> (rocksdb/range-get @(get-in api-test-app
+                                   [:storage :object-db :instance])
+                          {:prefix ["clinvar"]
+                           :return :ref})
+       (map deref)
+       (filter (fn [v] (some #(= "conflicting data from submitters"
+                                 (:Classification %))
+                             (:classifications v))))
+       (take 5)
+       tap>)
+  )
+
+;; clinvar comparision
+(comment
+  (def larry-clinvar-path
+    "/Users/tristan/downloads/bq-results-20241007-004305-1728261823900.json")
+  (with-open [r (io/reader larry-clinvar-path)]
+    (->> (line-seq r)
+         (take 5)
+         (map #(json/read-str % :key-fn keyword))
+         (into [])
+         tap>))
+  (time
+   (def larry-vars
+     (with-open [r (io/reader larry-clinvar-path)]
+       (->> (line-seq r)
+            (map #(json/read-str % :key-fn keyword))
+            (map :variation_id)
+            set))))
+  
+  (time
+   (def tristan-vars
+     (->> (rocksdb/range-get @(get-in api-test-app [:storage :object-db :instance])
+                             {:prefix ["clinvar"]
+                              :return :ref})
+          (map deref)
+          (map :variation-id)
+          set)))
+
+  (count larry-vars)
+  (count tristan-vars)
+
+  (with-open [r (io/reader larry-clinvar-path)]
+    (->> (line-seq r)
+         (map #(json/read-str % :key-fn keyword))
+         (remove #(tristan-vars (:variation_id %)))
+         (take 5)
+         (into [])
+         tap>))
+
+  (with-open [r (io/reader larry-clinvar-path)]
+    (->> (line-seq r)
+         (map #(json/read-str % :key-fn keyword))
+         (remove #(tristan-vars (:variation_id %)))
+         (remove :issue)
+         (filter :variant_length)
+         (map #(assoc % ::length (Integer/parseInt (:variant_length %))))
+         (filter #(< 1000 (::length %)))
+         (take 5)
+         (into [])
+         tap>
+         #_count))
+
+  (with-open [r (io/reader larry-clinvar-path)]
+    (->> (line-seq r)
+         (map #(json/read-str % :key-fn keyword))
+         (remove #(tristan-vars (:variation_id %)))
+         (map :issue)
+         frequencies))
+
+  (with-open [r (io/reader larry-clinvar-path)]
+    (->> (line-seq r)
+         (map #(json/read-str % :key-fn keyword))
+         (map :variation_type)
+         frequencies
+         tap>))
+
+  (with-open [r (io/reader larry-clinvar-path)]
+    (->> (line-seq r)
+         (map #(json/read-str % :key-fn keyword))
+         #_(remove #(tristan-vars (:variation_id %)))
+         (map :variation_id)
+         frequencies
+         (filter (fn [[_ c]] (< 1 c)))
+         count))
+
+  (count tristan-vars)
+  (count larry-vars)
+
+  
+
+  (->> (rocksdb/range-get @(get-in api-test-app [:storage :object-db :instance])
+                          {:prefix ["clinvar"]
+                           :return :ref})
+       (map deref)
+       (remove #(larry-vars (:variation-id %)))
+       (take 5)
+       (mapv :variation-id))
+
+  (portal/clear)
+
+  (->> (rocksdb/range-get @(get-in api-test-app [:storage :object-db :instance])
+                          {:prefix ["clinvar"]
+                           :return :ref})
+       (map deref)
+       (filter #(tristan-not-larry (:variation-id %)))
+       (filter #(= "Duplication" (:variant-type %)))
+       #_(map :variant-type)
+       #_frequencies
+       tap>)
+
+  (def cnv-types
+  #{"Deletion"
+    "Duplication"
+    "copy number gain"
+    "copy number loss"})
+  
+  (defn variation-length [{:keys [location]}]
+    (if (seq location)
+      (apply max
+             (mapv
+              (fn [{:keys [display_start display_stop]}]
+                (if (and display_start display_stop)
+                  (- display_stop display_start)
+                  -1))
+              location))
+      -1))
+  
+  (time
+   (def cnv-sample
+     (->> (rocksdb/range-get @(get-in api-test-app [:storage :object-db :instance])
+                             {:prefix ["clinvar"]
+                              :return :ref})
+          (map deref)
+          (filter #(and
+                    (cnv-types (:variant-type %))
+                    (or (:copy-count %)
+                        (< 1000 (variation-length %)))))
+          (take 5))))
+
+  (count cnv-sample)
+
+  
+  (def larry-not-tristan (set/difference larry-vars tristan-vars))
+  (count larry-not-tristan)
+
+  (with-open [w (io/writer "/users/tristan/Desktop/larry-not-tristan.json")]
+    (json/write (into [] larry-not-tristan) w))
+  
+  
+  (def tristan-not-larry (set/difference tristan-vars larry-vars))
+  (count tristan-not-larry)
+
+  )
+
+
+(comment
+  (with-open [r (-> "/Users/tristan/Desktop/erin-report.edn"
+                    io/reader
+                    PushbackReader.)
+              w (io/writer "/Users/tristan/Desktop/gcep-report.csv")]
+    (->> (edn/read r)
+         (mapv (fn [[gcep curations]]
+                 [gcep
+                  (get curations "NewCuration" 0)
+                  (reduce + (vals (dissoc curations "NewCuration")))]))
+         (cons ["GCEP" "New Curations" "Re-curations"])
+         (csv/write-csv w)))
+
+  )
+
+
+;; GFF integration and testing
+(comment
+
+  (run!
+   #(p/publish (get-in api-test-app [:topics :fetch-base-events]) %)
+   (->> "base.edn"
+        io/resource
+        slurp
+        edn/read-string
+        (filter #(= :genegraph.api.base/load-gff (:action %)))
+        (mapv (fn [e] {::event/data e}))))
+
+  (run!
+   #(p/publish (get-in api-test-app [:topics :fetch-base-events]) %)
+   (->> "base.edn"
+        io/resource
+        slurp
+        edn/read-string
+        (filter #(= :genegraph.api.base/load-gff (:action %)))
+        (mapv (fn [e] {::event/data e}))))
+
+  (run!
+   #(p/publish (get-in api-test-app [:topics :base-data]) %)
+   (->> "base.edn"
+        io/resource
+        slurp
+        edn/read-string
+        (filter #(= "https://ncbi.nlm.nih.gov/genomes/GCF_000001405.40_GRCh38.p14_genomic.gff"
+                    (:name %)))
+        (mapv (fn [e] {::event/data
+                       (assoc e
+                              :genegraph.api.base/handle
+                              {:type :file
+                               :base "data/base/"
+                               :path "GRCh38.gff.gz"})}))))
+  (tap> api-test-app)
+
+  (->> (rocksdb/range-get
+        @(get-in api-test-app [:storage :object-db :instance])
+        {:start [:sequences
+                 :so/Gene
+                 "https://identifiers.org/refseq:NC_000001.11"
+                 30000]
+         :end [:sequences
+               :so/Gene
+               "https://identifiers.org/refseq:NC_000001.11"
+               50500]
+         :return :ref})
+       (map deref)
+       tap>)
+
+  (->> (storage/read
+        @(get-in api-test-app [:storage :object-db :instance])
+        [:objects "https://identifiers.org/ncbigene:100302278"])
+       tap>)
+
+  (run!
+   #(p/publish (get-in api-test-app [:topics :base-data]) %)
+   (->> "base.edn"
+        io/resource
+        slurp
+        edn/read-string
+        (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+                    (:name %)))
+        (mapv (fn [e] {::event/data
+                       (assoc e
+                              :source
+                              {:type :file
+                               :base "data/base/"
+                               :path "clinvar.xml.gz"})}))))x
+  )
+

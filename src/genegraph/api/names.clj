@@ -30,7 +30,8 @@
  "oboinowl" "http://www.geneontology.org/formats/oboInOwl#"})
 
 (add-keyword-mappings
- {:bfo/realizes "http://purl.obolibrary.org/obo/BFO_0000055"
+ {:mondo/HereditaryDisease "http://purl.obolibrary.org/obo/MONDO_0003847"
+  :bfo/realizes "http://purl.obolibrary.org/obo/BFO_0000055"
   :bfo/has-part "http://purl.obolibrary.org/obo/BFO_0000051"
   :cg/website-legacy-id "http://dataexchange.clinicalgenome.org/terms/website_legacy_id"
   :hp/AutosomalRecessiveInheritance "http://purl.obolibrary.org/obo/HP_0000007"
@@ -192,6 +193,8 @@
   :sepio/NoEvidence "http://purl.obolibrary.org/obo/SEPIO_0004508"
   :sepio/ClinGenGeneValidityEvaluationCriteriaSOP4 "http://purl.obolibrary.org/obo/SEPIO_0004092"
   :sepio/ClinGenGeneValidityEvaluationCriteriaSOP5
-  "http://purl.obolibrary.org/obo/SEPIO_0004093"}) ; gci-ex only
+  "http://purl.obolibrary.org/obo/SEPIO_0004093"
+  :efo/copy-number-loss "http://www.ebi.ac.uk/efo/EFO_0030067"
+  :efo/copy-number-gain "http://www.ebi.ac.uk/efo/EFO_0030070"}) ; gci-ex only
 
 ;:cg/has-total-actionability-score

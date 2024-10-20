@@ -12,8 +12,13 @@
                                                 :git/sha "2a21b7a"}}
           :ns-default build}
   :dev {:extra-deps {djblue/portal {:mvn/version "0.57.3"}}
-        #_#_:jvm-opts ["-agentpath:/Applications/YourKit-Java-Profiler-2024.3.app/Contents/Resources/bin/mac/libyjpagent.dylib=disablestacktelemetry,exceptions=disable,delay=10000"
-                   "-XX:+UseZGC" "-XX:+ZGenerational" "-XX:MaxRAMPercentage=50"]}}
+        :jvm-opts [#_"-agentpath:/Applications/YourKit-Java-Profiler-2024.3.app/Contents/Resources/bin/mac/libyjpagent.dylib=disablestacktelemetry,exceptions=disable,delay=10000"
+                   
+                   "-XX:+UseZGC"
+                   "-XX:+ZGenerational"
+                   "-XX:MaxRAMPercentage=50"
+                   "-Djdk.attach.allowAttachSelf"]}}
+ ;; https://nrepl.org/nrepl/installation.html#jvmti
 
  :jvm-opts ["-XX:+UseZGC" "-XX:+ZGenerational" "-XX:MaxRAMPercentage=75"]
  
@@ -21,7 +26,7 @@
  {ch.qos.logback/logback-classic                    {:mvn/version "1.5.0"}
   org.clojure/clojure                               {:mvn/version "1.12.0"}
   io.github.clingen-data-model/genegraph-framework
-  {:git/sha "bc4c8984ecb4cd6ae4cdec96b28a69b9eed46e83"}
+  {:git/sha "33952cfcad5122f9dc32a3f52728e70b48c257ac"}
   com.walmartlabs/lacinia-pedestal
   {:git/sha "075bcdcbb0969fe4dbd15770f29b7273ff872b78"
    :git/url "https://github.com/walmartlabs/lacinia-pedestal.git"}
