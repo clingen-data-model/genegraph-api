@@ -13,6 +13,7 @@
 
 (def hgnc  "https://www.genenames.org")
 (def ensembl  "https://www.ensembl.org")
+(def entrez-gene-root "https://identifiers.org/ncbigene:")
 
 (def locus-types {"immunoglobulin gene" "http://purl.obolibrary.org/obo/SO_0002122"
                   "T cell receptor gene" "http://purl.obolibrary.org/obo/SO_0002099"
@@ -33,8 +34,7 @@
                   "RNA, misc" "http://purl.obolibrary.org/obo/SO_0000356"})
 
 (defn gene-as-triple [gene]
-  (let [uri #_(str "https://www.ncbi.nlm.nih.gov/gene/" (:entrez_id gene))
-        (keyword "ncbigene" (:entrez_id gene))
+  (let [uri (str entrez-gene-root (:entrez_id gene))
         hgnc-id (:hgnc_id gene)
         hgnc-iri (rdf/resource
                   (s/replace (:hgnc_id gene)
@@ -64,7 +64,7 @@
                          (:prev_symbol gene))))))
 
 (defn genes-as-triple [genes-json]
-  (let [genes (get-in genes-json [:response :docs])]
+  (let [genes (filter :entrez_id (get-in genes-json [:response :docs]))]
     (conj (mapcat gene-as-triple genes)
           ["https://www.genenames.org/" :rdf/type :void/Dataset])))
 
@@ -77,9 +77,13 @@
 
 (comment
   (take 50
-   (rdf/as-model {:format :genegraph.api.base/hgnc
-                  :source (io/file "/users/tristan/data/genegraph-neo/hgnc.json")}))
+        (rdf/as-model
+    {:format :genegraph.api.base/hgnc
+     :source (io/file
+              "/Users/tristan/code/genegraph-api/data/base/hgnc.json")}))
 
+  {:gene_group ["Immunoglobulin like domain containing"], :mane_select ["ENST00000263100.8" "NM_130786.4"], :omim_id ["138670"], :pubmed_id [2591067], :ccds_id ["CCDS12976"], :hgnc_id "HGNC:5", :symbol "A1BG", :name "alpha-1-B glycoprotein", :gene_group_id [594], :agr "HGNC:5", :ucsc_id "uc002qsd.5", :rgd_id ["RGD:69417"], :locus_group "protein-coding gene", :entrez_id "1", :mgd_id ["MGI:2152878"], :refseq_accession ["NM_130786"], :ensembl_gene_id "ENSG00000121410", :merops "I43.950", :status "Approved", :locus_type "gene with protein product", :vega_id "OTTHUMG00000183507", :date_modified "2023-01-20", :uniprot_ids ["P04217"], :uuid "fc83f9c0-da0f-4f8e-bfc7-5ef6b7ee052e", :location "19q13.43", :date_approved_reserved "1989-06-30"}
+  
   (rdf/resource :skos/prefLabel)
   )
 

@@ -27,9 +27,9 @@
   org.clojure/clojure                               {:mvn/version "1.12.0"}
   io.github.clingen-data-model/genegraph-framework
   {:git/sha "33952cfcad5122f9dc32a3f52728e70b48c257ac"}
-  com.walmartlabs/lacinia-pedestal
-  {:git/sha "075bcdcbb0969fe4dbd15770f29b7273ff872b78"
-   :git/url "https://github.com/walmartlabs/lacinia-pedestal.git"}
+  com.walmartlabs/lacinia-pedestal {:mvn/version "1.3"}
+  #_{:git/sha "075bcdcbb0969fe4dbd15770f29b7273ff872b78"
+     :git/url "https://github.com/walmartlabs/lacinia-pedestal.git"}
   hato/hato                                         {:mvn/version "0.9.0"}
   org.clojure/data.csv                              {:mvn/version "1.0.1"}
   org.clojure/data.zip {:mvn/version "1.0.0"}

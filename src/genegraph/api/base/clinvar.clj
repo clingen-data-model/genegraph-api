@@ -381,7 +381,8 @@
                       [:iri
                        :type
                        :cg/subject
-                       :cg/direction]))))
+                       :cg/direction
+                       :cg/reviewStatus]))))
 
 (defn clinvar-variant->statements [clinvar-variant]
   (concat
@@ -645,9 +646,6 @@
 
 (defn write-variant-bundle [object-db tdb variant-bundle]
   (let [model (rdf/statements->model (:statements variant-bundle))]
-    (rdf/pp-model model)
-    (tap> model)
-    (tap> variant-bundle)
     (run! #(storage/write object-db
                           [:objects (:iri %)]
                           %)
@@ -658,7 +656,6 @@
 
 (defmethod ap/process-base-event :genegraph.api.base/load-clinvar
   [event]
-  (tap> event)
   (log/info :fn ::ap/process-base-event
             :dispatch :genegraph.api.base/load-clinvar
             :object-db (get-in event [::storage/storage :object-db]))
@@ -674,15 +671,15 @@
           write-variant-bundle-with-db
           #(write-variant-bundle object-db tdb %)]
       (->> (:content (xml/parse is))
-           (take 10000)
+           #_(take 10000)
            (map clinvar-xml->intermediate-model)
            (filter is-cnv?)
            (map variant->statements-and-objects)
            (map add-gene-overlaps-with-db)
            (take 1)
-           (run! write-variant-bundle-with-db)
-           #_(into [])
-           #_tap>))
+           #_(run! write-variant-bundle-with-db)
+           (into [])
+           tap>))
     (Thread/sleep 500))
   (log/info :fn ::ap/process-base-event
             :msg "clinvar complete")
@@ -691,6 +688,8 @@
 ;; do these reflect our codes:
 ;; https://va-ga4gh.readthedocs.io/en/latest/examples/variant-pathogenicity-statement.html
 
+
+;; A bit of sample data for working with 
 (comment
   (defonce http-client
     (hc/build-http-client {:connect-timeout 10000
@@ -714,7 +713,8 @@
   
   )
 
-
+;; Some template code for extracting statistics from ClinVar
+;; Note that it takes about a half-hour to parse the ClinVar XML
 (comment
   (.start (Thread.
            (fn []

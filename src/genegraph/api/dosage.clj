@@ -231,7 +231,7 @@
     ;; Bad IRIs prevent Jena restore. Remove spaces in IRIs
     (or (when phenotype (rdf/resource (s/replace phenotype " " "")))
         legacy-mondo
-        (rdf/resource "http://purl.obolibrary.org/obo/MONDO_0000001"))))
+        :mondo/HereditaryDisease)))
 
 (defn- gene-dosage-variant [iri curation dosage]
   [[iri :rdf/type :geno/FunctionalCopyNumberComplement]
@@ -254,7 +254,7 @@
   (let [iri (proposition-iri curation dosage)
         variant-iri (rdf/blank-node)]
     [[iri :rdf/type :cg/GeneticConditionMechanismProposition]
-     [iri :cg/feature (subject-iri curation)]
+     [iri :cg/feature (rdf/resource (subject-iri curation))]
      [iri :cg/mechanism (dosage->mechanism dosage)]
      [iri :cg/condition (dosage-proposition-object curation dosage)]]))
 

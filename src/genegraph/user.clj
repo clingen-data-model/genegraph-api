@@ -152,18 +152,26 @@
                                  [:topics :fetch-base-events])
                          {::event/data %
                           ::event/key (:name %)})))
+
+  (->> (-> "base.edn" io/resource slurp edn/read-string)
+       (filter #(= "https://www.genenames.org/"
+                   (:name %)))
+       (run! #(p/publish (get-in api-test-app
+                                 [:topics :fetch-base-events])
+                         {::event/data %
+                          ::event/key (:name %)})))
   
   (tap>
    (p/process
     (get-in api-test-app [:processors :import-base-file])
     {::event/data
      (assoc (first (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
-                                   (:name %))
-                               (-> "base.edn" io/resource slurp edn/read-string)))
-                :source
-                {:type :file
-                 :base "data/base"
-                 :file "clinvar.xml.gz"})}))
+                               (:name %))
+                           (-> "base.edn" io/resource slurp edn/read-string)))
+            :source
+            {:type :file
+             :base "data/base"
+             :file "clinvar.xml.gz"})}))
   
   (tap>
    (count (storage/scan @(get-in api-test-app [:storage :object-db :instance])
@@ -175,19 +183,21 @@
   
   )
 
+(+ 1 1)
 ;; Dosage modifications
 
 ;; gene_dosage_raw-2024-09-18.edn.gz
+
+;; gene_dosage_raw-2024-10-21.edn.gz
 
 ;; Should also deal with dosage records throwing exceptions
 ;; though possibly the work done for this will handle that issue
 (comment
   (time
-   (def recent-dosage-records
-     (event-store/with-event-reader [r (str root-data-dir "gene_dosage_raw-2024-09-18.edn.gz")]
-       (->> (event-store/event-seq r)
-            (take-last 100)
-            (into [])))))
+   (tap>(event-store/with-event-reader [r (str root-data-dir "gene_dosage_raw-2024-10-21.edn.gz")]
+          (->> (event-store/event-seq r)
+               (take 1)
+               (into [])))))
 
   (def chr16p13
     (event-store/with-event-reader [r (str root-data-dir "gene_dosage_raw-2024-09-18.edn.gz")]
@@ -215,11 +225,14 @@
            (filter ::error)
            (into []))))
 
-  (event-store/with-event-reader [r (str root-data-dir "gene_dosage_raw-2024-09-27.edn.gz")]
-      (->> (event-store/event-seq r)
-           (run! #(p/publish (get-in api-test-app
-                                    [:topics :dosage])
-                             %))))
+  (event-store/with-event-reader
+      [r (str root-data-dir "gene_dosage_raw-2024-10-21.edn.gz")]
+    (->> (event-store/event-seq r)
+         (run! #(p/publish (get-in api-test-app
+                                   [:topics :dosage])
+                           %))))
+
+  (+ 1 1)
   
   (count errors)
 
@@ -261,9 +274,7 @@
 
        #_(run! #(rdf/pp-model (:genegraph.api.dosage/model %))))
 
-  #_(get-in chr16p13data [:fields :customfield_10532])
-  
-  )
+  #_(get-in chr16p13data [:fields :customfield_10532]))
 
 ;; clinvar transform
 (comment
@@ -530,3 +541,42 @@
   
   )
 
+
+
+;; Testing dosage queries
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "
+select ?x where 
+{?x a ?type}
+ limit 5
+")]
+    (rdf/tx tdb
+      (->> (q tdb {:type :cg/GeneticConditionMechanismProposition})
+           (mapv #(rdf/ld1-> % [:cg/feature])))))
+
+  ;; Deletion variants with complete overlap with haplo 3 gene
+  ;; Validated!
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "
+select ?variant where 
+{ ?assertion :cg/evidenceStrength :cg/DosageSufficientEvidence ;
+  :cg/subject ?dosageProp .
+  ?dosageProp :cg/mechanism :cg/Haploinsufficiency ;
+  a :cg/GeneticConditionMechanismProposition ;
+  :cg/feature ?feature .
+  ?variant :cg/CompleteOverlap ?feature .
+  ?pathProp :cg/variant ?variant .
+  ?pathAssertion :cg/subject ?pathProp ;
+  :cg/direction :cg/Refutes .
+}
+limit 5
+")]
+    (rdf/tx tdb
+      (->> (q tdb {:type :cg/GeneticConditionMechanismProposition})
+           #_count
+           (mapv str))))
+
+    (+ 1 1)
+  
+  )
