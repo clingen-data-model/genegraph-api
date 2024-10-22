@@ -671,15 +671,11 @@
           write-variant-bundle-with-db
           #(write-variant-bundle object-db tdb %)]
       (->> (:content (xml/parse is))
-           #_(take 10000)
            (map clinvar-xml->intermediate-model)
            (filter is-cnv?)
            (map variant->statements-and-objects)
            (map add-gene-overlaps-with-db)
-           (take 1)
-           #_(run! write-variant-bundle-with-db)
-           (into [])
-           tap>))
+           (run! write-variant-bundle-with-db)))
     (Thread/sleep 500))
   (log/info :fn ::ap/process-base-event
             :msg "clinvar complete")
