@@ -49,8 +49,7 @@
             :description {:type 'String
                           :description "Textual description of this resource"
                           ;; :path [:dc/description]
-                          :resolve description
-                          }
+                          :resolve description}
             :source {:type :BibliographicResource
                      :description "A related resource from which the described resource is derived."
                      :path [:dc/source]}
