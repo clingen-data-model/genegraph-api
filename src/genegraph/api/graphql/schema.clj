@@ -5,6 +5,7 @@
             [genegraph.api.graphql.schema.agent :as model-agent]
             [genegraph.api.graphql.schema.contribution :as model-contribution]
             [genegraph.api.graphql.schema.find :as model-find]
+            [genegraph.api.graphql.schema.conflicts :as model-conflicts]
             [genegraph.api.graphql.schema.proband-evidence :as model-proband]
             [genegraph.api.graphql.schema.variant-evidence :as model-variant-evidence]
             [genegraph.api.graphql.schema.family :as family]
@@ -56,7 +57,7 @@
    model-find/types-enum
    model-find/find-query
    model-find/query-result
-   model-find/find-query
+   model-conflicts/conflicts-query
    variation-descriptor/variation-descriptor
    value-set/value-set
    family/family
@@ -83,13 +84,21 @@
     (when (some identity vs)
       (reduce #(rec-merge %1 %2) v vs))))
 
-(defn merged-schema
+#_(defn merged-schema
   ([] (-> (legacy-schema/schema-for-merge)
           (deep-merge (schema-builder/schema-description (model)))
           lacinia-schema/compile))
   ([options] (-> (legacy-schema/schema-for-merge)
                  (deep-merge (schema-builder/schema-description (model)))
                  (lacinia-schema/compile options))))
+
+(defn merged-schema
+  ([] (lacinia-schema/compile
+       (schema-builder/schema-description (model))))
+  ([options] 
+   (lacinia-schema/compile
+    (schema-builder/schema-description (model))
+    options)))
 
 (defn schema-description []
   (schema-builder/schema-description model))

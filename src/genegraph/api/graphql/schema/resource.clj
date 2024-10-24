@@ -131,5 +131,5 @@
    :args {:iri {:type 'String}}
    :type :Resource
    :resolve (fn [context args _]
-              (let [r (rdf/resource (:iri args) (:db context))]
+              (let [r (rdf/resource (:iri args) (:tdb context))]
                 (or (rdf/ld1-> r [[:cg/website-legacy-id :<]]) r)))})

@@ -565,17 +565,18 @@ select ?variant where
   ?dosageProp :cg/mechanism :cg/Haploinsufficiency ;
   a :cg/GeneticConditionMechanismProposition ;
   :cg/feature ?feature .
-  ?variant :cg/CompleteOverlap ?feature .
+  ?variant :cg/CompleteOverlap ?feature ;
+  :ga4gh/copyChange :efo/copy-number-loss .
   ?pathProp :cg/variant ?variant .
   ?pathAssertion :cg/subject ?pathProp ;
   :cg/direction :cg/Refutes .
+  FILTER NOT EXISTS { ?pathAssertion :cg/reviewStatus :cg/Flagged }
 }
-limit 5
 ")]
     (rdf/tx tdb
       (->> (q tdb {:type :cg/GeneticConditionMechanismProposition})
-           #_count
-           (mapv str))))
+           count
+           #_(mapv str))))
 
     (+ 1 1)
   

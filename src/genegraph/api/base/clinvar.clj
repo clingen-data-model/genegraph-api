@@ -297,13 +297,15 @@
    :cg/LikelyBenign :cg/Refutes
    :cg/Benign :cg/Refutes})
 
-
-
 (defn clinvar-variant->canonical-var [v]
-  {:iri (str "https://identifiers.org/clinvar:" (:variation-id v))
-   :type :cg/CanonicalVariant
-   :rdfs/label (:name v)
-   :cg/includedVariants (clinvar-variant->ga4gh-alleles v)})
+  (let [base
+        {:iri (str "https://identifiers.org/clinvar:" (:variation-id v))
+         :type :cg/CanonicalVariant
+         :rdfs/label (:name v)
+         :cg/includedVariants (clinvar-variant->ga4gh-alleles v)}]
+    (if-let [copy-change (variant-type->efo-term (:variant-type v))]
+      (assoc base :ga4gh/copyChange copy-change)
+      base)))
 
 (defn variant-pathogenicity-proposition [v]
   (let [prop {:type :cg/VariantPathogenicityProposition
@@ -372,17 +374,18 @@
      (set/rename-keys (dissoc attrs :iri)
                       {:type :rdf/type}))))
 
-(defn canonical-variant->statements [{:keys [iri type]}]
-  [[iri :rdf/type type]])
+(defn canonical-variant->statements [cv]
+  (attrs->statements
+   (select-keys cv [:iri :type :ga4gh/copyChange])))
 
 (defn assertion->statements [assertion]
-  (conj (attrs->statements
-         (select-keys assertion
-                      [:iri
-                       :type
-                       :cg/subject
-                       :cg/direction
-                       :cg/reviewStatus]))))
+  (attrs->statements
+   (select-keys assertion
+                [:iri
+                 :type
+                 :cg/subject
+                 :cg/direction
+                 :cg/reviewStatus])))
 
 (defn clinvar-variant->statements [clinvar-variant]
   (concat
@@ -702,7 +705,9 @@
   (println flagged-submission-xml)
   (->> (xml/parse-str flagged-submission-xml)
        :content
-       (mapv clinvar-xml->statements-and-objects)
+       (mapv #(-> %
+                  clinvar-xml->intermediate-model
+                  variant->statements-and-objects))
        tap>)
   
 
