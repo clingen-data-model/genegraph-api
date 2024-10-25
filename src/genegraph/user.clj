@@ -581,3 +581,41 @@ select ?variant where
     (+ 1 1)
   
   )
+
+;; load resource decriptions
+(comment
+  "https://genegraph.app/resources"
+  (->> (-> "base.edn" io/resource slurp edn/read-string)
+       (filter #(= "https://genegraph.app/resources"
+                   (:name %)))
+       (run! #(p/publish (get-in api-test-app
+                                 [:topics :fetch-base-events])
+                         {::event/data %
+                          ::event/key (:name %)})))
+
+(let [tdb @(get-in api-test-app [:storage :api-tdb :instance])]
+    (rdf/tx tdb
+      (-> (rdf/resource :cg/Benign tdb)
+          (rdf/ld1-> [:rdfs/label]))))
+  
+  
+  )
+
+
+;; load clinvar submitters
+(comment
+  (->> (-> "base.edn" io/resource slurp edn/read-string)
+       (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/submitters"
+                   (:name %)))
+       (run! #(p/publish (get-in api-test-app
+                                 [:topics :fetch-base-events])
+                         {::event/data %
+                          ::event/key (:name %)})))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])]
+    (rdf/tx tdb
+      (-> (rdf/resource "https://identifiers.org/clinvar.submitter:1006" tdb)
+          (rdf/ld1-> [:rdfs/label]))))
+  
+  
+  )

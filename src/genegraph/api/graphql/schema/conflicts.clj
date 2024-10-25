@@ -40,16 +40,32 @@ select ?pathAssertion ?mechanismAssertion where
    :fields {:iri {:type 'String
                   :resolve (fn [_ _ v] (str v))}}})
 
+(def resource
+  {:name :Resource
+   :graphql-type :object
+   :skip-type-resolution true
+   :fields {:iri {:type 'String
+                  :resolve (fn [_ _ v] (str v))}
+            :label {:type 'String
+                    :path [:rdfs/label]}}})
+
+
+
 (def assertion
   {:name :Assertion
    :graphql-type :object
    :skip-type-resolution true
    :fields {:iri {:type 'String}
+            
             :conflictingAssertions
             {:type '(list :GeneticConditionMechanismAssertion)
              :resolve (fn [_ _ v] (:conflictingAssertions v))}
-            :classification {:type 'String
-                             :resolve (fn [_ _ v] )}
+            
+            :classification
+            {:type :Resource
+             :resolve (fn [{:keys [tdb]} _ v]
+                        (rdf/resource (:cg/classification v)
+                                      tdb))}
             ;; :comments {}
             ;; :submitter {}
             ;; :date {}

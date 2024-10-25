@@ -77,7 +77,8 @@
    model-conflicts/mechanism-assertion
    model-conflicts/assertion
    model-conflicts/conflicts-query
-   #_model-conflicts/assertion-conflict
+   model-conflicts/resource
+
    ;; variation-descriptor/variation-descriptor
    ;; value-set/value-set
    ;; family/family

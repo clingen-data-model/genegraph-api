@@ -17,6 +17,7 @@
             [genegraph.api.base.features]
             [genegraph.api.base.ucsc-cytoband]
             [genegraph.api.base.gci-express]
+            [genegraph.api.base.clinvar-submitters]
             [io.pedestal.interceptor :as interceptor]
             [io.pedestal.log :as log])
   (:import [java.io File InputStream OutputStream]
