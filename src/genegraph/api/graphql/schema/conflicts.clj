@@ -24,15 +24,21 @@ select ?pathAssertion ?mechanismAssertion where
        (group-by :pathAssertion)
        (take 1)
        (mapv (fn [[path-assertion tuples]]
-               (tap> (storage/read object-db [:objects (str path-assertion)]))
-               {:iri (str path-assertion)
-                ::rdf/resource path-assertion
-                :conflictingAssertions
-                (mapv (fn [{:keys [mechanismAssertion]}]
-                        {::rdf/resource mechanismAssertion
-                         :iri (str mechanismAssertion)})
-                      tuples)}))))
+               (assoc (storage/read object-db [:objects (str path-assertion)])
+                      ::rdf/resource path-assertion
+                      :conflictingAssertions
+                      (mapv (fn [{:keys [mechanismAssertion]}]
+                              mechanismAssertion)
+                            tuples))))))
 
+;; Technical debt, in case anyone is wondering
+(def mechanism-assertion
+  {:name :GeneticConditionMechanismAssertion
+   :graphql-type :object
+   :description "Temporary type to get us moving without yet having a grand merged database schema. Allows us to differentiate access between dosageassertion objects and regular assertions. Will figure out how to handle the differences later."
+   :skip-type-resolution true
+   :fields {:iri {:type 'String
+                  :resolve (fn [_ _ v] (str v))}}})
 
 (def assertion
   {:name :Assertion
@@ -40,15 +46,16 @@ select ?pathAssertion ?mechanismAssertion where
    :skip-type-resolution true
    :fields {:iri {:type 'String}
             :conflictingAssertions
-            {:type '(list :Assertion)
-             :resolve (fn [_ _ v] (:conflictingAssertions v))}}})
-
-#_(def assertion-conflict
-  {:name :AssertionConflict
-   :graphql-type :object
-   :description "A statement of conflict between an assertion and a set of assertions extant in a knowledgebase "
-   :fields {:assertion {:type 'String}
-            :conflictingAssertions {:type 'String}}})
+            {:type '(list :GeneticConditionMechanismAssertion)
+             :resolve (fn [_ _ v] (:conflictingAssertions v))}
+            :classification {:type 'String
+                             :resolve (fn [_ _ v] )}
+            ;; :comments {}
+            ;; :submitter {}
+            ;; :date {}
+            ;; :reviewStatus {}
+            ;; :description {}
+            }})
 
 (def conflicts-query
   {:name :conflicts

@@ -74,6 +74,7 @@
    ;; model-find/types-enum
    ;; model-find/find-query
    ;; model-find/query-result
+   model-conflicts/mechanism-assertion
    model-conflicts/assertion
    model-conflicts/conflicts-query
    #_model-conflicts/assertion-conflict

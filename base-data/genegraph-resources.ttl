@@ -1,0 +1,17 @@
+@prefix cg: <http://dataexchange.clinicalgenome.org/terms/>
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+## Classifications ##
+
+## Variant
+
+cg:Benign rdfs:label "Benign" .
+
+cg:LikelyBenign rdfs:label "Likely Benign" .
+
+cg:UncertainSignificance rdfs:label "Uncertain Significance" .
+
+cg:LikelyPathogenic rdfs:label "Likely Pathogenic" .
+
+cg:Pathogenic rdfs:label "Pathogenic" .
+
