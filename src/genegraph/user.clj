@@ -619,3 +619,7 @@ select ?variant where
   
   
   )
+(for [x [1 2 3]]
+  x)
+
+(str "hi " nil)

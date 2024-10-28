@@ -45,6 +45,7 @@
                           (:ensembl_gene_id gene)))]
     (remove nil?
             (concat [[uri :skos/prefLabel (:symbol gene)]
+                     [uri :rdfs/label (:symbol gene)]
                      [uri :skos/altLabel (:name gene)]
                      (when-let [loc (:location gene)] [uri :so/chromosome-band loc])
                      (when-let [locus-type (locus-types (:locus_type gene))]

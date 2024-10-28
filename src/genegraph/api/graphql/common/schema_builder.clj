@@ -112,8 +112,8 @@
 (defn- add-entity-to-schema [schema entity]
   (case (:graphql-type entity)
     :interface (assoc-in schema
-                           [:interfaces (:name entity)]
-                           (compose-interface entity schema))
+                         [:interfaces (:name entity)]
+                         (compose-interface entity schema))
     :object (assoc-in schema
                       [:objects (:name entity)]
                       (compose-object entity schema))
