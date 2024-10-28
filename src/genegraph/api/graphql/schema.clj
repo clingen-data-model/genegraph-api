@@ -123,8 +123,9 @@
     options)))
 
 (defn schema-description []
-  (schema-builder/schema-description model))
+  (schema-builder/schema-description (model)))
 
 (comment
   (merged-schema)
+  (tap> (schema-description))
   )

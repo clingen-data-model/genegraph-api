@@ -118,7 +118,7 @@
                       [:objects (:name entity)]
                       (compose-object entity schema))
     :query (assoc-in schema
-                     [:queries (:name entity)]
+                     [:objects :Query :fields (:name entity)]
                      (compose-query entity schema))
     :enum (assoc-in schema
                     [:enums (:name entity)]
