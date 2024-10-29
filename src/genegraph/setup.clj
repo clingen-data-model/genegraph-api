@@ -1,4 +1,4 @@
-(ns genegraph.gv-setup
+(ns genegraph.setup
   "Functions and procedures generally intended to be run from the REPL
   for the purpose of configuring and maintaining a genegraph gene validity
   instance."
@@ -43,8 +43,8 @@
 
 (comment
   (run! #(kafka-admin/configure-kafka-for-app! (p/init %))
-        [ggapi/gv-base-app-def
-         ggapi/gv-graphql-endpoint-def])
+        [ggapi/base-app-def
+         ggapi/graphql-endpoint-def])
 
   ;; Delete all (or some) Genegraph-created topics
   ;; Use this to fix mistakes.
@@ -73,7 +73,7 @@
 ;; The data needed to seed this topic is stored in version control with
 ;;    genegraph-gene-validity in resources/base.edn
 
-(def gv-seed-base-event-def
+(def seed-base-event-def
   {:type :genegraph-app
    :kafka-clusters {:data-exchange ggapi/data-exchange}
    :topics {:fetch-base-events
@@ -82,40 +82,40 @@
                    :create-producer true)}})
 
 (comment
-  (def gv-seed-base-event
-    (p/init gv-seed-base-event-def))
+  (def seed-base-event
+    (p/init seed-base-event-def))
 
-  (p/start gv-seed-base-event)
-  (p/stop gv-seed-base-event)
-  
+  (p/start seed-base-event)
+  (p/stop seed-base-event)
+
   (->> (-> "base.edn" io/resource slurp edn/read-string)
-       (run! #(p/publish (get-in gv-seed-base-event
+       (run! #(p/publish (get-in seed-base-event
                                  [:topics :fetch-base-events])
                          {::event/data %
                           ::event/key (:name %)})))
 
   (->> (-> "base.edn" io/resource slurp edn/read-string)
        (filter #(= "http://purl.obolibrary.org/obo/mondo.owl" (:name %)))
-       (run! #(p/publish (get-in gv-seed-base-event
+       (run! #(p/publish (get-in seed-base-event
                                  [:topics :fetch-base-events])
                          {::event/data %
                           ::event/key (:name %)})))
 
   (->> (-> "base.edn" io/resource slurp edn/read-string)
        (filter #(= "http://dataexchange.clinicalgenome.org/gci-express" (:name %)))
-       (run! #(p/publish (get-in gv-seed-base-event
+       (run! #(p/publish (get-in seed-base-event
                                  [:topics :fetch-base-events])
                          {::event/data %
                           ::event/key (:name %)})))
 
   (->> (-> "base.edn" io/resource slurp edn/read-string)
        (filter #(= "http://dataexchange.clinicalgenome.org/missing-dosage-curations" (:name %)))
-       (run! #(p/publish (get-in gv-seed-base-event
+       (run! #(p/publish (get-in seed-base-event
                                  [:topics :fetch-base-events])
                          {::event/data %
                           ::event/key (:name %)})))
 
-  (p/stop gv-seed-base-event)
+  (p/stop seed-base-event)
   )
 
 

@@ -39,7 +39,7 @@
 (def admin-env
   (if (or (System/getenv "DX_JAAS_CONFIG_DEV")
           (System/getenv "DX_JAAS_CONFIG")) ; prevent this in cloud deployments
-    {:platform "local"
+    {:platform "stage"
      :dataexchange-genegraph (System/getenv "DX_JAAS_CONFIG")
      :local-data-path "data/"}
     {}))
@@ -93,6 +93,13 @@
   (qualified-kafka-name "gg"))
 
 ;; Topics
+
+(def clinvar-curation-topic
+  {:name :clinvar-curation
+   :serialization :json
+   :kafka-cluster :data-exchange
+   :kafka-topic (qualified-kafka-name "ggapi-clinvar-curation")
+   :kafka-topic-config {}})
 
 (def fetch-base-events-topic
   {:name :fetch-base-events
@@ -411,6 +418,8 @@
     :leave (fn [e] (tap> (assoc e ::on :leave)) e)
     :error (fn [e] (tap> (assoc e ::on :error)) e)}))
 
+;; If any prior interceptors ever have side effects, this may
+;; wipe them out. But that should never happen...
 (defn enter-graphql-mutation-effects [e]
   (assoc-in e [:request :lacinia-app-context :effects] (atom {})))
 
@@ -476,10 +485,16 @@
                  {:status 200 :body "ready"}
                  {:status 500 :body "not ready"}))))))
 
+
+(defn ready-fn [e]
+  (assoc e
+         :response
+         {:status 200 :body "ready"}))
+
 (def graphql-ready-interceptor
   (interceptor/interceptor
    {:name :graphql-ready
-    :enter (fn [e] (gv-ready-fn e))}))
+    :enter (fn [e] (ready-fn e))}))
 
 (def graphql-ready
   {:name :graphql-ready
@@ -573,7 +588,10 @@
                    :type :kafka-reader-topic)
             :base-data
             (assoc base-data-topic
-                   :type :kafka-reader-topic)}
+                   :type :kafka-reader-topic)
+            :clinvar-curation
+            (assoc clinvar-curation-topic
+                   :type :kafka-producer-topic)}
    :processors {:import-gv-curations import-gv-curations
                 :import-base-file import-base-processor
                 :graphql-api graphql-api

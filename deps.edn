@@ -17,10 +17,20 @@
                    "-XX:+UseZGC"
                    "-XX:+ZGenerational"
                    "-XX:MaxRAMPercentage=50"
-                   "-Djdk.attach.allowAttachSelf"]}}
+                   "-Djdk.attach.allowAttachSelf"
+                   "-Djava.security.manager=allow"]}}
  ;; https://nrepl.org/nrepl/installation.html#jvmti
 
- :jvm-opts ["-XX:+UseZGC" "-XX:+ZGenerational" "-XX:MaxRAMPercentage=75"]
+ :jvm-opts ["-XX:+UseZGC"
+            "-XX:+ZGenerational"
+            "-XX:MaxRAMPercentage=75"
+            "-Djava.security.manager=allow"]
+
+ ;; reference for "-Djava.security.manager=allow" (requried in JDK 23+)
+ ;; https://cwiki.apache.org/confluence/display/KAFKA/KIP-1006%3A+Remove+SecurityManager+Support
+ ;; https://openjdk.org/jeps/411
+;; https://github.com/quarkusio/quarkus/issues/39634
+ ;; 
  
  :deps
  {ch.qos.logback/logback-classic                    {:mvn/version "1.5.0"}
