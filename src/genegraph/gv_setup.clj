@@ -8,6 +8,7 @@
             [genegraph.framework.event :as event]
             [genegraph.framework.kafka.admin :as kafka-admin]
             [genegraph.framework.storage :as storage]
+            [genegraph.api :as ggapi]
             [io.pedestal.interceptor :as interceptor]
             [io.pedestal.log :as log]
             [clojure.set :as set]
@@ -42,24 +43,23 @@
 
 (comment
   (run! #(kafka-admin/configure-kafka-for-app! (p/init %))
-        [gv/gv-base-app-def
-         gv/gv-transformer-def
-         gv/gv-graphql-endpoint-def])
+        [ggapi/gv-base-app-def
+         ggapi/gv-graphql-endpoint-def])
 
   ;; Delete all (or some) Genegraph-created topics
   ;; Use this to fix mistakes.
-  (with-open [admin-client (kafka-admin/create-admin-client gv/data-exchange)]
+  (with-open [admin-client (kafka-admin/create-admin-client ggapi/data-exchange)]
     (run! #(try
              (kafka-admin/delete-topic admin-client (:kafka-topic %))
              (catch Exception e
                (log/info :msg "Exception deleting topic "
                          :topic (:kafka-topic %))))
-          [#_gv/fetch-base-events-topic
-           #_gv/base-data-topic
-           #_gv/gene-validity-complete-topic
-           #_gv/gene-validity-legacy-complete-topic
-           #_gv/gene-validity-sepio-topic
-           #_gv/api-log-topic]))
+          [#_ggapi/fetch-base-events-topic
+           #_ggapi/base-data-topic
+           #_ggapi/gene-validity-complete-topic
+           #_ggapi/gene-validity-legacy-complete-topic
+           #_ggapi/gene-validity-sepio-topic
+           #_ggapi/api-log-topic]))
   )
 
 ;; Step 3
@@ -75,9 +75,9 @@
 
 (def gv-seed-base-event-def
   {:type :genegraph-app
-   :kafka-clusters {:data-exchange gv/data-exchange}
+   :kafka-clusters {:data-exchange ggapi/data-exchange}
    :topics {:fetch-base-events
-            (assoc gv/fetch-base-events-topic
+            (assoc ggapi/fetch-base-events-topic
                    :type :kafka-producer-topic
                    :create-producer true)}})
 
@@ -118,173 +118,4 @@
   (p/stop gv-seed-base-event)
   )
 
-;; Step 3.2
-;; :gene-validity-legacy: old 'summary' format for gene validity data, needs to be seeded with some
-;;                        early data that needed to be recovered due to a misconfiguration.
-;; The data needed to seed this topic is stored in Google Cloud Storage
-;; and must be downloaded and unzipped into a local directory.
-
-;; Set this var for the path on your local system
-(def gene-validity-legacy-path
-  "/Users/tristan/data/genegraph-neo/neo4j-legacy-events")
-
-;; This step has been flaky on occasion. Remember to verfiy that all historic curations have been
-;; successfully written to the topic before moving on.
-
-(def upload-gv-neo4j-def
-  {:type :genegraph-app
-   :kafka-clusters {:data-exchange gv/data-exchange}
-   :topics {:gene-validity-legacy-complete
-            (assoc gv/gene-validity-legacy-complete-topic
-                   :type :kafka-producer-topic
-                   :create-producer true)}})
-
-(defn legacy-gv-edn->event [f]
-  (with-open [pbr (PushbackReader. (io/reader f))]
-    (let [{:keys [id score-string]} (:genegraph.sink.event/value (edn/read pbr))]
-      {::event/data {:iri id
-                     :scoreJson score-string}
-       ::event/key id})))
-
-(comment
-  (def upload-gv-neo4j
-    (p/init upload-gv-neo4j-def))
-  (p/start upload-gv-neo4j)
-  (p/stop upload-gv-neo4j)
-
-  (->> gene-validity-legacy-path
-       io/file
-       file-seq
-       (filter #(.isFile %))
-       (run! #(p/publish (get-in upload-gv-neo4j
-                                 [:topics  :gene-validity-legacy-complete])
-                         (legacy-gv-edn->event %))))
-
-
-  (->> gene-validity-legacy-path
-       io/file
-       file-seq
-       (filter #(.isFile %))
-       (map legacy-gv-edn->event)
-       (take 5)
-       tap>)
-
-  )
-
-;; Step 3.3
-;; :gene-validity-complete: raw gene validity data,
-;; needs to be seeded with gene validity curations
-;; made prior to release of the GCI
-;; The data needed to seed this topic is stored in Google Cloud Storage
-
-;; This is another potentially flaky one. Remember to verfiy that all historic curations have been
-;; successfully written to the topic before moving on.
-
-(def gv-setup-def
-  {:type :genegraph-app
-   :kafka-clusters {:data-exchange gv/data-exchange}
-   :topics {:gene-validity-complete
-            (assoc gv/gene-validity-complete-topic
-                   :type :kafka-producer-topic
-                   :create-producer true
-                   :serialization nil)}}) ; just copying strings, do not serialize
-
-(def sept-1-2020
-  (-> (OffsetDateTime/parse "2020-09-01T00:00Z")
-      .toInstant
-      .toEpochMilli))
-
-(defn prior-event->publish-fn [file]
-  (with-open [pbr (PushbackReader. (io/reader file))]
-    (-> (edn/read pbr)
-        (set/rename-keys {:genegraph.sink.event/key ::event/key
-                          :genegraph.sink.event/value ::event/data})
-        (select-keys [::event/key ::event/data])
-        (assoc ::event/timestamp sept-1-2020))))
-
-(defn event-files [directory]
-  (->> directory
-       io/file
-       file-seq
-       (filter #(re-find #".edn" (.getName %)))))
-
-(comment
-  (def gv-setup (p/init gv-setup-def))
-  (p/start gv-setup)
-  (p/stop gv-setup)
-
-  (run! #(p/publish (get-in gv-setup [:topics :gene-validity-complete])
-                   (prior-event->publish-fn %))
-        (concat
-         (event-files "/users/tristan/data/genegraph/2023-11-07T1617/events/:gci-raw-snapshot")
-         (event-files "/users/tristan/data/genegraph/2023-11-07T1617/events/:gci-raw-missing-data")))
-  
-  (count
-   (concat
-    (event-files "/users/tristan/data/genegraph/2023-11-07T1617/events/:gci-raw-snapshot")
-    (event-files "/users/tristan/data/genegraph/2023-11-07T1617/events/:gci-raw-missing-data")))
-  )
-
-;; Re-initialize sample data in dev
-
-(comment
-
-  (let [genegraph-dev-user "User:2189780"
-        stanford-dev-user "User:193111"
-        data-exchange
-        {:type :kafka-cluster
-         ;;:kafka-user "User:2189780"
-         :common-config {"ssl.endpoint.identification.algorithm" "https"
-                         "sasl.mechanism" "PLAIN"
-                         "request.timeout.ms" "20000"
-                         "bootstrap.servers" "pkc-4yyd6.us-east1.gcp.confluent.cloud:9092"
-                         "retry.backoff.ms" "500"
-                         "security.protocol" "SASL_SSL"
-                         "sasl.jaas.config" (System/getenv "DX_JAAS_CONFIG_DEV")}
-         :consumer-config {"key.deserializer"
-                           "org.apache.kafka.common.serialization.StringDeserializer"
-                           "value.deserializer"
-                           "org.apache.kafka.common.serialization.StringDeserializer"}
-         :producer-config {"key.serializer"
-                           "org.apache.kafka.common.serialization.StringSerializer"
-                           "value.serializer"
-                           "org.apache.kafka.common.serialization.StringSerializer"}}
-        stanford-app (p/init
-                      {:type :genegraph-app
-                       :kafka-clusters {:data-exchange (assoc data-exchange
-                                                              :kafka-user
-                                                              stanford-dev-user)}
-                       :topics {:gene-validity-complete
-                                (assoc gv/gene-validity-complete-topic
-                                       :type :kafka-producer-topic
-                                       :create-producer true)
-                                :gene-validity-legacy-complete
-                                (assoc gv/gene-validity-legacy-complete-topic
-                                       :type :kafka-producer-topic
-                                       :create-producer true)}})]
-    
-    ;; am careful to only delete the relevant topics on dev -- not prod!
-    #_(with-open [admin-client (kafka-admin/create-admin-client data-exchange)]
-        (run! #(try (kafka-admin/delete-topic admin-client
-                                              (:kafka-topic %))
-                    (catch Exception e :topic (:kafka-topic %)))
-              [gv/gene-validity-legacy-complete-topic
-               gv/gene-validity-complete-topic]))
-
-    #_(run! #(kafka-admin/configure-kafka-for-app! %)
-          [stanford-app])
-    (p/start stanford-app)
-    #_(event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene_validity_legacy_complete-2024-07-30.edn.gz"]
-      (->> (event-store/event-seq r)
-           (map event/deserialize)
-           (run! #(p/publish (get-in stanford-app [:topics :gene-validity-legacy-complete])
-                             %))))
-    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene_validity_complete-2024-07-30.edn.gz"]
-      (->> (event-store/event-seq r)
-           (map event/deserialize)
-           (run! #(p/publish (get-in stanford-app [:topics :gene-validity-complete])
-                             %))))
-    (p/stop stanford-app))
-  
-  )
 

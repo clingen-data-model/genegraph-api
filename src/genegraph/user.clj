@@ -107,7 +107,7 @@
                 :import-dosage-curations api/import-dosage-curations
                 :read-api-log read-api-log
                 :read-clinvar-curations read-clinvar-curations}
-   :http-servers api/gv-http-server})
+   :http-servers api/http-server})
 
 (comment
   (def api-test-app (p/init api-test-app-def))

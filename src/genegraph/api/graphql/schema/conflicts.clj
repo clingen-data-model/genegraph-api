@@ -130,7 +130,6 @@ select ?pathAssertion ?mechanismAssertion where
             :evidence {:type '(list String)}}})
 
 (defn create-curation-fn [context args _]
-  (tap> args)
   (let [curation (assoc (select-keys args [:agent
                                            :classification
                                            :description

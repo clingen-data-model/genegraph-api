@@ -130,7 +130,6 @@
 (defmethod ap/process-base-event :genegraph.api.base/load-gff [event]
   (log/info :fn ::ap/process-base-event
             :action :genegraph.api.base/load-gff)
-  (tap> event)
   (with-open [r (-> (get-in event [:genegraph.framework.event/data
                                    :source])
                     storage/as-handle

@@ -52,7 +52,7 @@
                                (gql-schema/merged-schema
                                 {:executor direct-executor}))}
     "dev" (assoc (env/build-environment "522856288592" ["dataexchange-genegraph"])
-                 :version 8
+                 :version 1
                  :name "dev"
                  :function (System/getenv "GENEGRAPH_FUNCTION")
                  :kafka-user "User:2189780"
@@ -62,7 +62,7 @@
                  :graphql-schema (gql-schema/merged-schema
                                   {:executor direct-executor}))
     "stage" (assoc (env/build-environment "583560269534" ["dataexchange-genegraph"])
-                   :version 8
+                   :version 1
                    :name "stage"
                    :function (System/getenv "GENEGRAPH_FUNCTION")
                    :kafka-user "User:2592237"
@@ -415,7 +415,6 @@
   (assoc-in e [:request :lacinia-app-context :effects] (atom {})))
 
 (defn leave-graphql-mutation-effects [e]
-  (tap> @(get-in e [:request :lacinia-app-context :effects]))
   (merge e @(get-in e [:request :lacinia-app-context :effects])))
 
 (def graphql-mutation-effects-interceptor
@@ -443,7 +442,7 @@
                   lacinia-pedestal/disallow-subscriptions-interceptor
                   lacinia-pedestal/prepare-query-interceptor
                   #_lacinia-pedestal/enable-tracing-interceptor
-                  inspect-event-interceptor
+                  #_inspect-event-interceptor
                   graphql-mutation-effects-interceptor
                   lacinia-pedestal/query-executor-handler]
    :init-fn init-graphql-processor})
@@ -487,7 +486,7 @@
    :type :processor
    :interceptors [graphql-ready-interceptor]})
 
-(def gv-http-server
+(def http-server
   {:gene-validity-server
    {:type :http-server
     :name :gene-validity-server
@@ -516,10 +515,10 @@
     ::http/join? false
     ::http/secure-headers nil}})
 
-(def gv-ready-server
+(def ready-server
   {:gene-validity-server
    {:type :http-server
-    :name :gv-ready-server
+    :name :ready-server
     ::http/host "0.0.0.0"
     ::http/allowed-origins {:allowed-origins (constantly true)
                             :creds true}
@@ -535,7 +534,7 @@
     ::http/join? false
     ::http/secure-headers nil}})
 
-(def gv-base-app-def
+(def base-app-def
   {:type :genegraph-app
    :kafka-clusters {:data-exchange data-exchange}
    :topics {:fetch-base-events
@@ -548,7 +547,7 @@
    :processors {:fetch-base (assoc fetch-base-processor
                                    :kafka-cluster :data-exchange
                                    :kafka-transactional-id (qualified-kafka-name "fetch-base"))}
-   :http-servers gv-ready-server})
+   :http-servers ready-server})
 
 
 (def reporter-interceptor
@@ -558,7 +557,7 @@
              (log/info :fn :reporter :key (::event/key e))
              e)}))
 
-(def gv-graphql-endpoint-def
+(def graphql-endpoint-def
   {:type :genegraph-app
    :kafka-clusters {:data-exchange data-exchange}
    :storage {:api-tdb (assoc api-tdb :load-snapshot true)
@@ -580,11 +579,11 @@
                 :graphql-api graphql-api
                 :graphql-ready graphql-ready
                 :import-dosage-curations import-dosage-curations}
-   :http-servers gv-http-server})
+   :http-servers http-server})
 
 (def genegraph-function
-  {"fetch-base" gv-base-app-def
-   "graphql-endpoint" gv-graphql-endpoint-def})
+  {"fetch-base" base-app-def
+   "graphql-endpoint" graphql-endpoint-def})
 
 (defn store-snapshots! [app]
   (->> (:storage app)
