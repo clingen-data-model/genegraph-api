@@ -404,6 +404,26 @@
     :error (fn [e] (report-error-interceptor-fn
                     (assoc e ::status :error)))}))
 
+(def inspect-event-interceptor
+  (interceptor/interceptor
+   {:name ::inspect-event
+    :enter (fn [e] (tap> (assoc e ::on :enter)) e)
+    :leave (fn [e] (tap> (assoc e ::on :leave)) e)
+    :error (fn [e] (tap> (assoc e ::on :error)) e)}))
+
+(defn enter-graphql-mutation-effects [e]
+  (assoc-in e [:request :lacinia-app-context :effects] (atom {})))
+
+(defn leave-graphql-mutation-effects [e]
+  (tap> @(get-in e [:request :lacinia-app-context :effects]))
+  (merge e @(get-in e [:request :lacinia-app-context :effects])))
+
+(def graphql-mutation-effects-interceptor
+  (interceptor/interceptor
+   {:name ::inspect-event
+    :enter (fn [e] (enter-graphql-mutation-effects e))
+    :leave (fn [e] (leave-graphql-mutation-effects e))}))
+
 (def graphql-api
   {:name :graphql-api
    :type :processor
@@ -423,6 +443,8 @@
                   lacinia-pedestal/disallow-subscriptions-interceptor
                   lacinia-pedestal/prepare-query-interceptor
                   #_lacinia-pedestal/enable-tracing-interceptor
+                  inspect-event-interceptor
+                  graphql-mutation-effects-interceptor
                   lacinia-pedestal/query-executor-handler]
    :init-fn init-graphql-processor})
 

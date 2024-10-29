@@ -79,6 +79,7 @@
    model-conflicts/conflicts-query
    model-conflicts/resource
    model-conflicts/conflict-curation
+   model-conflicts/create-curation
    ;; variation-descriptor/variation-descriptor
    ;; value-set/value-set
    ;; family/family

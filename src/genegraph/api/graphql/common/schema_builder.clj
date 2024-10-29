@@ -120,6 +120,9 @@
     :query (assoc-in schema
                      [:objects :Query :fields (:name entity)]
                      (compose-query entity schema))
+    :mutation (assoc-in schema
+                        [:objects :Mutation :fields (:name entity)]
+                        (compose-query entity schema))
     :enum (assoc-in schema
                     [:enums (:name entity)]
                     (compose-enum entity))

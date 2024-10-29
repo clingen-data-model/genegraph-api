@@ -61,6 +61,17 @@
    :subscribe :api-log
    :interceptors [log-api-event]})
 
+(def log-clinvar-curation
+  (interceptor/interceptor
+   {:name :log-clinvar-curation
+    :enter (fn [e] (tap> (assoc e ::interceptor ::log-clinvar-curation)) e)}))
+
+(def read-clinvar-curations
+  {:name :read-clinvar-curation
+   :type :processor
+   :subscribe :clinvar-curation
+   :interceptors [log-clinvar-curation]})
+
 (def api-test-app-def
   {:type :genegraph-app
    :kafka-clusters {:data-exchange api/data-exchange}
@@ -78,6 +89,9 @@
              :type :simple-queue-topic}
             :api-log
             {:name :api-log
+             :type :simple-queue-topic}
+            :clinvar-curation
+            {:name :clinvar-curation
              :type :simple-queue-topic}}
    :storage {:api-tdb api/api-tdb
              :response-cache-db api/response-cache-db
@@ -91,7 +105,8 @@
                                     {::response-cache/skip-response-cache true})
                 :graphql-ready api/graphql-ready
                 :import-dosage-curations api/import-dosage-curations
-                :read-api-log read-api-log}
+                :read-api-log read-api-log
+                :read-clinvar-curations read-clinvar-curations}
    :http-servers api/gv-http-server})
 
 (comment
@@ -619,7 +634,6 @@ select ?variant where
   
   
   )
-(for [x [1 2 3]]
-  x)
 
-(str "hi " nil)
+
+

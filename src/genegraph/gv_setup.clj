@@ -16,6 +16,8 @@
   (:import [java.time Instant OffsetDateTime Duration]
            [java.io PushbackReader]))
 
+;; TODO Reconfigure to add ClinVar Curation topic
+
 ;; Step 1
 ;; Select the environment to configure
 

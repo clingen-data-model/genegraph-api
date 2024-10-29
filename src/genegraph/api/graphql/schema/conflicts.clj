@@ -1,6 +1,9 @@
 (ns genegraph.api.graphql.schema.conflicts
   (:require [genegraph.framework.storage.rdf :as rdf]
-            [genegraph.framework.storage :as storage]))
+            [genegraph.framework.storage :as storage]
+            [genegraph.framework.event :as event]
+            [io.pedestal.log :as log])
+  (:import [java.time Instant]))
 
 (def haplo-conflict-query
   (rdf/create-query "
@@ -31,17 +34,7 @@ select ?pathAssertion ?mechanismAssertion where
                             tuples))
                ))))
 
-(def conflict-curation
-  {:name :ConflictCuration
-   :graphql-type :object
-   :description "An assessment on a clinvar curation"
-   :skip-type-resolution true
-   :fields {:iri {:type 'String}
-            :subject {:type :Assertion}
-            :annotation {:type 'String}
-            :description {:type 'String}
-            :agent {:type 'String}
-            :date {:type 'String}}})
+
 
 (str "https://clingen.app/" (random-uuid))
 
@@ -67,7 +60,6 @@ select ?pathAssertion ?mechanismAssertion where
 
 (defn scv-date [{:keys [tdb]} _ v]
   (let [contribs (group-by :cg/role (:cg/contributions v))]
-    (tap> contribs) 
     (-> (some #(get contribs %)
            [:cg/Evaluator
             :cg/Submitter
@@ -124,14 +116,46 @@ select ?pathAssertion ?mechanismAssertion where
    :skip-type-resolution true
    :resolve conflicts-query-fn})
 
+(def conflict-curation
+  {:name :ConflictCuration
+   :graphql-type :object
+   :description "An assessment on a clinvar curation"
+   :skip-type-resolution true
+   :fields {:iri {:type 'String}
+            :subject {:type :Assertion}
+            :classification {:type 'String}
+            :description {:type 'String}
+            :agent {:type 'String}
+            :date {:type 'String}
+            :evidence {:type '(list String)}}})
+
+(defn create-curation-fn [context args _]
+  (tap> args)
+  (let [curation (assoc (select-keys args [:agent
+                                           :classification
+                                           :description
+                                           :evidence])
+                        :subject {:iri (:subject args)}
+                        :date (str (Instant/now)))]
+    (swap! (:effects context)
+           event/publish
+           {::event/topic :clinvar-curation
+            ::event/key (:iri curation)
+            ::event/data curation})
+    curation))
+
 (def create-curation
-  :name :createCuration
-  :graphql-type :mutation
-  :description "Mutation to create a curation of a clinvar assertion"
-  :type :ConflictCuration
-  :args {:subject {:type 'String}
-         :user {:type 'String}
-         :description {:type 'String}})
+  {:name :createCuration
+   :graphql-type :mutation
+   :description "Mutation to create a curation of a clinvar assertion"
+   :type :ConflictCuration
+   :skip-type-resolution true
+   :args {:subject {:type 'String}
+          :agent {:type 'String}
+          :classification {:type 'String}
+          :description {:type 'String}
+          :evidence {:type '(list String)}}
+   :resolve create-curation-fn})
 
 (comment
   (let [tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])]
