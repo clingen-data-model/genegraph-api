@@ -1,4 +1,4 @@
-FROM clojure:temurin-21-tools-deps-jammy AS builder
+FROM clojure:temurin-21-tools-deps-noble AS builder
 
 # Copying and building deps as a separate step in order to mitigate
 # the need to download new dependencies every build.
@@ -9,7 +9,7 @@ COPY . /usr/src/app
 RUN clojure -T:build uber
 
 # Using image without lein for deployment.
-FROM eclipse-temurin:21-jammy
+FROM eclipse-temurin:21-noble
 LABEL maintainer="Tristan Nelson <thnelson@geisinger.edu>"
 
 COPY --from=builder /usr/src/app/target/app.jar /app/app.jar

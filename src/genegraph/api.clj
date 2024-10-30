@@ -278,13 +278,13 @@
 (def api-tdb
   {:type :rdf
    :name :api-tdb
-   :snapshot-handle (assoc (:fs-handle env) :path "api-tdb-v12.nq.gz")
+   :snapshot-handle (assoc (:fs-handle env) :path "api-tdb-v1.nq.gz")
    :path (str (:local-data-path env) "/api-tdb")})
 
 (def object-db
   {:type :rocksdb
    :name :object-db
-   :snapshot-handle (assoc (:fs-handle env) :path "object-db.lz4")
+   :snapshot-handle (assoc (:fs-handle env) :path "object-db-v1.lz4")
    :path (str (:local-data-path env) "/object-db")})
 
 (def sequence-feature-db
@@ -304,8 +304,6 @@
    :subscribe :base-data
    :backing-store :api-tdb
    :interceptors [publish-record-to-system-topic
-                  #_base/read-base-data
-                  #_base/store-model
                   base/base-event
                   response-cache/invalidate-cache]})
 
@@ -576,11 +574,9 @@
   {:type :genegraph-app
    :kafka-clusters {:data-exchange data-exchange}
    :storage {:api-tdb (assoc api-tdb :load-snapshot true)
-             :response-cache-db response-cache-db}
-   :topics {:gene-validity-sepio
-            (assoc gene-validity-sepio-topic
-                   :type :kafka-reader-topic)
-            :api-log
+             :response-cache-db response-cache-db
+             :object-db (assoc object-db :load-snapshot true)}
+   :topics {:api-log
             (assoc api-log-topic
                    :type :kafka-producer-topic)
             :dosage
@@ -592,8 +588,7 @@
             :clinvar-curation
             (assoc clinvar-curation-topic
                    :type :kafka-producer-topic)}
-   :processors {:import-gv-curations import-gv-curations
-                :import-base-file import-base-processor
+   :processors {:import-base-file import-base-processor
                 :graphql-api graphql-api
                 :graphql-ready graphql-ready
                 :import-dosage-curations import-dosage-curations}

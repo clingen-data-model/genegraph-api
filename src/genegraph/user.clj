@@ -95,7 +95,7 @@
              :type :simple-queue-topic}}
    :storage {:api-tdb api/api-tdb
              :response-cache-db api/response-cache-db
-             :sequence-feature-db api/sequence-feature-db
+             #_#_:sequence-feature-db api/sequence-feature-db
              :object-db api/object-db}
    :processors {:fetch-base-file api/fetch-base-processor
                 :import-base-file api/import-base-processor

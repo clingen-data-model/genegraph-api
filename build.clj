@@ -6,7 +6,7 @@
   "The defaults to configure a build."
   {:class-dir  "target/classes"
    :java-opts  ["-Dclojure.main.report=stderr"]
-   :main       'genegraph.gene-validity
+   :main       'genegraph.api
    :path       "target"
    :project    "deps.edn"
    :target-dir "target/classes"
@@ -22,5 +22,5 @@
     (b/copy-dir    (assoc project :src-dirs paths))
     (b/compile-clj (assoc project
                           :src-dirs ["src"]
-                          :ns-compile ['genegraph.gene-validity]))
+                          :ns-compile ['genegraph.api]))
     (b/uber        project)))
