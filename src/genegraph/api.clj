@@ -278,13 +278,13 @@
 (def api-tdb
   {:type :rdf
    :name :api-tdb
-   :snapshot-handle (assoc (:fs-handle env) :path "api-tdb-v1.nq.gz")
+   :snapshot-handle (assoc (:fs-handle env) :path "api-tdb-v2.nq.gz")
    :path (str (:local-data-path env) "/api-tdb")})
 
 (def object-db
   {:type :rocksdb
    :name :object-db
-   :snapshot-handle (assoc (:fs-handle env) :path "object-db-v1.lz4")
+   :snapshot-handle (assoc (:fs-handle env) :path "object-db-v2.lz4")
    :path (str (:local-data-path env) "/object-db")})
 
 (def sequence-feature-db
@@ -437,7 +437,7 @@
                   publish-result-interceptor
                   query-timer-interceptor
                   lacinia-pedestal/body-data-interceptor
-                  response-cache/response-cache
+                  #_response-cache/response-cache
                   jena-transaction-interceptor
                   lacinia-pedestal/json-response-interceptor
                   report-error-interceptor

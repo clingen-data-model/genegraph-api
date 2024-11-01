@@ -157,9 +157,10 @@ select ?pathAssertion ?mechanismAssertion where
    :resolve create-curation-fn})
 
 (comment
-  (let [tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])]
+  (let [tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]
     (rdf/tx tdb
-      (->> (conflicts-query-fn {:tdb tdb} nil nil)
+      (->> (conflicts-query-fn {:tdb tdb :object-db object-db} nil nil)
            tap>)))
   (tap> 
    (storage/read @(get-in genegraph.user/api-test-app
