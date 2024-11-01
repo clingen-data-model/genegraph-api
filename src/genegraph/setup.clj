@@ -95,7 +95,7 @@
                           ::event/key (:name %)})))
 
   (->> (-> "base.edn" io/resource slurp edn/read-string)
-       (filter #(= "http://purl.obolibrary.org/obo/mondo.owl" (:name %)))
+       (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/" (:name %)))
        (run! #(p/publish (get-in seed-base-event
                                  [:topics :fetch-base-events])
                          {::event/data %
