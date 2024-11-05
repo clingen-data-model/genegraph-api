@@ -6,8 +6,7 @@
   (:import [java.time Instant]))
 
 (defn conflicts-query-fn [{:keys [tdb object-db]} args _]
-  (let [haplo-conflict-query (def haplo-conflict-query
-  (rdf/create-query "
+  (let [haplo-conflict-query (rdf/create-query "
 select ?pathAssertion ?mechanismAssertion where 
 { ?mechanismAssertion :cg/evidenceStrength :cg/DosageSufficientEvidence ;
   :cg/subject ?dosageProp .
@@ -21,7 +20,7 @@ select ?pathAssertion ?mechanismAssertion where
   FILTER NOT EXISTS { ?pathAssertion :cg/reviewStatus :cg/Flagged }
   FILTER NOT EXISTS { ?pathAssertion :cg/direction :cg/Supports }
 }
-"))]
+")]
     (->> (haplo-conflict-query tdb {::rdf/params {:type :table}})
          (group-by :pathAssertion)
          (mapv (fn [[path-assertion tuples]]
