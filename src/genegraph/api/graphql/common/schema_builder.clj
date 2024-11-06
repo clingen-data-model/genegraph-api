@@ -20,7 +20,7 @@
 
 (def type-query (rdf/create-query "select ?type where {?resource a / :rdfs/subClassOf * ?type}"))
 
-(defn resolve-type [resource schema]
+(defn rdf-type [resource schema]
   (if resource
     (let [resource-types (->> (type-query resource {:resource resource})
                               (map rdf/->kw)
@@ -33,6 +33,18 @@
         (:default-type-mapping schema)))
     (:default-type-mapping schema)))
 
+(defn edn-type [resource schema]
+  (if (and (map? resource) (:type resource))
+    (-> (filter #(= (:type resource) (first %))
+                (:type-mappings schema))
+        first
+        second)
+    false))
+
+(defn resolve-type [resource schema]
+  (or (edn-type resource schema)
+      (rdf-type resource schema)))
+
 (defn- construct-resolver-from-path [field]
   (if (:path field)
     (let [resolver-fn (if (is-list? field)
@@ -43,7 +55,7 @@
       (assoc field :resolve resolver-fn))
     field))
 
-(defn- attach-type-to-resolver-result [field schema]
+(defn- attach-type-to-resolver-result [field schema] 
   (if-let [resolver-fn (:resolve field)]
     (if (is-object? field)
       (if (is-list? field)

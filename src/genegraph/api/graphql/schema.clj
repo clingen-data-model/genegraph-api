@@ -17,6 +17,7 @@
             [genegraph.api.graphql.schema.case-cohort :as model-case-cohort]
             [genegraph.api.graphql.schema.control-cohort :as model-control-cohort]
             [genegraph.api.graphql.schema.variation-descriptor :as variation-descriptor]
+            [genegraph.api.graphql.schema.evidence-strength-assertion :as es-assertion]
             [genegraph.api.graphql.legacy-schema :as legacy-schema]
             [genegraph.api.graphql.common.schema-builder :as schema-builder]
             [com.walmartlabs.lacinia :as lacinia]
@@ -42,19 +43,7 @@
 
 (def rdf-to-graphql-type-mappings
   {:type-mappings
-   [[:sepio/Assertion :Statement]
-    [:sepio/Proposition :Statement]
-    [:prov/Agent :Agent]
-    [:sepio/EvidenceLine :Statement]
-    [:dc/BibliographicResource :BibliographicResource]
-    [:sepio/ProbandWithVariantEvidenceItem :ProbandEvidence]
-    [:sepio/VariantEvidenceItem :VariantEvidence]
-    [:ga4gh/VariationDescriptor :VariationDescriptor]
-    [:sepio/FamilyCosegregation :Segregation]
-    [:sepio/CaseControlEvidenceItem :CaseControlEvidence]
-    [:stato/Cohort :Cohort]
-    [:sepio/ValueSet :ValueSet]
-    [:pco/Family :Family]]
+   [[:cg/EvidenceStrengthAssertion :EvidenceStrengthAssertion]]
    :default-type-mapping :GenericResource})
 
 ;; changing to function to benefit from dynamic type bindings
@@ -75,7 +64,7 @@
    ;; model-find/find-query
    ;; model-find/query-result
    model-conflicts/mechanism-assertion
-   model-conflicts/assertion
+   es-assertion/assertion
    model-conflicts/conflicts-query
    model-conflicts/resource
    model-conflicts/conflict-curation

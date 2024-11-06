@@ -51,62 +51,12 @@ select ?pathAssertion ?mechanismAssertion where
             :label {:type 'String
                     :path [:rdfs/label]}}})
 
-(defn scv-date [{:keys [tdb]} _ v]
-  (let [contribs (group-by :cg/role (:cg/contributions v))]
-    (-> (some #(get contribs %)
-           [:cg/Evaluator
-            :cg/Submitter
-            :cg/Creator])
-        first
-        :cg/date)))
-
-(defn assertion-label [{:keys [object-db]} _ v]
-  (let [get-object #(storage/read object-db [:objects %])]
-    (-> v
-        :cg/subject
-        get-object
-        :cg/variant
-        get-object
-        :rdfs/label)))
-
-(def assertion
-  {:name :Assertion
-   :graphql-type :object
-   :skip-type-resolution true
-   :fields {:iri {:type 'String}
-            
-            :conflictingAssertions
-            {:type '(list :GeneticConditionMechanismAssertion)
-             :resolve (fn [_ _ v] (:conflictingAssertions v))}
-            
-            :classification
-            {:type :Resource
-             :resolve (fn [{:keys [tdb]} _ v]
-                        (rdf/resource (:cg/classification v)
-                                      tdb))}
-            ;; :comments {}
-            :submitter
-            {:type :Resource
-             :resolve (fn [{:keys [tdb]} _ v]
-                        (-> (:cg/contributions v)
-                            first
-                            :cg/agent
-                            (rdf/resource tdb)))}
-            
-            :date {:type 'String
-                   :resolve scv-date}
-            :label {:type 'String
-                    :resolve assertion-label}
-            ;; :reviewStatus {}
-            ;; :description {}
-            }})
-
 (def conflicts-query
   {:name :conflicts
    :graphql-type :query
    :description "Query to find conflicts in interpretation between knowledge statements, such as GeneticConditionMechanismPropositions and VariantPathogenicityPropositions."
-   :type '(list :Assertion)
-   :skip-type-resolution true
+   :type '(list :EvidenceStrengthAssertion)
+   ;;:skip-type-resolution true
    :resolve conflicts-query-fn})
 
 (def conflict-curation
@@ -115,7 +65,7 @@ select ?pathAssertion ?mechanismAssertion where
    :description "An assessment on a clinvar curation"
    :skip-type-resolution true
    :fields {:iri {:type 'String}
-            :subject {:type :Assertion}
+            :subject {:type :EvidenceStrengthAssertion}
             :classification {:type 'String}
             :description {:type 'String}
             :agent {:type 'String}
@@ -156,12 +106,13 @@ select ?pathAssertion ?mechanismAssertion where
       (->> (conflicts-query-fn {:tdb tdb :object-db object-db} nil nil)
            tap>)))
   
-  (storage/read @(get-in genegraph.user/api-test-app
-                         [:storage :object-db :instance])
-                [:objects
-                 #_"https://identifiers.org/clinvar.submission:SCV000176131"
-                 #_"https://genegraph.clingen.app/unMuqS1LlBQ"
+  (tap>
+   (storage/read @(get-in genegraph.user/api-test-app
+                          [:storage :object-db :instance])
+                 [:objects
+                  "https://identifiers.org/clinvar.submission:SCV000176131"
+                  #_"https://genegraph.clingen.app/unMuqS1LlBQ"
 
-                 "https://identifiers.org/clinvar:146850"])
-
+                  #_"https://identifiers.org/clinvar:146850"]))
+  
   )

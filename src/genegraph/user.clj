@@ -592,8 +592,8 @@ select ?variant where
 ")]
     (rdf/tx tdb
       (->> (q tdb {:type :cg/GeneticConditionMechanismProposition})
-           count
-           #_(mapv str))))
+           first
+)))
 
     (+ 1 1)
   
