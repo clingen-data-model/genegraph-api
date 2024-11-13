@@ -2,7 +2,8 @@
   (:require [genegraph.framework.storage.rdf.names :as names :refer [add-prefixes add-keyword-mappings]]))
 
 (add-prefixes
-{"dc" "http://purl.org/dc/terms/"
+{"genegraph" "https://genegraph.clingen.app/"
+ "dc" "http://purl.org/dc/terms/"
  "hp" "http://purl.obolibrary.org/obo/HP_"
  "sepio" "http://purl.obolibrary.org/obo/SEPIO_"
  "geno" "http://purl.obolibrary.org/obo/GENO_"

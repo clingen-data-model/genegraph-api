@@ -20,8 +20,8 @@
    model-resource/generic-resource
    model-resource/resource-query
    ;; model-conflicts/mechanism-assertion
-   ;; es-assertion/assertion
-   ;; model-conflicts/conflicts-query
+   es-assertion/assertion
+   model-conflicts/conflicts-query
    ;; model-conflicts/resource
    ;; model-conflicts/conflict-curation
    ;; model-conflicts/create-curation

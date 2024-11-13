@@ -2,10 +2,12 @@
   (:require [genegraph.framework.storage.rdf :as rdf]
             [genegraph.framework.storage :as storage]
             [genegraph.framework.event :as event]
+            [genegraph.api.hybrid-resource :as hr]
+            [com.walmartlabs.lacinia.schema :as schema]
             [io.pedestal.log :as log])
   (:import [java.time Instant]))
 
-(defn conflicts-query-fn [{:keys [tdb object-db]} args _]
+(defn conflicts-query-fn [{:keys [tdb object-db] :as context} args _]
   (let [haplo-conflict-query (rdf/create-query "
 select ?pathAssertion ?mechanismAssertion where 
 { ?mechanismAssertion :cg/evidenceStrength :cg/DosageSufficientEvidence ;
@@ -21,14 +23,16 @@ select ?pathAssertion ?mechanismAssertion where
   FILTER NOT EXISTS { ?pathAssertion :cg/direction :cg/Supports }
 }
 ")]
+    (tap> context)
     (->> (haplo-conflict-query tdb {::rdf/params {:type :table}})
          (group-by :pathAssertion)
          (mapv (fn [[path-assertion tuples]]
-                 (assoc (storage/read object-db [:objects (str path-assertion)])
-                        ::rdf/resource path-assertion
+                 (assoc (hr/hybrid-resource path-assertion
+                                            context)
                         :conflictingAssertions
                         (mapv (fn [{:keys [mechanismAssertion]}]
-                                mechanismAssertion)
+                                (hr/hybrid-resource mechanismAssertion
+                                                    context))
                               tuples)))))))
 
 ;; Technical debt, in case anyone is wondering

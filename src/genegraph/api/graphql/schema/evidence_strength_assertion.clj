@@ -25,26 +25,30 @@
 (def assertion
   {:name :EvidenceStrengthAssertion
    :graphql-type :object
-   :skip-type-resolution true
+   :implements [:Resource]
    :fields {:iri {:type 'String}
             
             :conflictingAssertions
-            {:type '(list :GeneticConditionMechanismAssertion)
+            {:type '(list :EvidenceStrengthAssertion)
              :resolve (fn [_ _ v] (:conflictingAssertions v))}
+
+            :subject
+            {:type :Resource
+             :path [:cg/subject]}
             
-            :classification
-            {:type :Resource
-             :resolve (fn [{:keys [tdb]} _ v]
-                        (rdf/resource (:cg/classification v)
-                                      tdb))}
+            ;; :classification
+            ;; {:type :Resource
+            ;;  :resolve (fn [{:keys [tdb]} _ v]
+            ;;             (rdf/resource (:cg/classification v)
+            ;;                           tdb))}
             ;; :comments {}
-            :submitter
-            {:type :Resource
-             :resolve (fn [{:keys [tdb]} _ v]
-                        (-> (:cg/contributions v)
-                            first
-                            :cg/agent
-                            (rdf/resource tdb)))}
+            ;; :submitter
+            ;; {:type :Resource
+            ;;  :resolve (fn [{:keys [tdb]} _ v]
+            ;;             (-> (:cg/contributions v)
+            ;;                 first
+            ;;                 :cg/agent
+            ;;                 (rdf/resource tdb)))}
             
             :date {:type 'String
                    :resolve scv-date}
