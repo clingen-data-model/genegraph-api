@@ -546,8 +546,8 @@
   (let [object-db @(get-in api-test-app [:storage :object-db :instance])
         tdb @(get-in api-test-app [:storage :api-tdb :instance])
         var-query (rdf/create-query "select ?x where { ?x a :cg/CanonicalVariant }")]
-    #_(storage/read object-db [:objects "https://identifiers.org/clinvar:536"])
-    (rdf/tx tdb
+    (tap> (storage/read object-db [:objects "https://identifiers.org/clinvar:536"]))
+    #_(rdf/tx tdb
       (count (var-query tdb)))
     )
 

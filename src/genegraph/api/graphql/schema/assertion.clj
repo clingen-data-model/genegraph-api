@@ -1,4 +1,4 @@
-(ns genegraph.api.graphql.schema.evidence-strength-assertion
+(ns genegraph.api.graphql.schema.assertion
   (:require [genegraph.framework.storage.rdf :as rdf]
             [genegraph.framework.storage :as storage]
             [genegraph.framework.event :as event]
@@ -26,9 +26,7 @@
   {:name :EvidenceStrengthAssertion
    :graphql-type :object
    :implements [:Resource]
-   :fields {:iri {:type 'String}
-            
-            :conflictingAssertions
+   :fields {:conflictingAssertions
             {:type '(list :EvidenceStrengthAssertion)
              :resolve (fn [_ _ v] (:conflictingAssertions v))}
 
@@ -36,11 +34,9 @@
             {:type :Resource
              :path [:cg/subject]}
             
-            ;; :classification
-            ;; {:type :Resource
-            ;;  :resolve (fn [{:keys [tdb]} _ v]
-            ;;             (rdf/resource (:cg/classification v)
-            ;;                           tdb))}
+            :classification
+            {:type :Resource
+             :path [:cg/classification]}
             ;; :comments {}
             ;; :submitter
             ;; {:type :Resource
@@ -57,3 +53,9 @@
             ;; :reviewStatus {}
             ;; :description {}
             }})
+
+(def variant-pathogenicity-proposition
+  {:name :VariantPathogenicityProposition
+   :graphql-type :object
+   :implements [:Resource]
+   :fields {:variant {:type :Variant}}})

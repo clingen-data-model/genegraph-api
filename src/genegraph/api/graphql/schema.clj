@@ -1,7 +1,9 @@
 (ns genegraph.api.graphql.schema
   (:require [genegraph.api.graphql.schema.resource :as model-resource]
+            [genegraph.api.graphql.schema.sequence-location :as sequence-location]
             [genegraph.api.graphql.schema.conflicts :as model-conflicts]
-            [genegraph.api.graphql.schema.evidence-strength-assertion :as es-assertion]
+            [genegraph.api.graphql.schema.assertion :as assertion]
+            [genegraph.api.graphql.schema.variant :as variant]
             [genegraph.api.graphql.legacy-schema :as legacy-schema]
             [genegraph.api.graphql.common.schema-builder :as schema-builder]
             [com.walmartlabs.lacinia :as lacinia]
@@ -10,7 +12,10 @@
 
 (def rdf-to-graphql-type-mappings
   {:type-mappings
-   [[:cg/EvidenceStrengthAssertion :EvidenceStrengthAssertion]]
+   [[:cg/EvidenceStrengthAssertion :EvidenceStrengthAssertion]
+    [:cg/CanonicalVariant :CanonicalVariant]
+    [:ga4gh/CopyNumberChange :CopyNumberChange]
+    [:ga4gh/SequenceLocation :SequenceLocation]]
    :default-type-mapping :GenericResource})
 
 ;; changing to function to benefit from dynamic type bindings
@@ -19,8 +24,11 @@
    model-resource/resource-interface
    model-resource/generic-resource
    model-resource/resource-query
+   sequence-location/sequence-location
+   variant/canonical-variant
+   variant/copy-number-variant
    ;; model-conflicts/mechanism-assertion
-   es-assertion/assertion
+   assertion/assertion
    model-conflicts/conflicts-query
    ;; model-conflicts/resource
    ;; model-conflicts/conflict-curation

@@ -1,6 +1,7 @@
 (ns genegraph.api.hybrid-resource
   "Extensions and functions to support a hybrid database architecture"
   (:require [genegraph.framework.storage.rdf.types :as rdf-types]
+            [genegraph.framework.storage.rdf.names :as names]
             [genegraph.framework.storage.rdf :as rdf]
             [genegraph.framework.storage :as storage]
             [io.pedestal.log :as log])
@@ -56,6 +57,11 @@
     (if iri
       (assoc o ::rdf/resource (rdf/resource iri tdb))
       (assoc o ::rdf/resource (rdf/resource (rdf/blank-node) tdb)))))
+
+(extend-type clojure.lang.Keyword
+  AsHybridResource
+  (hybrid-resource [kw opts]
+    (hybrid-resource (names/kw->iri kw) opts)))
 
 (defn resource? [r]
   (instance? Resource r))
