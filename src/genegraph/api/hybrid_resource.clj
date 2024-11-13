@@ -28,16 +28,6 @@
   (ld-> [this ks] (rdf-types/ld-> (rdf-types/resource this) ks))
   (ld1-> [this ks] (rdf-types/ld1-> (rdf-types/resource this) ks)))
 
-(defn resource->hybrid-resource
-  "Take Jena resource r, and reference to RocksDB 
-   object store db, and return "
-  [r {:keys [object-db tdb]}]
-  (let [o (storage/read object-db [:objects (str r)])]
-    (if (= ::storage/miss o)
-      {::rdf/resource r
-       :iri (str r)}
-      (assoc o ::rdf/resource r))))
-
 (defprotocol AsHybridResource
   (hybrid-resource [v opts]))
 
@@ -77,12 +67,9 @@
   [hr opts attrs]
   (if-let [attr (or (some #(get hr %) attrs)
                     (rdf/ld1->* hr attrs))]
-    (cond
-      (:primitive opts) attr
-      (string? attr) (resource->hybrid-resource (rdf/resource attr (:tdb opts))
-                                                opts)
-      (resource? attr) (resource->hybrid-resource attr
-                                                  opts))))
+    (if (:primitive opts)
+      attr
+      (hybrid-resource attr opts))))
 
 (defn path->
   "Return first attribute matching from hybrid resource. Map keys are
@@ -94,12 +81,9 @@
                                (rdf/ld->* hr attrs)))]
     (if (:primitive opts)
       values
-      (set
-       (map (fn [v]
-              (if (string? v)
-                (resource->hybrid-resource (rdf/resource v (:tdb opts)) opts)
-                (resource->hybrid-resource v opts)))
-            values)))))
+      (->> values
+           (map #(hybrid-resource % opts))
+           set))))
 
 
 (comment

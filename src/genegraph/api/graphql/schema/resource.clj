@@ -23,13 +23,11 @@
 
 (defn hybrid-types [{:keys [tdb object-db] :as opts} args value]
   (let [rdf-types (mapv
-                   #(hr/resource->hybrid-resource % opts)
+                   #(hr/hybrid-resource % opts)
                    (rdf-types args value))]
     (if (seq rdf-types) 
       rdf-types ; type in Jena
-      [(hr/resource->hybrid-resource
-        (rdf/resource (:type value) tdb)
-        opts)])))
+      [(hr/hybrid-resource (:type value) opts)])))
 
 (def resource-interface
   {:name :Resource
@@ -90,7 +88,7 @@
    :args {:iri {:type 'String}}
    :type :Resource
    :resolve (fn [context args _]
-              (hr/resource->hybrid-resource (rdf/resource (:iri args) (:tdb context))
-                                            (select-keys context [:object-db :tdb])))})
+              (hr/hybrid-resource (:iri args) 
+                                  (select-keys context [:object-db :tdb])))})
 
 
