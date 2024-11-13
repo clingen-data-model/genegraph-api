@@ -1,5 +1,6 @@
 (ns genegraph.api.graphql.schema
-  (:require [genegraph.api.graphql.schema.conflicts :as model-conflicts]
+  (:require [genegraph.api.graphql.schema.resource :as model-resource]
+            [genegraph.api.graphql.schema.conflicts :as model-conflicts]
             [genegraph.api.graphql.schema.evidence-strength-assertion :as es-assertion]
             [genegraph.api.graphql.legacy-schema :as legacy-schema]
             [genegraph.api.graphql.common.schema-builder :as schema-builder]
@@ -15,12 +16,16 @@
 ;; changing to function to benefit from dynamic type bindings
 (defn model []
   [rdf-to-graphql-type-mappings
-   model-conflicts/mechanism-assertion
-   es-assertion/assertion
-   model-conflicts/conflicts-query
-   model-conflicts/resource
-   model-conflicts/conflict-curation
-   model-conflicts/create-curation])
+   model-resource/resource-interface
+   model-resource/generic-resource
+   model-resource/resource-query
+   ;; model-conflicts/mechanism-assertion
+   ;; es-assertion/assertion
+   ;; model-conflicts/conflicts-query
+   ;; model-conflicts/resource
+   ;; model-conflicts/conflict-curation
+   ;; model-conflicts/create-curation
+   ])
 
 
 (defn schema

@@ -631,8 +631,9 @@ select ?variant where
 
   (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])]
     (rdf/tx tdb
-      (-> (rdf/resource "https://identifiers.org/clinvar.submitter:1006" tdb)
-          (rdf/ld1-> [:rdfs/label]))))
+      (rdf/resource (rdf/blank-node) tdb)
+      #_(-> (rdf/resource "https://identifiers.org/clinvar.submitter:1006" tdb)
+            (rdf/ld1-> [:rdfs/label]))))
   
   
   )

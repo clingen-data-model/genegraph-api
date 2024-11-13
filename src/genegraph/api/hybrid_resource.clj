@@ -2,7 +2,8 @@
   "Extensions and functions to support a hybrid database architecture"
   (:require [genegraph.framework.storage.rdf.types :as rdf-types]
             [genegraph.framework.storage.rdf :as rdf]
-            [genegraph.framework.storage :as storage])
+            [genegraph.framework.storage :as storage]
+            [io.pedestal.log :as log])
   (:import [org.apache.jena.rdf.model Model Resource ModelFactory
             ResourceFactory Statement Property]))
 
@@ -15,26 +16,90 @@
                  (rdf-types/resource r model)
                  (rdf-types/resource (:iri m) model))))
 
+  rdf-types/AsRDFNode
+  (rdf-types/to-rdf-node [m]
+    (rdf-types/resource m))
+
+  rdf-types/AsModel
+  (rdf-types/model [m]
+    (rdf-types/model (::rdf/resource m)))
+
   rdf-types/ThreadableData
   (ld-> [this ks] (rdf-types/ld-> (rdf-types/resource this) ks))
-  (ld1-> [this ks] (rdf-types/ld1-> (rdf-types/resource this) ks))
-  )
+  (ld1-> [this ks] (rdf-types/ld1-> (rdf-types/resource this) ks)))
 
-(defn resource->hybrid-resource [r db]
-  (assoc (storage/read db [:objects (str r)])
-         ::rdf/resource r))
+(defn resource->hybrid-resource
+  "Take Jena resource r, and reference to RocksDB 
+   object store db, and return "
+  [r {:keys [object-db tdb]}]
+  (let [o (storage/read object-db [:objects (str r)])]
+    (if (= ::storage/miss o)
+      {::rdf/resource r
+       :iri (str r)}
+      (assoc o ::rdf/resource r))))
 
-(defn path->
-  "Similar to ld-> function, but maps output to a hybrid resource
-   populated by the data in (::db this)"
-  [this ks db]
-  (map #(resource->hybrid-resource % db) (rdf/ld-> this ks)))
+(defprotocol AsHybridResource
+  (hybrid-resource [v opts]))
+
+(extend-type Resource
+  AsHybridResource
+  (hybrid-resource [r {:keys [object-db tdb]}]
+    (let [o (storage/read object-db [:objects (str r)])]
+      (if (= ::storage/miss o)
+        {::rdf/resource r
+         :iri (str r)}
+        (assoc o ::rdf/resource r)))))
+
+(extend-type java.lang.String
+  AsHybridResource
+  (hybrid-resource [v {:keys [object-db tdb]}]
+    (let [o (storage/read object-db [:objects v])
+          r (rdf/resource v tdb)]
+      (if (= ::storage/miss o)
+        {::rdf/resource r
+         :iri v}
+        (assoc o ::rdf/resource r)))))
+
+(extend-type clojure.lang.IPersistentMap
+  AsHybridResource
+  (hybrid-resource [{:keys [iri] :as o} {:keys [object-db tdb]}]
+    (if iri
+      (assoc o ::rdf/resource (rdf/resource iri tdb))
+      (assoc o ::rdf/resource (rdf/resource (rdf/blank-node) tdb)))))
+
+(defn resource? [r]
+  (instance? Resource r))
 
 (defn path1->
-  "Similar to ld, ld1 functions, but maps output to a hybrid resource
-   populated by the data in (::db this)"
-  [this ks db]
-  (first (path-> this ks db)))
+  "Return first attribute matching from hybrid resource. Map keys are
+  prioritized. Return a hybrid value unless a primitive is explicitly
+  specified."
+  [hr opts attrs]
+  (if-let [attr (or (some #(get hr %) attrs)
+                    (rdf/ld1->* hr attrs))]
+    (cond
+      (:primitive opts) attr
+      (string? attr) (resource->hybrid-resource (rdf/resource attr (:tdb opts))
+                                                opts)
+      (resource? attr) (resource->hybrid-resource attr
+                                                  opts))))
+
+(defn path->
+  "Return first attribute matching from hybrid resource. Map keys are
+  prioritized. Return a hybrid value unless a primitive is explicitly
+  specified."
+  [hr opts attrs]
+  (let [values (remove nil?
+                       (concat (map #(get hr %) attrs)
+                               (rdf/ld->* hr attrs)))]
+    (if (:primitive opts)
+      values
+      (set
+       (map (fn [v]
+              (if (string? v)
+                (resource->hybrid-resource (rdf/resource v (:tdb opts)) opts)
+                (resource->hybrid-resource v opts)))
+            values)))))
 
 
 (comment

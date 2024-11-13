@@ -7,6 +7,7 @@
  "sepio" "http://purl.obolibrary.org/obo/SEPIO_"
  "geno" "http://purl.obolibrary.org/obo/GENO_"
  "mondo" "http://purl.obolibrary.org/obo/MONDO_"
+ "so" "http://purl.obolibrary.org/obo/SO_"
  "cg" "http://dataexchange.clinicalgenome.org/terms/"
  "cgdosage" "http://dataexchange.clinicalgenome.org/dci/"
  "cggv" "http://dataexchange.clinicalgenome.org/gci/"
@@ -194,6 +195,8 @@
   :sepio/ClinGenGeneValidityEvaluationCriteriaSOP4 "http://purl.obolibrary.org/obo/SEPIO_0004092"
   :sepio/ClinGenGeneValidityEvaluationCriteriaSOP5
   "http://purl.obolibrary.org/obo/SEPIO_0004093"
+
+  
   :efo/copy-number-loss "http://www.ebi.ac.uk/efo/EFO_0030067"
   :efo/copy-number-gain "http://www.ebi.ac.uk/efo/EFO_0030070"}) ; gci-ex only
 

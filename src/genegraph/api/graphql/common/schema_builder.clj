@@ -1,5 +1,6 @@
 (ns genegraph.api.graphql.common.schema-builder
   (:require [genegraph.framework.storage.rdf :as rdf]
+            [genegraph.api.hybrid-resource :as hr]
             [com.walmartlabs.lacinia :as lacinia]
             [com.walmartlabs.lacinia.schema :as schema]
             [com.walmartlabs.lacinia.util :as util]))
@@ -13,6 +14,9 @@
   (if (is-list? field)
     (keyword? (second (:type field)))
     (keyword? (:type field))))
+
+(defn is-primitive? [field]
+  (not (is-object? field)))
 
 ;; This has always been a performance concern. Will implement as-is for now
 ;; but it's probably worth optimizing the conversion of a Jena type into a GraphQL
@@ -45,14 +49,21 @@
   (or (edn-type resource schema)
       (rdf-type resource schema)))
 
+;; TODO 11/12 Design replacement for path
+;; leverage attr1-> function in hybrid-resource
+;; 
+
 (defn- construct-resolver-from-path [field]
   (if (:path field)
-    (let [resolver-fn (if (is-list? field)
-                        (fn [_ _ value]
-                          (rdf/ld-> value (:path field)))
-                        (fn [_ _ value]
-                          (rdf/ld1-> value (:path field))))]
-      (assoc field :resolve resolver-fn))
+    (assoc field
+           :resolve
+           (fn [context _ value]
+             ((if (is-list? field) hr/path-> hr/path1->)
+              value
+              (-> context
+                  (select-keys [:tdb :object-db])
+                  (assoc :primitive (is-primitive? field)))
+              (:path field))))
     field))
 
 (defn- attach-type-to-resolver-result [field schema] 
