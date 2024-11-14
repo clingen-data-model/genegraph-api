@@ -21,9 +21,8 @@ select ?pathAssertion ?mechanismAssertion where
   ?pathAssertion :cg/subject ?pathProp .
   FILTER NOT EXISTS { ?pathAssertion :cg/reviewStatus :cg/Flagged }
   FILTER NOT EXISTS { ?pathAssertion :cg/direction :cg/Supports }
-}
+} limit 1
 ")]
-    (tap> context)
     (->> (haplo-conflict-query tdb {::rdf/params {:type :table}})
          (group-by :pathAssertion)
          (mapv (fn [[path-assertion tuples]]

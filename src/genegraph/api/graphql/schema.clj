@@ -13,6 +13,7 @@
 (def rdf-to-graphql-type-mappings
   {:type-mappings
    [[:cg/EvidenceStrengthAssertion :EvidenceStrengthAssertion]
+    [:cg/VariantPathogenicityProposition :VariantPathogenicityProposition]
     [:cg/CanonicalVariant :CanonicalVariant]
     [:ga4gh/CopyNumberChange :CopyNumberChange]
     [:ga4gh/SequenceLocation :SequenceLocation]]
@@ -29,6 +30,7 @@
    variant/copy-number-variant
    ;; model-conflicts/mechanism-assertion
    assertion/assertion
+   assertion/variant-pathogenicity-proposition
    model-conflicts/conflicts-query
    ;; model-conflicts/resource
    ;; model-conflicts/conflict-curation

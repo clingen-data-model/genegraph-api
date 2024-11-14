@@ -82,9 +82,9 @@
   prioritized. Return a hybrid value unless a primitive is explicitly
   specified."
   [hr opts attrs]
-  (let [values (remove nil?
-                       (concat (map #(get hr %) attrs)
-                               (rdf/ld->* hr attrs)))]
+  (let [values (->> (mapcat #(get hr %) attrs)
+                    (concat (rdf/ld->* hr attrs))
+                    (remove nil?))]
     (if (:primitive opts)
       values
       (->> values

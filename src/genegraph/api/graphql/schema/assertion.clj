@@ -58,4 +58,5 @@
   {:name :VariantPathogenicityProposition
    :graphql-type :object
    :implements [:Resource]
-   :fields {:variant {:type :Variant}}})
+   :fields {:variant {:type :Resource
+                      :path [:cg/variant]}}})
