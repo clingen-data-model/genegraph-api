@@ -46,6 +46,7 @@
             ;;                 :cg/agent
             ;;                 (rdf/resource tdb)))}
             
+            
             :date {:type 'String
                    :resolve scv-date}
             :label {:type 'String
@@ -60,3 +61,15 @@
    :implements [:Resource]
    :fields {:variant {:type :Resource
                       :path [:cg/variant]}}})
+
+(def genetic-condition-mechanism-proposition
+  {:name :GeneticConditionMechanismProposition
+   :graphql-type :object
+   :description "Proposition that variation affecting a given feature is causative of a condition, specified or unspecified, with a particular mechanism of action (haploinsufficiency, triplosensitivity, etc), if available."
+   :implements [:Resource]
+   :fields {:feature {:type :SequenceFeature
+                      :path [:cg/feature]}
+            :mechanism {:type :Resource
+                        :path [:cg/mechanism]}
+            :condition {:type :Resource
+                        :path [:cg/condition]}}})

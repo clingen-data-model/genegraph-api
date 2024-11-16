@@ -114,6 +114,22 @@
      [:copy-count])
     {}))
 
+(defn classification-allele->allele [z]
+  (if-let [sa (xml-zip/xml1-> z :SimpleAllele)]
+    {:allele-id (xml-zip/attr sa :AlleleID)
+     :variation-id (xml-zip/attr sa :VariationID)
+     :variant-type (xml-zip/xml1-> sa :VariantType xml-zip/text)
+     :spdi (xml-zip/xml1-> sa :CanonicalSPDI xml-zip/text)
+     :genes (vec (xml-zip/xml-> sa :GeneList :Gene (xml-zip/attr :GeneID)))
+     :name (xml-zip/xml1-> sa :Name xml-zip/text)
+     :location (clinvar-zip-node->allele-locations sa)
+     :hgvs (xml-zip/xml-> sa
+                          :AttributeSet
+                          :Attribute
+                          (xml-zip/attr= :Type "HGVS")
+                          xml-zip/text)}
+    {}))
+
 (defn clinvar-zip-node->classifications [n]
   (mapv
    (fn [n1]
@@ -127,6 +143,7 @@
               :SubmitterName
               :OrgID
               :OrganizationCategory])
+            :SimpleAllele (classification-allele->allele n1)
             :DateLastEvaluated (xml-zip/xml1->
                                 n1
                                 :Classification
@@ -137,10 +154,10 @@
                            :ReviewStatus
                            xml-zip/text)
             :Comment (xml-zip/xml1->
-                           n1
-                           :Classification
-                           :Comment
-                           xml-zip/text)
+                      n1
+                      :Classification
+                      :Comment
+                      xml-zip/text)
             :Classification (xml-zip/xml1->
                              n1
                              :Classification
@@ -225,15 +242,35 @@
 
 
 (defn clinvar-variant->ga4gh-alleles [{:keys [location
-                                              variant-type]}]
+                                              variant-type
+                                              hgvs
+                                              spdi]
+                                       :as clinvar-variant}]
+  (tap> clinvar-variant)
   (mapv (fn [l]
-            (let [vrs-allele
-                  {:type :ga4gh/CopyNumberChange
-                   :ga4gh/copyChange (variant-type->efo-term
-                                      variant-type)
-                   :ga4gh/location (clinvar-loc->ga4gh-loc l)}]
-              (assoc vrs-allele :iri (id/iri vrs-allele))))
-          location))
+          (let [hgvs-expressions
+                (mapv (fn [v]{:type :ga4gh/Expression
+                              :ga4gh/syntax "HGVS"
+                              :ga4gh/value (if (map? v)
+                                             (:expression v)
+                                             v)})
+                      hgvs)
+                expressions (if spdi
+                              (conj
+                               hgvs-expressions
+                               {:type :ga4gh/Expression
+                                :ga4gh/syntax "SPDI"
+                                :ga4gh/value spdi})
+                              hgvs-expressions)
+
+                vrs-allele
+                {:type :ga4gh/CopyNumberChange
+                 :ga4gh/copyChange (variant-type->efo-term
+                                    variant-type)
+                 :ga4gh/location (clinvar-loc->ga4gh-loc l)
+                 :ga4gh/expressions expressions}]
+            (assoc vrs-allele :iri (id/iri vrs-allele))))
+        location))
 
 ;; classifications
 #_{"association" 20,
@@ -322,7 +359,8 @@
     (->> (select-keys scv [:DateCreated :DateLastEvaluated :DateUpdated])
          (remove #(nil? (val %)))
          (mapv (fn [[k v]]
-                 {:cg/agent scv-agent
+                 {:type :cg/Contribution
+                  :cg/agent scv-agent
                   :cg/role (get role-mapping k)
                   :cg/date v})))))
 
@@ -332,7 +370,8 @@
                     SubmissionComment
                     Comment
                     ReviewStatus
-                    Version]
+                    Version
+                    SimpleAllele]
              :as scv}]
   (let [classification (get clinvar-class->acmg-class
                             Classification
@@ -351,6 +390,9 @@
      :cg/reviewStatus (get clinvar-status->cg-status
                            ReviewStatus
                            :cg/OtherStatus)
+     :cg/submittedVariant (if SimpleAllele ; TODO pick up here
+                            (clinvar-variant->ga4gh-alleles SimpleAllele)
+                            nil)
      :cg/version Version}))
 
 (defn clinvar-variant->ga4gh [{:keys [classifications
@@ -450,22 +492,6 @@
           :cg/NoOverlap
           :cg/OuterOverlap))
       :cg/NoOverlap))
-
-#_(defn overlap-type [loc1 loc2]
-  (let [loc1-start (max-coord (:ga4gh/start loc1))
-        loc2-start (max-coord (:ga4gh/start loc2))
-        loc1-end (min-coord (:ga4gh/end loc1))
-        loc2-end (min-coord (:ga4gh/end loc2))
-        all-coords [loc1-start loc2-start loc1-end loc2-end]]
-    (cond
-      (some nil? all-coords) :cg/NoOverlap
-      (or (< loc1-end loc2-start)
-          (< loc2-end loc1-start)) :cg/NoOverlap
-      (and (< loc1-start loc2-start)
-           (< loc2-end loc1-end)) :cg/CompleteOverlap
-      (or (< loc1-start loc2-start)
-          (< loc2-end loc1-end)) :cg/PartialOverlap
-      :default (outer-overlap? loc1 loc2))))
 
 (defn overlap-type [loc1 loc2]
   (let [loc1-start (max-coord (:ga4gh/start loc1))
@@ -694,7 +720,7 @@
     (hc/build-http-client {:connect-timeout 10000
                            :redirect-policy :always}))
 
-  (tap> (get-clinvar-variants ["14206" "59149"] http-client))
+  (def test-submissions (get-clinvar-variants ["14206" "59149"] http-client))
 
   (def flagged-submission-xml (get-clinvar-variants ["1412663"] http-client))
 
@@ -703,7 +729,9 @@
   (println internal-conflict)
 
   (println flagged-submission-xml)
-  (->> (xml/parse-str flagged-submission-xml)
+
+  (println test-submissions)
+  (->> (xml/parse-str test-submissions)
        :content
        (mapv #(-> %
                   clinvar-xml->intermediate-model

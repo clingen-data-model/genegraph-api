@@ -176,8 +176,10 @@
 
 (defn- contribution
   [iri curation]
-  [[iri :cg/date (resolution-date curation)]
-   [iri :cg/role :cg/Publisher]])
+  [[iri :rdf/type :cg/Contribution]
+   [iri :cg/agent :cg/GeneDosageCurationExpertPanel]
+   [iri :cg/date (resolution-date curation)]
+   [iri :cg/role :cg/Approver]])
 
 (defn- assertion-iri [curation dosage]
   (rdf/resource (str cg-prefix (:key curation) "x" dosage "-" (updated-date curation))))

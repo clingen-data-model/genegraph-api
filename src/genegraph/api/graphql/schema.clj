@@ -1,9 +1,11 @@
 (ns genegraph.api.graphql.schema
   (:require [genegraph.api.graphql.schema.resource :as model-resource]
-            [genegraph.api.graphql.schema.sequence-location :as sequence-location]
+            [genegraph.api.graphql.schema.sequence-annotation :as sequence-annotation]
             [genegraph.api.graphql.schema.conflicts :as model-conflicts]
             [genegraph.api.graphql.schema.assertion :as assertion]
             [genegraph.api.graphql.schema.variant :as variant]
+            [genegraph.api.graphql.schema.agent :as agent]
+            [genegraph.api.graphql.schema.contribution :as contribution]
             [genegraph.api.graphql.legacy-schema :as legacy-schema]
             [genegraph.api.graphql.common.schema-builder :as schema-builder]
             [com.walmartlabs.lacinia :as lacinia]
@@ -14,6 +16,7 @@
   {:type-mappings
    [[:cg/EvidenceStrengthAssertion :EvidenceStrengthAssertion]
     [:cg/VariantPathogenicityProposition :VariantPathogenicityProposition]
+    [:cg/GeneticConditionMechanismProposition :GeneticConditionMechanismProposition]
     [:cg/CanonicalVariant :CanonicalVariant]
     [:ga4gh/CopyNumberChange :CopyNumberChange]
     [:ga4gh/SequenceLocation :SequenceLocation]]
@@ -22,14 +25,18 @@
 ;; changing to function to benefit from dynamic type bindings
 (defn model []
   [rdf-to-graphql-type-mappings
+   #_agent/agent
+   #_contribution/contribution
    model-resource/resource-interface
    model-resource/generic-resource
    model-resource/resource-query
-   sequence-location/sequence-location
+   sequence-annotation/sequence-location
+   sequence-annotation/sequence-feature
    variant/canonical-variant
    variant/copy-number-variant
    ;; model-conflicts/mechanism-assertion
    assertion/assertion
+   assertion/genetic-condition-mechanism-proposition
    assertion/variant-pathogenicity-proposition
    model-conflicts/conflicts-query
    ;; model-conflicts/resource

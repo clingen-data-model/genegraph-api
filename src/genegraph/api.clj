@@ -278,13 +278,13 @@
 (def api-tdb
   {:type :rdf
    :name :api-tdb
-   :snapshot-handle (assoc (:fs-handle env) :path "api-tdb-v2.nq.gz")
+   :snapshot-handle (assoc (:fs-handle env) :path "api-tdb-v3.nq.gz")
    :path (str (:local-data-path env) "/api-tdb")})
 
 (def object-db
   {:type :rocksdb
    :name :object-db
-   :snapshot-handle (assoc (:fs-handle env) :path "object-db-v2.lz4")
+   :snapshot-handle (assoc (:fs-handle env) :path "object-db-v3.lz4")
    :path (str (:local-data-path env) "/object-db")})
 
 (def sequence-feature-db

@@ -107,6 +107,10 @@
   :source "http://purl.obolibrary.org/obo/mondo.owl",
   :target "mondo.owl",
   :format :genegraph.framework.storage.rdf/rdf-xml}
+ {:name "http://www.ebi.ac.uk/efo"
+  :source "http://www.ebi.ac.uk/efo/efo.owl"
+  :target "efo.owl"
+  :format :genegraph.framework.storage.rdf/rdf-xml}
  {:name "https://www.genenames.org/"
   :source "https://storage.googleapis.com/public-download-files/hgnc/json/json/hgnc_complete_set.json"
   :target "hgnc.json",

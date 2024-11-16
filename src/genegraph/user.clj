@@ -163,7 +163,7 @@
                           ::event/key (:name %)})))
 
   (->> (-> "base.edn" io/resource slurp edn/read-string)
-       (filter #(= "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+       (filter #(= "http://www.ebi.ac.uk/efo"
                    (:name %)))
        (run! #(p/publish (get-in api-test-app
                                  [:topics :fetch-base-events])
