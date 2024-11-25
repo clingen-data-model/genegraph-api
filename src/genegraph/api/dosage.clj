@@ -270,6 +270,7 @@
   (let [description-field (if (= 1 dosage) :customfield_10198 :customfield_10199)]
     (or (get-in curation [:fields description-field :value]) "")))
 
+;; TODO, this looks like legacy dreck--see if it can be removed
 (defn- common-assertion-fields
   [iri curation dosage]
   []

@@ -2,6 +2,7 @@
   (:require [genegraph.framework.storage.rdf :as rdf]
             [genegraph.framework.storage :as storage]
             [genegraph.framework.event :as event]
+            [genegraph.framework.id :as id]
             [genegraph.api.hybrid-resource :as hr]
             [com.walmartlabs.lacinia.schema :as schema]
             [io.pedestal.log :as log])
@@ -21,7 +22,7 @@ select ?pathAssertion ?mechanismAssertion where
   ?pathAssertion :cg/subject ?pathProp .
   FILTER NOT EXISTS { ?pathAssertion :cg/reviewStatus :cg/Flagged }
   FILTER NOT EXISTS { ?pathAssertion :cg/direction :cg/Supports }
-} limit 1
+  FILTER NOT EXISTS { ?pathAssertion :cg/classification :cg/OtherClassification } }
 ")]
     (->> (haplo-conflict-query tdb {::rdf/params {:type :table}})
          (group-by :pathAssertion)
@@ -45,15 +46,6 @@ select ?pathAssertion ?mechanismAssertion where
             :gene {:type :Resource
                    :path [:cg/subject :cg/feature]}}})
 
-(def resource
-  {:name :Resource
-   :graphql-type :object
-   :skip-type-resolution true
-   :fields {:iri {:type 'String
-                  :resolve (fn [_ _ v] (str v))}
-            :label {:type 'String
-                    :path [:rdfs/label]}}})
-
 (def conflicts-query
   {:name :conflicts
    :graphql-type :query
@@ -62,51 +54,82 @@ select ?pathAssertion ?mechanismAssertion where
    ;;:skip-type-resolution true
    :resolve conflicts-query-fn})
 
-(def conflict-curation
-  {:name :ConflictCuration
+(def assertion-annotation
+  {:name :AssertionAnnotation
    :graphql-type :object
+   :implements [:Resource]
    :description "An assessment on a clinvar curation"
-   :skip-type-resolution true
-   :fields {:iri {:type 'String}
-            :subject {:type :EvidenceStrengthAssertion}
-            :classification {:type 'String}
-            :description {:type 'String}
-            :agent {:type 'String}
-            :date {:type 'String}
-            :evidence {:type '(list String)}}})
+   :fields {:subject {:type :EvidenceStrengthAssertion
+                      :path [:cg/subject]}
+            :classification {:type :Resource
+                             :path [:cg/classification]}
+            :description {:type 'String
+                          :path [:dc/description]}
+            :contributions {:type '(list :Contribution)
+                            :path [:cg/contributions]}
+            :evidence {:type '(list :EvidenceStrengthAssertion)
+                       :path [:cg/evidence]}}})
 
-(defn create-curation-fn [context args _]
-  (let [curation (assoc (select-keys args [:agent
+
+
+(defn create-annotation-fn [context args _]
+  (let [annotation (assoc (select-keys args [:agent
                                            :classification
                                            :description
                                            :evidence])
-                        :subject {:iri (:subject args)}
-                        :date (str (Instant/now)))]
+                        :subject (:subject args)
+                        :date (str (Instant/now))
+                        :iri (id/random-iri))]
     (swap! (:effects context)
            event/publish
            {::event/topic :clinvar-curation
-            ::event/key (:iri curation)
-            ::event/data curation})
-    curation))
+            ::event/key (:iri annotation)
+            ::event/data annotation})
+    annotation))
 
-(def create-curation
-  {:name :createCuration
+(def create-annotation
+  {:name :createAssertionAnnotation
    :graphql-type :mutation
-   :description "Mutation to create a curation of a clinvar assertion"
-   :type :ConflictCuration
+   :description "Mutation to create a annotation of a clinvar assertion"
+   :type :AssertionAnnotation
    :skip-type-resolution true
    :args {:subject {:type 'String}
           :agent {:type 'String}
           :classification {:type 'String}
           :description {:type 'String}
           :evidence {:type '(list String)}}
-   :resolve create-curation-fn})
+   :resolve create-annotation-fn})
+
+(defn assertion-annotation-query-fn
+  [context args _]
+  (let [query (rdf/create-query "
+select ?assertion where {
+?annoation a :cg/AssertionAnnotation ;
+:cg/subject ?assertion .
+}")]
+    (mapv #(hr/hybrid-resource % context)
+          (query (:tdb context)))))
+
+(def assertion-annotation-query
+  {:name :assertionAnnotation
+   :graphql-type :query
+   :description "Query to find assertions for which there exists annotation."
+   :type '(list :EvidenceStrengthAssertion)
+   :resolve assertion-annotation-query-fn})
+
+
 
 (comment
   (let [tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])
         object-db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]
     (rdf/tx tdb
       (->> (conflicts-query-fn {:tdb tdb :object-db object-db} nil nil)
+           tap>)))
+
+  (let [tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]
+    (rdf/tx tdb
+      (->> (assertion-annotation-query-fn {:tdb tdb :object-db object-db} nil nil)
            tap>)))
   
   (tap>

@@ -427,6 +427,7 @@
                  :type
                  :cg/subject
                  :cg/direction
+                 :cg/classification
                  :cg/reviewStatus])))
 
 (defn clinvar-variant->statements [clinvar-variant]

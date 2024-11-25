@@ -10,7 +10,7 @@
   (concat (rdf/ld-> value [[:sepio/has-subject :<]])
           (rdf/ld-> value [[:sepio/has-object :<]])))
 
-(defn- description [_ _ value]
+#_(defn- description [_ _ value]
   (or (rdf/ld1-> value [:dc/description])
       (rdf/ld1-> value [:iao/definition])))
 
@@ -57,8 +57,8 @@
                    :resolve hybrid-types}
             :description {:type 'String
                           :description "Textual description of this resource"
-                          ;; :path [:dc/description]
-                          :resolve description}
+                          :path [:dc/description
+                                 :iao/definition]}
             ;; :source {:type :BibliographicResource
             ;;          :description "A related resource from which the described resource is derived."
             ;;          :path [:dc/source]}

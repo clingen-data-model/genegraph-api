@@ -15,6 +15,7 @@
 (def rdf-to-graphql-type-mappings
   {:type-mappings
    [[:cg/EvidenceStrengthAssertion :EvidenceStrengthAssertion]
+    [:cg/AssertionAnnotation :AssertionAnnotation]
     [:cg/VariantPathogenicityProposition :VariantPathogenicityProposition]
     [:cg/GeneticConditionMechanismProposition :GeneticConditionMechanismProposition]
     [:cg/CanonicalVariant :CanonicalVariant]
@@ -23,13 +24,17 @@
    :default-type-mapping :GenericResource})
 
 ;; changing to function to benefit from dynamic type bindings
+;; Note that resource-interface must appear before any
+;; entities that implement resource if any of the default
+;; methods in resource are used. The same would apply for any
+;; interface that implements default methods.
 (defn model []
   [rdf-to-graphql-type-mappings
    #_agent/agent
-   #_contribution/contribution
    model-resource/resource-interface
    model-resource/generic-resource
    model-resource/resource-query
+   contribution/contribution
    sequence-annotation/sequence-location
    sequence-annotation/sequence-feature
    variant/canonical-variant
@@ -39,9 +44,9 @@
    assertion/genetic-condition-mechanism-proposition
    assertion/variant-pathogenicity-proposition
    model-conflicts/conflicts-query
-   ;; model-conflicts/resource
-   ;; model-conflicts/conflict-curation
-   ;; model-conflicts/create-curation
+   model-conflicts/assertion-annotation
+   model-conflicts/create-annotation
+   model-conflicts/assertion-annotation-query
    ])
 
 

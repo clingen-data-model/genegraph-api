@@ -11,7 +11,9 @@
   :build {:deps {io.github.clojure/tools.build {:git/tag "v0.10.5"
                                                 :git/sha "2a21b7a"}}
           :ns-default build}
-  :dev {:extra-deps {djblue/portal {:mvn/version "0.57.3"}}
+  :dev {:extra-deps {djblue/portal {:mvn/version "0.57.3"}
+                     io.github.nextjournal/clerk {:mvn/version "0.17.1102"}}
+        
         :jvm-opts [#_"-agentpath:/Applications/YourKit-Java-Profiler-2024.3.app/Contents/Resources/bin/mac/libyjpagent.dylib=disablestacktelemetry,exceptions=disable,delay=10000"
                    
                    "-XX:+UseZGC"
@@ -36,7 +38,7 @@
  {ch.qos.logback/logback-classic                    {:mvn/version "1.5.0"}
   org.clojure/clojure                               {:mvn/version "1.12.0"}
   io.github.clingen-data-model/genegraph-framework
-  {:git/sha "6f9c7e4d437c2a797134ce0bb990e1c4170acc6c"}
+  {:git/sha "9cebf6798495c8052df4c6133b3edde311dfe91c"}
   com.walmartlabs/lacinia-pedestal {:mvn/version "1.3"}
   hato/hato                                         {:mvn/version "0.9.0"}
   org.clojure/data.csv                              {:mvn/version "1.0.1"}

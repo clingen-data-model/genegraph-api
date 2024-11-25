@@ -422,11 +422,12 @@
   (assoc-in e [:request :lacinia-app-context :effects] (atom {})))
 
 (defn leave-graphql-mutation-effects [e]
+#_  (tap> @(get-in e [:request :lacinia-app-context :effects]))
   (merge e @(get-in e [:request :lacinia-app-context :effects])))
 
 (def graphql-mutation-effects-interceptor
   (interceptor/interceptor
-   {:name ::inspect-event
+   {:name ::graphql-mutation-effects
     :enter (fn [e] (enter-graphql-mutation-effects e))
     :leave (fn [e] (leave-graphql-mutation-effects e))}))
 

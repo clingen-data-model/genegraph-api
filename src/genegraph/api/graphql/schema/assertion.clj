@@ -2,6 +2,7 @@
   (:require [genegraph.framework.storage.rdf :as rdf]
             [genegraph.framework.storage :as storage]
             [genegraph.framework.event :as event]
+            [genegraph.api.hybrid-resource :as hr]
             [io.pedestal.log :as log]))
 
 (defn assertion-label [{:keys [object-db]} _ v]
@@ -33,6 +34,12 @@
             :subject
             {:type :Resource
              :path [:cg/subject]}
+
+            :annotations
+            {:type '(list :AssertionAnnotation)
+             :resolve (fn [context _ v]
+                        (mapv #(hr/hybrid-resource % context)
+                              (rdf/ld-> v [[:cg/subject :<]])))}
             
             :classification
             {:type :Resource
@@ -46,6 +53,9 @@
             ;;                 :cg/agent
             ;;                 (rdf/resource tdb)))}
             
+            :contributions
+            {:type '(list :Contribution)
+             :path [:cg/contributions]}
             
             :date {:type 'String
                    :resolve scv-date}

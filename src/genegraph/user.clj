@@ -24,7 +24,9 @@
             [clojure.set :as set]
             [clojure.edn :as edn]
             [clojure.walk :as walk]
-            [clojure.spec.alpha :as spec])
+            [clojure.spec.alpha :as spec]
+            [nextjournal.clerk :as clerk]
+            [genegraph.api.assertion-annotation :as ac])
   (:import [ch.qos.logback.classic Logger Level]
            [org.slf4j LoggerFactory]
            [java.time Instant LocalDate]
@@ -37,6 +39,12 @@
     (add-tap #'portal/submit))
   (portal/close)
   (portal/clear)
+  )
+
+(comment
+  (clerk/serve! {:watch-paths ["notebooks" "src"]})
+  (clerk/build! {:paths ["notebooks/clinvar.clj"]
+                 :package :single-file})
   )
 
 
@@ -72,7 +80,7 @@
   {:name :read-clinvar-curation
    :type :processor
    :subscribe :clinvar-curation
-   :interceptors [log-clinvar-curation]})
+   :interceptors [ac/process-annotation]})
 
 (def api-test-app-def
   {:type :genegraph-app
@@ -146,6 +154,7 @@
   (get-events-from-topic api/gene-validity-raw-topic)
   (time (get-events-from-topic api/gene-validity-legacy-complete-topic))
   (time (get-events-from-topic api/dosage-topic))
+  (+ 1 1)
 
   (time (get-events-from-topic api/gene-validity-sepio-topic))
 
@@ -210,11 +219,11 @@
 ;; Should also deal with dosage records throwing exceptions
 ;; though possibly the work done for this will handle that issue
 (comment
-  (time
-   (tap>(event-store/with-event-reader [r (str root-data-dir "gene_dosage_raw-2024-10-21.edn.gz")]
-          (->> (event-store/event-seq r)
-               (take 1)
-               (into [])))))
+  (event-store/with-event-reader [r (str root-data-dir "gene_dosage_raw-2024-11-18.edn.gz")]
+    (->> (event-store/event-seq r)
+         (take 1)
+         (into [])
+         tap>))
 
   (def chr16p13
     (event-store/with-event-reader [r (str root-data-dir "gene_dosage_raw-2024-09-18.edn.gz")]
@@ -243,7 +252,7 @@
            (into []))))
 
   (event-store/with-event-reader
-      [r (str root-data-dir "gene_dosage_raw-2024-10-21.edn.gz")]
+      [r (str root-data-dir "gene_dosage_raw-2024-11-18.edn.gz")]
     (->> (event-store/event-seq r)
          (run! #(p/publish (get-in api-test-app
                                    [:topics :dosage])
@@ -641,3 +650,86 @@ select ?variant where
 
 
 
+(comment
+  (def path-calls-with-genes
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+          object-db @(get-in api-test-app [:storage :object-db :instance])
+          q (rdf/create-query "
+select ?class ?gene where {
+?prop a :cg/VariantPathogenicityProposition .
+?prop :cg/variant ?variant .
+?variant :ga4gh/copyChange :efo/copy-number-gain .
+?variant :cg/CompleteOverlap ?gene .
+?class :cg/subject ?prop .
+?class a :cg/EvidenceStrengthAssertion .
+?class :cg/direction :cg/Supports .
+}")]
+      (rdf/tx tdb
+        (-> (group-by :class
+                      (q tdb {::rdf/params {:type :table}}))
+            (update-vals #(set (map :gene %)))))))
+
+  (def non-path-calls-with-genes
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+          object-db @(get-in api-test-app [:storage :object-db :instance])
+          q (rdf/create-query "
+select ?class ?gene where {
+?prop a :cg/VariantPathogenicityProposition .
+?prop :cg/variant ?variant .
+?variant :ga4gh/copyChange :efo/copy-number-gain .
+?variant :cg/CompleteOverlap ?gene .
+?class :cg/subject ?prop .
+?class a :cg/EvidenceStrengthAssertion .
+FILTER NOT EXISTS { ?class :cg/direction :cg/Supports } .
+}")]
+      (rdf/tx tdb
+        (-> (group-by :class
+                      (q tdb {::rdf/params {:type :table}}))
+            (update-vals #(set (map :gene %)))))))
+
+  (count path-calls-with-genes)
+
+  (count non-path-calls-with-genes)
+  
+  (->> non-path-calls-with-genes
+       #_(take 10)
+       (filter (fn [[_ g1]]
+                 (some #(set/superset? g1 %)
+                       (vals path-calls-with-genes))))
+       count)
+  
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?class where {
+?class :cg/direction :cg/Supports ;
+:cg/subject / :cg/variant / :ga4gh/copyChange :efo/copy-number-loss .
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           first)))
+  (+ 1 1)
+  (println
+   (rdf/create-query "
+select ?copyChange where {
+?class :cg/direction :cg/Supports ;
+:cg/subject / :cg/variant / :ga4gh/copyChange :efo/copy-number-loss .
+}
+"))
+  
+  (tap> (+ 1 1))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?ann where {
+?ann a :cg/AssertionAnnotation .
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           #_(run! #(storage/delete tdb (str %)))
+           count)))
+  
+  )
