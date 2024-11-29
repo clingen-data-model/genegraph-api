@@ -596,9 +596,7 @@
             :base-data
             (assoc base-data-topic
                    :type :kafka-reader-topic)
-            :clinvar-curation
-            (assoc clinvar-curation-topic
-                   :type :kafka-producer-topic)}
+            :clinvar-curation clinvar-curation-topic}
    :processors {:import-base-file import-base-processor
                 :graphql-api graphql-api
                 :graphql-ready graphql-ready
