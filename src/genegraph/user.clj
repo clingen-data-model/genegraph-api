@@ -80,6 +80,7 @@
   {:name :read-clinvar-curation
    :type :processor
    :subscribe :clinvar-curation
+   :backing-store :api-tdb
    :interceptors [ac/process-annotation]})
 
 (def api-test-app-def

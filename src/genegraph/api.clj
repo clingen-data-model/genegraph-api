@@ -12,6 +12,7 @@
             [genegraph.api.base.clinvar]
             [genegraph.api.names]
             [genegraph.api.base.gff]
+            [genegraph.api.assertion-annotation :as ac]
             [com.walmartlabs.lacinia.pedestal2 :as lacinia-pedestal]
             [com.walmartlabs.lacinia.pedestal.internal :as internal]
             [io.pedestal.http :as http]
@@ -96,10 +97,13 @@
 
 (def clinvar-curation-topic
   {:name :clinvar-curation
+   :type :kafka-reader-topic
    :serialization :json
+   :create-producer true
    :kafka-cluster :data-exchange
    :kafka-topic (qualified-kafka-name "ggapi-clinvar-curation")
    :kafka-topic-config {}})
+
 
 (def fetch-base-events-topic
   {:name :fetch-base-events
@@ -306,6 +310,12 @@
    :interceptors [publish-record-to-system-topic
                   base/base-event
                   response-cache/invalidate-cache]})
+
+(def read-clinvar-curations
+  {:name :read-clinvar-curation
+   :type :processor
+   :subscribe :clinvar-curation
+   :interceptors [ac/process-annotation]})
 
 (def genes-graph-name
   "https://www.genenames.org/")

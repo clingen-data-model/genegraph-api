@@ -22,7 +22,9 @@ select ?pathAssertion ?mechanismAssertion where
   ?pathAssertion :cg/subject ?pathProp .
   FILTER NOT EXISTS { ?pathAssertion :cg/reviewStatus :cg/Flagged }
   FILTER NOT EXISTS { ?pathAssertion :cg/direction :cg/Supports }
-  FILTER NOT EXISTS { ?pathAssertion :cg/classification :cg/OtherClassification } }
+  FILTER NOT EXISTS { ?pathAssertion :cg/classification :cg/OtherClassification }
+  FILTER NOT EXISTS { ?annotation :cg/subject ?pathAssertion ;
+                                  a :cg/AssertionAnnotation . } }
 ")]
     (->> (haplo-conflict-query tdb {::rdf/params {:type :table}})
          (group-by :pathAssertion)
