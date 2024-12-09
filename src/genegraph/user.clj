@@ -244,20 +244,29 @@
                         ::event/skip-publish-effects true))
       (catch Exception e (assoc event ::error e))))
   
-  (def errors
-    (event-store/with-event-reader [r (str root-data-dir "gene_dosage_raw-2024-09-27.edn.gz")]
-      (->> (event-store/event-seq r)
-           #_(take 100)
-           (map process-dosage)
-           (filter ::error)
-           (into []))))
-
+  (event-store/with-event-reader [r (str root-data-dir
+                                         "gene_dosage_raw-2024-11-18.edn.gz")]
+    (->> (event-store/event-seq r)
+         (take 1)
+         (map process-dosage)
+         (into [])
+         tap>)
+    #_(->> (event-store/event-seq r)
+         (take 1)
+         (map process-dosage)
+         #_(filter ::error)
+         (into [])
+         (map ::event/data)
+         tap>
+         #_(run! #(rdf/pp-model (::dosage/model %)))))
+  
+  ;; ISCA-37421
   (event-store/with-event-reader
       [r (str root-data-dir "gene_dosage_raw-2024-11-18.edn.gz")]
-    (->> (event-store/event-seq r)
-         (run! #(p/publish (get-in api-test-app
-                                   [:topics :dosage])
-                           %))))
+      (->> (event-store/event-seq r)
+           (run! #(p/publish (get-in api-test-app
+                                     [:topics :dosage])
+                             %))))
 
   (+ 1 1)
   
@@ -733,4 +742,10 @@ select ?ann where {
            #_(run! #(storage/delete tdb (str %)))
            count)))
   
+  )
+(comment
+  (def stage-app (p/init api/graphql-endpoint-def))
+  (p/start stage-app)
+  (p/stop stage-app)
+  (+ 1 1)
   )

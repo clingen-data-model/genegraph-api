@@ -4,12 +4,11 @@
             [genegraph.framework.storage.rdf :as rdf]
             [genegraph.framework.storage :as storage]
             [genegraph.framework.event :as event]
+            [genegraph.framework.id :as id]
             [clojure.spec.alpha :as spec]
             [io.pedestal.interceptor :as interceptor])
   (:import java.time.Instant
            java.time.OffsetDateTime))
-
-
 
 (def evidence-levels {"3" :cg/DosageSufficientEvidence
                       "2" :cg/DosageModerateEvidence
@@ -133,23 +132,36 @@
 ;; DefiningFeature
 ;; IncludedFeature
 
+(defn sequence-location-map [curation build]
+  (when-let [loc-str (get-in curation [:fields (build-location build)])]
+    (let [[_ chr start-coord end-coord] (re-find #"(\w+):(.+)[-_–](.+)$" loc-str)
+          loc {:type :ga4gh/SequenceLocation
+               :ga4gh/sequenceReference (get-in chr-to-ref
+                                     [build
+                                      (subs chr 3)])
+               :ga4gh/start (-> start-coord (s/replace #"\D" "") Long.)
+               :ga4gh/end (-> end-coord (s/replace #"\D" "") Long.)}]
+      (assoc loc :iri (id/iri loc)))))
 
 (defn sequence-location [curation build]
   (when-let [loc-str (get-in curation [:fields (build-location build)])]
+    (tap> (sequence-location-map curation build))
     #_(tap> {:loc-str loc-str
-           :build build
-           :curation (:key curation)
-           :bindings (re-find #"(\w+):(.+)[-_–](.+)$" loc-str)})
+             :build build
+             :curation (:key curation)
+             :bindings (re-find #"(\w+):(.+)[-_–](.+)$" loc-str)})
     (let [[_ chr start-coord end-coord] (re-find #"(\w+):(.+)[-_–](.+)$" loc-str)
           iri (region-iri curation (name build))
           interval-iri (rdf/blank-node)
           reference-sequence (get-in chr-to-ref
                                      [build
-                                      (subs chr 3)])]
+                                      (subs chr 3)])
+          start (-> start-coord (s/replace #"\D" "") Integer.)
+          end (-> end-coord (s/replace #"\D" "") Integer.)]
       [iri [[iri :rdf/type :ga4gh/SequenceLocation]
             [iri :ga4gh/sequenceReference (rdf/resource reference-sequence)]
-            [iri :ga4gh/start (-> start-coord (s/replace #"\D" "") Integer.)]
-            [iri :ga4gh/end (-> end-coord (s/replace #"\D" "") Integer.)]]])))
+            [iri :ga4gh/start start]
+            [iri :ga4gh/end start]]])))
 
 
 (defn location [curation]

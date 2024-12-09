@@ -40,7 +40,7 @@
 (def admin-env
   (if (or (System/getenv "DX_JAAS_CONFIG_DEV")
           (System/getenv "DX_JAAS_CONFIG")) ; prevent this in cloud deployments
-    {:platform "local"
+    {:platform "stage"
      :dataexchange-genegraph (System/getenv "DX_JAAS_CONFIG")
      :local-data-path "data/"}
     {}))
@@ -314,6 +314,7 @@
 (def read-clinvar-curations
   {:name :read-clinvar-curation
    :type :processor
+   :backing-store :api-tdb
    :subscribe :clinvar-curation
    :interceptors [ac/process-annotation]})
 
@@ -600,7 +601,8 @@
    :processors {:import-base-file import-base-processor
                 :graphql-api graphql-api
                 :graphql-ready graphql-ready
-                :import-dosage-curations import-dosage-curations}
+                :import-dosage-curations import-dosage-curations
+                :read-clinvar-curations read-clinvar-curations}
    :http-servers http-server})
 
 (def genegraph-function
