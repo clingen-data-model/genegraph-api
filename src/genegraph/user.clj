@@ -43,7 +43,7 @@
 
 (comment
   (clerk/serve! {:watch-paths ["notebooks" "src"]})
-  (clerk/build! {:paths ["notebooks/clinvar.clj"]
+  (clerk/build! {:paths ["notebooks/cnv.clj"]
                  :package :single-file})
   )
 
@@ -158,7 +158,7 @@
   (+ 1 1)
 
   (time (get-events-from-topic api/gene-validity-sepio-topic))
-
+  (time (get-events-from-topic api/clinvar-curation-topic))
 )
 
 
@@ -748,4 +748,53 @@ select ?ann where {
   (p/start stage-app)
   (p/stop stage-app)
   (+ 1 1)
+  )
+
+
+;; Troubleshooting 'no comment'
+(comment
+  ;; SCV004933996
+  (event-store/with-event-reader [r (str root-data-dir "ggapi-clinvar-curation-stage-1-2024-12-18.edn.gz")]
+    (->> (event-store/event-seq r)
+         count))
+
+  
+  (event-store/with-event-reader [r (str root-data-dir "ggapi-clinvar-curation-stage-1-2024-12-18.edn.gz")]
+    (->> (event-store/event-seq r)
+         #_(filter #(re-find #"SCV004933996" (::event/value %)))
+         (take 1)
+         (mapv event/deserialize)
+         tap>))
+
+  (event-store/with-event-reader [r (str root-data-dir "ggapi-clinvar-curation-stage-1-2024-12-18.edn.gz")]
+    (->> (event-store/event-seq r)
+         (filter #(re-find #"SCV004933996" (::event/value %)))
+         (mapv event/deserialize)
+         tap>))
+
+  (portal/clear)
+
+
+
+  
+  )
+
+
+;; Per Christa -- path assertions 2020-2024 -- 2022-2024
+;; email from Erin Riggs 12/18/2024
+
+
+(comment
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?ann where {
+?ann a :cg/AssertionAnnotation .
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           #_(run! #(storage/delete tdb (str %)))
+           count)))
   )
