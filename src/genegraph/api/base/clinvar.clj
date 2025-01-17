@@ -454,6 +454,9 @@
   (->> (rocksdb/range-get db
                          (idx/location->search-params location
                                                       :so/Gene))
+       (concat (rocksdb/range-get db
+                         (idx/location->search-params location
+                                                      :cg/DosageRegion)))
        (map :iri)
        set))
 
@@ -732,12 +735,17 @@
   (println flagged-submission-xml)
 
   (println test-submissions)
-  (->> (xml/parse-str test-submissions)
-       :content
-       (mapv #(-> %
-                  clinvar-xml->intermediate-model
-                  variant->statements-and-objects))
-       tap>)
+  (let [object-db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])
+        tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])
+        add-gene-overlaps-with-db
+        #(add-gene-overlaps-for-variant object-db  %)]
+    (->> (xml/parse-str test-submissions)
+         :content
+         (mapv #(-> %
+                    clinvar-xml->intermediate-model
+                    variant->statements-and-objects
+                    add-gene-overlaps-with-db))
+         tap>))
   
 
   

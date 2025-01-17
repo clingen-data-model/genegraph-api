@@ -21,6 +21,15 @@
 ;; Coordinate integer
 ;; entitiy iri (prevent overwriting other entities)
 
+
+;; TODO consider utility of this as a multimethod
+;; seems more specific to a datasource and less
+;; specific to type.
+
+;; Maybe re-implement as a regular function that you can pass an arbitrary type to.
+;; Possibly expects a canonical location, or something that respects it's interface
+;; (an iri, type, and set of sequencelocation entities under :ga4gh/location
+
 (defmulti sequence-feature->sequence-index
   "Accepts a map with a located sequence feature. Returns
   a set of entries to insert into a RocksDB backed sequence.
@@ -39,7 +48,8 @@
 ;; Minimum width of a scan to identify overlaps that
 ;; do not cover the edge of a feature
 (def min-search-width
-  {:so/Gene 500000})
+  {:so/Gene 500000
+   :cg/DosageRegion 12000000})
 
 (defn location->search-params
   "Generate the search params needed to identify features
@@ -109,4 +119,13 @@
     "https://identifiers.org/refseq:NC_000001.11",
     :iri "https://genegraph.clingen.app/1j6gkJ4Yze0"}
    :so/Gene)
+  (location->search-params
+   {:type :ga4gh/SequenceLocation,
+    :ga4gh/sequenceReference
+    "https://identifiers.org/refseq:NC_000002.12",
+    :ga4gh/start 241988449,
+    :ga4gh/end 242157305,
+    :iri "https://genegraph.clingen.app/cT5GFfCC0z8"}
+   :cg/DosageRegion)
+  
   )

@@ -379,6 +379,8 @@
    :backing-store :api-tdb
    :interceptors [dosage/add-dosage-model
                   dosage/write-dosage-model-to-db
+                  dosage/add-dosage-region
+                  dosage/add-dosage-indexes
                   response-cache/invalidate-cache]})
 
 (def query-timer-interceptor

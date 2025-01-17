@@ -26,7 +26,9 @@
             [clojure.walk :as walk]
             [clojure.spec.alpha :as spec]
             [nextjournal.clerk :as clerk]
-            [genegraph.api.assertion-annotation :as ac])
+            [genegraph.api.assertion-annotation :as ac]
+            [genegraph.api.hybrid-resource :as hr]
+            [genegraph.api.ga4gh :as ga4gh])
   (:import [ch.qos.logback.classic Logger Level]
            [org.slf4j LoggerFactory]
            [java.time Instant LocalDate]
@@ -104,10 +106,10 @@
             :clinvar-curation
             {:name :clinvar-curation
              :type :simple-queue-topic}}
-   :storage {:api-tdb (assoc api/api-tdb :load-snapshot false)
+   :storage {:api-tdb (assoc api/api-tdb :load-snapshot true)
              :response-cache-db api/response-cache-db
              #_#_:sequence-feature-db api/sequence-feature-db
-             :object-db (assoc api/object-db :load-snapshot false)}
+             :object-db (assoc api/object-db :load-snapshot true)}
    :processors {:fetch-base-file api/fetch-base-processor
                 :import-base-file api/import-base-processor
                 :import-gv-curations api/import-gv-curations
@@ -124,6 +126,16 @@
   (def api-test-app (p/init api-test-app-def))
   (p/start api-test-app)
   (p/stop api-test-app)
+
+  (defn process-dosage [event]
+    (try
+      (p/process (get-in api-test-app [:processors
+                                       :import-dosage-curations])
+                 (assoc event
+                        ::event/skip-local-effects true
+                        ::event/skip-publish-effects true))
+      (catch Exception e (assoc event ::error e))))
+  
   )
 
 ;; Downloading events
@@ -785,7 +797,7 @@ select ?ann where {
 
 
 (comment
-
+  
   (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
         object-db @(get-in api-test-app [:storage :object-db :instance])
         q (rdf/create-query "
@@ -797,4 +809,73 @@ select ?ann where {
       (->> (q tdb)
            #_(run! #(storage/delete tdb (str %)))
            count)))
+  )
+
+
+;; 2025-01-15 integrating dosage regions
+
+
+(comment
+  
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?ann where {
+?ann a :cg/AssertionAnnotation .
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           #_(run! #(storage/delete tdb (str %)))
+           count)))
+
+
+  ;; ISCA-37445
+  (def bwrs
+    (event-store/with-event-reader
+        [r (str root-data-dir "gene_dosage_raw-2025-01-15.edn.gz")]
+      (->> (event-store/event-seq r)
+           (filter #(re-find #"ISCA-37445" (::event/value %)))
+           (into []))))
+
+  (def bwrs1 (-> bwrs first event/deserialize))
+
+  (-> bwrs1 process-dosage tap>)
+
+  (count bwrs)
+  (->> bwrs
+       (take 1)
+       (run! process-dosage)
+       #_(run! #(-> %
+                    process-dosage
+                    ::dosage/model)))
+
+
+  ;;get max dosage region size
+  ;; 12MB is max size
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?x where {
+?x a :cg/DosageRegion .
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           (mapv #(let [r (hr/hybrid-resource
+                           %
+                           {:object-db object-db :tdb tdb})]
+                    (try
+                      (ga4gh/max-size r)
+                      (catch Exception e r))))
+           (apply max))))
+  
+  
+  (time
+   (event-store/with-event-reader
+       [r (str root-data-dir "gene_dosage_raw-2025-01-15.edn.gz")]
+       (->> (event-store/event-seq r)
+            (run! #(p/publish (get-in api-test-app [:topics :dosage]) %)))))
+  
+  
   )

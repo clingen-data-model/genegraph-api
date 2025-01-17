@@ -5,6 +5,7 @@
             [genegraph.framework.storage :as storage]
             [genegraph.framework.event :as event]
             [genegraph.framework.id :as id]
+            [genegraph.api.sequence-index :as idx]
             [clojure.spec.alpha :as spec]
             [io.pedestal.interceptor :as interceptor])
   (:import java.time.Instant
@@ -132,24 +133,10 @@
 ;; DefiningFeature
 ;; IncludedFeature
 
-(defn sequence-location-map [curation build]
-  (when-let [loc-str (get-in curation [:fields (build-location build)])]
-    (let [[_ chr start-coord end-coord] (re-find #"(\w+):(.+)[-_–](.+)$" loc-str)
-          loc {:type :ga4gh/SequenceLocation
-               :ga4gh/sequenceReference (get-in chr-to-ref
-                                     [build
-                                      (subs chr 3)])
-               :ga4gh/start (-> start-coord (s/replace #"\D" "") Long.)
-               :ga4gh/end (-> end-coord (s/replace #"\D" "") Long.)}]
-      (assoc loc :iri (id/iri loc)))))
+
 
 (defn sequence-location [curation build]
   (when-let [loc-str (get-in curation [:fields (build-location build)])]
-    (tap> (sequence-location-map curation build))
-    #_(tap> {:loc-str loc-str
-             :build build
-             :curation (:key curation)
-             :bindings (re-find #"(\w+):(.+)[-_–](.+)$" loc-str)})
     (let [[_ chr start-coord end-coord] (re-find #"(\w+):(.+)[-_–](.+)$" loc-str)
           iri (region-iri curation (name build))
           interval-iri (rdf/blank-node)
@@ -162,6 +149,9 @@
             [iri :ga4gh/sequenceReference (rdf/resource reference-sequence)]
             [iri :ga4gh/start start]
             [iri :ga4gh/end start]]])))
+
+
+
 
 
 (defn location [curation]
@@ -178,8 +168,7 @@
                [iri :rdfs/label (get-in curation
                                         [:fields :customfield_10202]
                                         "")]
-               [iri :rdf/type :so/SequenceFeature]
-               [iri :rdf/type :ga4gh/CanonicalLocation]])
+               [iri :rdf/type :cg/DosageRegion]])
       [])))
 
 (defn- contribution-iri
@@ -342,6 +331,21 @@
     #_(tap> result)
     result))
 
+
+(defn sequence-location-map [curation build]
+  (when-let [loc-str (get-in curation [:fields (build-location build)])]
+    (let [[_ chr start-coord end-coord] (re-find #"(\w+):(.+)[-_–](.+)$" loc-str)
+          loc {:type :ga4gh/SequenceLocation
+               :ga4gh/sequenceReference (get-in chr-to-ref
+                                     [build
+                                      (subs chr 3)])
+               :ga4gh/start (-> start-coord (s/replace #"\D" "") Long.)
+               :ga4gh/end (-> end-coord (s/replace #"\D" "") Long.)}]
+      (assoc loc :iri (id/iri loc)))))
+
+
+
+
 (defn add-dosage-model-fn [event]
   (if (spec/invalid? (spec/conform ::fields (get-in event [::event/data :fields])))
     (assoc event ::spec/invalid true)
@@ -369,3 +373,61 @@
   (interceptor/interceptor
    {:name ::write-dosage-model-to-db
     :enter (fn [e] (write-dosage-model-to-db-fn e))}))
+
+
+(defn dosage-region [curation]
+  {:type :cg/DosageRegion
+   :iri (str (region-iri curation))
+   :ga4gh/location (mapv #(sequence-location-map curation %)
+                         (keys build-location))})
+
+(defn add-dosage-region-fn [event]
+  (if (::model event)
+    (let [region (dosage-region (::event/data event))] 
+      (-> event
+          (assoc ::region region)
+          (event/store :object-db [:objects (:iri region)] region)))
+    event))
+
+(def add-dosage-region
+  (interceptor/interceptor
+   {:name ::add-dosage-region
+    :enter (fn [e] (add-dosage-region-fn e))}))
+
+;; this may belong somewhere else at some point soon
+(defmethod idx/sequence-feature->sequence-index :cg/DosageRegion [feature]
+  (mapv
+   (fn [l]
+     {:key [:sequences
+            :cg/DosageRegion
+            (:sequence-reference l)
+            (:coordinate l)
+            (:iri feature)]
+      :value (select-keys feature [:iri])})
+   (mapcat idx/location->index-entries (:ga4gh/location feature))))
+
+(defn add-dosage-indexes-fn [event]
+  (if (::model event)
+    (reduce (fn [e idx] 
+              (event/store e
+                           :object-db
+                           (:key idx)
+                           (:value idx)))
+            event
+            (-> event
+                ::region
+                idx/sequence-feature->sequence-index))
+    event))
+
+
+;; TODO start here--test this
+(def add-dosage-indexes
+  (interceptor/interceptor
+   {:name ::add-dosage-indexes
+    :enter (fn [e] (add-dosage-indexes-fn e))}))
+
+(comment
+  (-> genegraph.user/bwrs1
+      ::event/data
+      dosage-region
+      idx/sequence-feature->sequence-index))
