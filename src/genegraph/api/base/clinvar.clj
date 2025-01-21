@@ -246,7 +246,6 @@
                                               hgvs
                                               spdi]
                                        :as clinvar-variant}]
-  (tap> clinvar-variant)
   (mapv (fn [l]
           (let [hgvs-expressions
                 (mapv (fn [v]{:type :ga4gh/Expression
@@ -451,12 +450,11 @@
      :statements (clinvar-variant->statements objects)}))
 
 (defn gene-overlaps-for-location [db location]
-  (->> (rocksdb/range-get db
-                         (idx/location->search-params location
-                                                      :so/Gene))
-       (concat (rocksdb/range-get db
-                         (idx/location->search-params location
-                                                      :cg/DosageRegion)))
+  (->> (mapcat
+        #(rocksdb/range-get
+          db
+          (idx/location->search-params location %))
+        [:so/Gene :cg/DosageRegion])
        (map :iri)
        set))
 
@@ -746,9 +744,6 @@
                     variant->statements-and-objects
                     add-gene-overlaps-with-db))
          tap>))
-  
-
-  
   )
 
 ;; Some template code for extracting statistics from ClinVar

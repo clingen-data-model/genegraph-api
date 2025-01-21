@@ -106,10 +106,10 @@
             :clinvar-curation
             {:name :clinvar-curation
              :type :simple-queue-topic}}
-   :storage {:api-tdb (assoc api/api-tdb :load-snapshot true)
+   :storage {:api-tdb (assoc api/api-tdb :load-snapshot false)
              :response-cache-db api/response-cache-db
              #_#_:sequence-feature-db api/sequence-feature-db
-             :object-db (assoc api/object-db :load-snapshot true)}
+             :object-db (assoc api/object-db :load-snapshot false)}
    :processors {:fetch-base-file api/fetch-base-processor
                 :import-base-file api/import-base-processor
                 :import-gv-curations api/import-gv-curations
@@ -876,6 +876,64 @@ select ?x where {
        [r (str root-data-dir "gene_dosage_raw-2025-01-15.edn.gz")]
        (->> (event-store/event-seq r)
             (run! #(p/publish (get-in api-test-app [:topics :dosage]) %)))))
+
+  
+  ;; Building query for region conflict overlaps
+  ;; Haploinsufficiency region conflicts
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?va where {
+?region a :cg/DosageRegion .
+?prop :cg/feature ?region ;
+      :cg/mechanism :cg/Haploinsufficiency .
+?a :cg/subject ?prop ;
+   :cg/evidenceStrength :cg/DosageSufficientEvidence .
+?v :cg/CompleteOverlap ?region ;
+   :ga4gh/copyChange :efo/copy-number-loss .
+?vprop :cg/variant ?v .
+?va :cg/subject ?vprop .
+filter not exists { ?va :cg/direction :cg/Supports }
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           #_(take 5)
+           #_(into [])
+           (mapv #(hr/hybrid-resource
+                   %
+                   {:object-db object-db :tdb tdb}))
+           count)))
+
+  ;; Triplosensitivity region conflicts
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?va where {
+?region a :cg/DosageRegion .
+?prop :cg/feature ?region ;
+      :cg/mechanism :cg/Triplosensitivity .
+?a :cg/subject ?prop ;
+   :cg/evidenceStrength :cg/DosageSufficientEvidence .
+?v :cg/CompleteOverlap ?region ;
+   :ga4gh/copyChange :efo/copy-number-gain .
+?vprop :cg/variant ?v .
+?va :cg/subject ?vprop .
+filter not exists { ?va :cg/direction :cg/Supports }
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           (take 5)
+           #_(into [])
+           (mapv #(hr/hybrid-resource
+                   %
+                   {:object-db object-db :tdb tdb}))
+           tap>)))
+
+  (portal/clear)
+  
+  
   
   
   )

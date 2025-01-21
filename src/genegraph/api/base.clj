@@ -42,9 +42,14 @@
   (and (<= 200 status) (< status 400)))
 
 (defn fetch-file-fn [event]
+  (log/info :fn ::fetch-file-fn
+            :source (get-in event [::event/data :source])
+            :name  (get-in event [::event/data :name])
+            :status :started)
   (let [response (hc/get (get-in event [::event/data :source])
                          {:http-client (hc/build-http-client {:redirect-policy :always})
                           :as :stream})]
+
     (when (instance? InputStream (:body response))
       (with-open [os (io/output-stream (storage/as-handle (output-handle event)))]
         (.transferTo (:body response) os)))
