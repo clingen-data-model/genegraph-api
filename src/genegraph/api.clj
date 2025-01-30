@@ -148,10 +148,7 @@
 ;; Interceptors for reader
 
 (def prop-query
-  (rdf/create-query "select ?x where {?x a ?type}"))
-
-(def prop-query
-  (rdf/create-query "select ?prop where { ?prop a :sepio/GeneValidityProposition } "))
+  (rdf/create-query "select ?prop where { ?prop a :cg/GeneValidityProposition } "))
 
 (def same-as-query
   (rdf/create-query "select ?x where { ?x :owl/sameAs ?y }"))
@@ -161,7 +158,7 @@
   (rdf/tx (get-in event [::storage/storage :api-tdb])
       (let [m (::event/data event)
             prop (first (prop-query m))
-            hgnc-gene (rdf/ld1-> prop [:sepio/has-subject])
+            hgnc-gene (rdf/ld1-> prop [:cg/gene])
             ncbi-gene (first (same-as-query (get-in event [::storage/storage :api-tdb])
                                             {:y hgnc-gene}))]
         (.remove m (rdf/construct-statement [prop :sepio/has-subject hgnc-gene]))
@@ -174,7 +171,7 @@
     :enter (fn [e] (replace-hgnc-with-ncbi-gene-fn e))}))
 
 (defn has-publish-action [m]
-  (< 0 (count ((rdf/create-query "select ?x where { ?x :bfo/realizes :cg/PublisherRole } ") m))))
+  (< 0 (count ((rdf/create-query "select ?x where { ?x :cg/role :cg/Publisher } ") m))))
 
 (defn store-curation-fn [event]
   (if (has-publish-action (::event/data event))
@@ -382,6 +379,18 @@
                   dosage/add-dosage-region
                   dosage/add-dosage-indexes
                   response-cache/invalidate-cache]})
+
+;; todo start here, bring GV import in
+#_(def import-gv-curations
+    {:type :processor
+     :subscribe :gene-validity-sepio
+     :name :gene-validity-sepio-reader
+     :backing-store :api-tdb
+     #_#_:init-fn (init-await-genes ::import-gv-curations-await-genes)
+     :interceptors [await-genes
+                    replace-hgnc-with-ncbi-gene
+                    store-curation
+                    response-cache/invalidate-cache]})
 
 (def query-timer-interceptor
   (interceptor/interceptor

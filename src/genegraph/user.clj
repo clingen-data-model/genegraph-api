@@ -167,9 +167,13 @@
   (get-events-from-topic api/gene-validity-raw-topic)
   (time (get-events-from-topic api/gene-validity-legacy-complete-topic))
   (time (get-events-from-topic api/dosage-topic))
-  (+ 1 1)
-
+  (.start 
+   (Thread/new (fn []
+                 (println "getting topic")
+                 (time (get-events-from-topic api/gene-validity-sepio-topic))
+                 (println "complete)"))))
   (time (get-events-from-topic api/gene-validity-sepio-topic))
+  
   (time (get-events-from-topic api/clinvar-curation-topic))
 )
 
@@ -929,11 +933,70 @@ filter not exists { ?va :cg/direction :cg/Supports }
            (mapv #(hr/hybrid-resource
                    %
                    {:object-db object-db :tdb tdb}))
-           tap>)))
+           count)))
 
   (portal/clear)
   
   
   
   
+  )
+
+
+;; testing new affils service
+(comment 
+  (def http-client (hc/build-http-client {}))
+
+
+  (do
+    (def test-affils-api "https://affils-test.clinicalgenome.org/api/")
+    (def prod-affils-api "https://affils.clinicalgenome.org/api/")
+    (def test-affils-api-key "AwCuqYcu.ZMYcwGsPPzNmQekBLi6EMGflmaRte3Cn")
+    (def prod-affils-api-key "TfZhEETS.YUpN38StKbRTNJhZByU5A1XBmh6ZKZQ8")
+    (def test-affils-list "https://affils-test.clinicalgenome.org/api/affiliations_list/"))
+  (-> (hc/get
+       test-affils-list
+       {:headers {"X-Api-Key" test-affils-api-key}
+        :http-client http-client})
+      :body
+      json/read-str
+      tap>)
+  
+  )
+
+
+;; load gene curations
+
+(comment
+
+"1. All curations that are Moderate and above, AD, and have dominant negative in the free text of the evidence summary (I realize you pulled this for me previously but the curation links no longer worked when I went back to refer to it)"
+
+(let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+      object-db @(get-in api-test-app [:storage :object-db :instance])
+      q (rdf/create-query "
+select ?prop where {
+?prop a :cg/GeneValidityProposition .
+}
+")]
+  (rdf/tx tdb
+    (->> (q tdb)
+         #_(take 5)
+         #_(into [])
+         #_(mapv #(hr/hybrid-resource
+                   %
+                   {:object-db object-db :tdb tdb}))
+         count)))
+
+"2. All curations that are Strong or Definitive, AD, have dominant negative in the free text, but don't have much experimental evidence. Jonathan suggested maybe 4 points or less, but since there won't be many of these curations anyway, I guess you could consider bucketing them... whatever makes sense to you... I'm trying to pull curations that might have a borderline mechanism so I can stress test the framework."
+  
+  
+(event-store/with-event-reader
+    [r (str root-data-dir "gg-gvs2-stage-1-2025-01-30.edn.gz")]
+    (->> (event-store/event-seq r)
+         #_(take 1)
+         (map event/deserialize)
+         #_(map #(api/has-publish-action (::event/data %)))
+         (run! #(rdf/pp-model (::event/data %)))
+         #_(run! #(p/publish (get-in api-test-app [:topics :gene-validity-sepio]) %)))
+    #_(println "done publishing gv"))
   )

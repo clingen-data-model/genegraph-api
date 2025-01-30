@@ -743,7 +743,7 @@
                     clinvar-xml->intermediate-model
                     variant->statements-and-objects
                     add-gene-overlaps-with-db))
-         tap>))
+         #_tap>))
   )
 
 ;; Some template code for extracting statistics from ClinVar
