@@ -25,6 +25,7 @@
             [clojure.edn :as edn]
             [clojure.walk :as walk]
             [clojure.spec.alpha :as spec]
+            [clojure.string :as string]
             [nextjournal.clerk :as clerk]
             [genegraph.api.assertion-annotation :as ac]
             [genegraph.api.hybrid-resource :as hr]
@@ -106,10 +107,10 @@
             :clinvar-curation
             {:name :clinvar-curation
              :type :simple-queue-topic}}
-   :storage {:api-tdb (assoc api/api-tdb :load-snapshot false)
+   :storage {:api-tdb (assoc api/api-tdb :load-snapshot true)
              :response-cache-db api/response-cache-db
              #_#_:sequence-feature-db api/sequence-feature-db
-             :object-db (assoc api/object-db :load-snapshot false)}
+             :object-db (assoc api/object-db :load-snapshot true)}
    :processors {:fetch-base-file api/fetch-base-processor
                 :import-base-file api/import-base-processor
                 :import-gv-curations api/import-gv-curations
@@ -967,36 +968,125 @@ filter not exists { ?va :cg/direction :cg/Supports }
 
 ;; load gene curations
 
+(defn dominant-negative? [assertion]
+  (if-let [assertion-description (rdf/ld1-> assertion [:dc/description])]
+    (->> assertion-description
+         string/lower-case
+         (re-find #"dominant negative"))
+    false))
+(count "http://dataexchange.clinicalgenome.org/gci/")
+;; https://search.clinicalgenome.org/kb/gene-validity/CGGV:570947a0-3e45-419c-bc22-0fdc60ca6009
+(do
+  (defn assertion->website-url [assertion]
+    (let [[_ uuid] (re-find #"http://dataexchange\.clinicalgenome\.org/gci/(.+)v.+"
+                          (str assertion))]
+      (str "https://search.clinicalgenome.org/kb/gene-validity/CGGV:"
+           uuid)))
+  (assertion->website-url "http://dataexchange.clinicalgenome.org/gci/570947a0-3e45-419c-bc22-0fdc60ca6009v1.0"))
+
+(def experimental-evidence
+  (rdf/create-query "
+select ?ex where {
+?assertion :cg/evidence ?ex .
+?ex :cg/specifiedBy :cg/GeneValidityOverallExperimentalEvidenceCriteria .
+}"))
+
+(defn experimental-evidence-score [assertion]
+  (if-let [ex (first (experimental-evidence assertion {:assertion assertion}))]
+    (rdf/ld1-> ex [:cg/strengthScore])
+    0))
+
 (comment
 
-"1. All curations that are Moderate and above, AD, and have dominant negative in the free text of the evidence summary (I realize you pulled this for me previously but the curation links no longer worked when I went back to refer to it)"
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?gene where {
+?gene a :so/Gene .
+}
+limit 5")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           (mapv #(rdf/ld-> % [:owl/sameAs]))
+           )))
 
-(let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
-      object-db @(get-in api-test-app [:storage :object-db :instance])
-      q (rdf/create-query "
-select ?prop where {
-?prop a :cg/GeneValidityProposition .
+  "1. All curations that are Moderate and above, AD, and have dominant negative in the free text of the evidence summary (I realize you pulled this for me previously but the curation links no longer worked when I went back to refer to it)"
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?assertion where {
+?prop a :cg/GeneValidityProposition ;
+      :cg/modeOfInheritance :hp/AutosomalDominantInheritance .
+?assertion :cg/subject ?prop ;
+           :cg/evidenceStrength ?strength .
+values ?strength { :cg/Definitive :cg/Strong  :cg/Moderate } 
 }
 ")]
-  (rdf/tx tdb
-    (->> (q tdb)
-         #_(take 5)
-         #_(into [])
-         #_(mapv #(hr/hybrid-resource
-                   %
-                   {:object-db object-db :tdb tdb}))
-         count)))
+    (rdf/tx tdb
+      (with-open [w (io/writer "/users/tristan/Desktop/moderate+-dn.csv")]
+        (->> (q tdb)
+             (filter dominant-negative?)
+             #_(take 5)
+             #_(into [])
+             #_(mapv #(hr/hybrid-resource
+                       %
+                       {:object-db object-db :tdb tdb}))
+             (mapv (fn [a]
+                     [(rdf/ld1-> a
+                                 [:cg/subject
+                                  :cg/gene
+                                  [:owl/sameAs :<]
+                                  :skos/prefLabel])
+                      (re-find #"\w+$"
+                               (str (rdf/ld1-> a [:cg/evidenceStrength])))
+                      (experimental-evidence-score a)
+                      (assertion->website-url a)]))
+             set
+             #_(take 5)
+             (sort-by first)
+             (concat [["Gene" "Classification" "Experimental Evidence Total" "Link"]])
+             (csv/write-csv w)))))
 
-"2. All curations that are Strong or Definitive, AD, have dominant negative in the free text, but don't have much experimental evidence. Jonathan suggested maybe 4 points or less, but since there won't be many of these curations anyway, I guess you could consider bucketing them... whatever makes sense to you... I'm trying to pull curations that might have a borderline mechanism so I can stress test the framework."
+  "2. All curations that are Strong or Definitive, AD, have dominant negative in the free text, but don't have much experimental evidence. Jonathan suggested maybe 4 points or less, but since there won't be many of these curations anyway, I guess you could consider bucketing them... whatever makes sense to you... I'm trying to pull curations that might have a borderline mechanism so I can stress test the framework."
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?assertion where {
+?prop a :cg/GeneValidityProposition ;
+      :cg/modeOfInheritance :hp/AutosomalDominantInheritance .
+?assertion :cg/subject ?prop ;
+           :cg/evidenceStrength ?strength .
+values ?strength { :cg/Definitive :cg/Strong }
+}
+")]
+    (rdf/tx tdb
+      (with-open [w (io/writer "/users/tristan/Desktop/moderate+-dn.csv")]
+        (csv/write-csv w
+                       (->> (q tdb)
+                            (filter dominant-negative?)
+                            #_(take 5)
+                            #_(into [])
+                            #_(mapv #(hr/hybrid-resource
+                                      %
+                                      {:object-db object-db :tdb tdb}))
+                            (mapv (fn [a]
+                                    [(rdf/ld1-> a
+                                                [:cg/subject
+                                                 :cg/gene
+                                                 [:owl/sameAs :<]
+                                                 :skos/prefLabel])
+                                     (assertion->website-url a)]))
+                            set
+                            (sort-by first))))))
   
-  
-(event-store/with-event-reader
-    [r (str root-data-dir "gg-gvs2-stage-1-2025-01-30.edn.gz")]
-    (->> (event-store/event-seq r)
-         #_(take 1)
-         (map event/deserialize)
-         #_(map #(api/has-publish-action (::event/data %)))
-         (run! #(rdf/pp-model (::event/data %)))
-         #_(run! #(p/publish (get-in api-test-app [:topics :gene-validity-sepio]) %)))
-    #_(println "done publishing gv"))
+  (event-store/with-event-reader
+      [r (str root-data-dir "gg-gvs2-stage-1-2025-01-30.edn.gz")]
+      (->> (event-store/event-seq r)
+           (take 1)
+           (map event/deserialize)
+           #_(map #(api/has-publish-action (::event/data %)))
+           (run! #(rdf/pp-model (::event/data %)))
+           #_(run! #(p/publish (get-in api-test-app [:topics :gene-validity-sepio]) %))))
   )
