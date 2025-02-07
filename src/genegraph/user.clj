@@ -107,10 +107,10 @@
             :clinvar-curation
             {:name :clinvar-curation
              :type :simple-queue-topic}}
-   :storage {:api-tdb (assoc api/api-tdb :load-snapshot true)
+   :storage {:api-tdb (assoc api/api-tdb :load-snapshot false :snapshot-handle nil)
              :response-cache-db api/response-cache-db
              #_#_:sequence-feature-db api/sequence-feature-db
-             :object-db (assoc api/object-db :load-snapshot true)}
+             :object-db (assoc api/object-db :load-snapshot false :snapshot-handle nil)}
    :processors {:fetch-base-file api/fetch-base-processor
                 :import-base-file api/import-base-processor
                 :import-gv-curations api/import-gv-curations
@@ -1046,7 +1046,8 @@ values ?strength { :cg/Definitive :cg/Strong  :cg/Moderate }
              #_(take 5)
              (sort-by first)
              (concat [["Gene" "Classification" "Experimental Evidence Total" "Link"]])
-             (csv/write-csv w)))))
+             count
+             #_(csv/write-csv w)))))
 
   "2. All curations that are Strong or Definitive, AD, have dominant negative in the free text, but don't have much experimental evidence. Jonathan suggested maybe 4 points or less, but since there won't be many of these curations anyway, I guess you could consider bucketing them... whatever makes sense to you... I'm trying to pull curations that might have a borderline mechanism so I can stress test the framework."
 
@@ -1089,4 +1090,19 @@ values ?strength { :cg/Definitive :cg/Strong }
            #_(map #(api/has-publish-action (::event/data %)))
            (run! #(rdf/pp-model (::event/data %)))
            #_(run! #(p/publish (get-in api-test-app [:topics :gene-validity-sepio]) %))))
+
+  (event-store/with-event-reader
+      [r (str root-data-dir "gg-gvs2-stage-1-2025-01-30.edn.gz")]
+    (->> (event-store/event-seq r)
+         
+         (map event/deserialize)
+         #_(map #(api/has-publish-action (::event/data %)))
+         (run! #(rdf/pp-model (::event/data %)))
+         #_(run! #(p/publish (get-in api-test-app [:topics :gene-validity-sepio]) %))))
+  )
+
+
+;; exploration building filters
+(comment
+  (gensym "filter_name")
   )

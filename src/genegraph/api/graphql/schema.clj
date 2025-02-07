@@ -6,6 +6,7 @@
             [genegraph.api.graphql.schema.variant :as variant]
             [genegraph.api.graphql.schema.agent :as agent]
             [genegraph.api.graphql.schema.contribution :as contribution]
+            [genegraph.api.graphql.schema.find :as find-query]
             [genegraph.api.graphql.legacy-schema :as legacy-schema]
             [genegraph.api.graphql.common.schema-builder :as schema-builder]
             [com.walmartlabs.lacinia :as lacinia]
@@ -47,6 +48,10 @@
    model-conflicts/assertion-annotation
    model-conflicts/create-annotation
    model-conflicts/assertion-annotation-query
+   find-query/query-result
+   find-query/filters-enum
+   find-query/filter-call
+   find-query/find-query
    ])
 
 
