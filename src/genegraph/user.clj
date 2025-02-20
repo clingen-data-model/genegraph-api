@@ -7,6 +7,7 @@
             [genegraph.framework.storage :as storage]
             [genegraph.framework.storage.rdf :as rdf]
             [genegraph.framework.storage.rdf.jsonld :as jsonld]
+            [genegraph.framework.storage.rdf.query :as rdf-query]
             [genegraph.framework.storage.rocksdb :as rocksdb]
             [genegraph.framework.event.store :as event-store]
             [genegraph.api :as api]
@@ -33,7 +34,9 @@
   (:import [ch.qos.logback.classic Logger Level]
            [org.slf4j LoggerFactory]
            [java.time Instant LocalDate]
-           [java.io PushbackReader]))
+           [java.io PushbackReader]
+           [org.apache.jena.query Dataset ARQ QueryExecutionFactory QueryFactory]
+           [org.apache.jena.sparql.algebra Algebra]))
 
 ;; Portal
 (comment
@@ -1105,4 +1108,81 @@ values ?strength { :cg/Definitive :cg/Strong }
 ;; exploration building filters
 (comment
   (gensym "filter_name")
+
+
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+          object-db @(get-in api-test-app [:storage :object-db :instance])
+          q (rdf/create-query "
+select ?assertion where {
+?prop a :cg/VariantPathogenicityProposition .
+?assertion :cg/subject ?prop .
+?prop :cg/variant ?variant .
+?variant :ga4gh/copyChange ?copy_change
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb {:copy_change (rdf/resource "http://www.ebi.ac.uk/efo/EFO_0030067")})
+           (take 1)
+           #_(into [])
+           (mapv #(hr/hybrid-resource
+                   %
+                   {:object-db object-db :tdb tdb}))
+           count)))
+  )
+
+
+(rdf/resource "EFO:0030070")
+
+;; Put together list of groups to assemble for ClinVar cleanup trial
+
+(comment
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+          object-db @(get-in api-test-app [:storage :object-db :instance])
+          query (rdf/create-query "
+select ?assertion where {
+?annoation a :cg/AssertionAnnotation ;
+:cg/subject ?assertion .
+}")]
+      (rdf/tx tdb
+          (->> (query tdb)
+               count)))
+  )
+
+;; Query statistics.
+;; Need to figure out how to optimize sub-optimal queries
+
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        query (rdf/create-query "
+select ?assertion where {
+?annoation a :cg/AssertionAnnotation ;
+:cg/subject ?assertion .
+}")]
+    #_query
+    (QueryExecutionFactory/create query))
+
+  )
+
+
+;; Exploring operations for negation queries
+(comment
+  (-> (QueryFactory/create "
+prefix cg: <http://dataexchange.clinicalgenome.org/terms/>
+select ?x where {
+?x a cg:EvidenceLevelAssertion .
+filter not exists { 
+    ?x cg:subject cg:NotThis .
+  }
+filter not exists {
+    ?x cg:subject cg:ThisEither .
+  }
+filter not exists {
+    ?x cg:subject cg:ForSureNotThis .
+  }
+}")
+      Algebra/compile
+      str
+      println)
+  
   )

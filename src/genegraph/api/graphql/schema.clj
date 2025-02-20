@@ -19,6 +19,7 @@
     [:cg/AssertionAnnotation :AssertionAnnotation]
     [:cg/VariantPathogenicityProposition :VariantPathogenicityProposition]
     [:cg/GeneticConditionMechanismProposition :GeneticConditionMechanismProposition]
+    [:cg/GeneValidityProposition :GeneValidityProposition]
     [:cg/CanonicalVariant :CanonicalVariant]
     [:ga4gh/CopyNumberChange :CopyNumberChange]
     [:ga4gh/SequenceLocation :SequenceLocation]]
@@ -44,6 +45,7 @@
    assertion/assertion
    assertion/genetic-condition-mechanism-proposition
    assertion/variant-pathogenicity-proposition
+   assertion/gene-validity-proposition
    model-conflicts/conflicts-query
    model-conflicts/assertion-annotation
    model-conflicts/create-annotation

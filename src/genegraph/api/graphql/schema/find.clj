@@ -1,5 +1,6 @@
 (ns genegraph.api.graphql.schema.find
-  (:require [genegraph.api.filter :as query-filter]))
+  (:require [genegraph.api.filter :as query-filter]
+            [genegraph.api.hybrid-resource :as hr]))
 
 (def query-result
   {:name :QueryResult
@@ -26,7 +27,8 @@
 
 (defn find-query-fn [context args _]
   (tap> context)
-  (query-filter/apply-filters context (:filters args)))
+  (mapv #(hr/hybrid-resource % context)
+        (query-filter/apply-filters context (:filters args))))
 
 (def find-query
   {:name :find

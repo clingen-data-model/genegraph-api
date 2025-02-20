@@ -83,3 +83,11 @@
                         :path [:cg/mechanism]}
             :condition {:type :Resource
                         :path [:cg/condition]}}})
+
+
+(def gene-validity-proposition
+  {:name :GeneValidityProposition
+   :graphql-type :object
+   :implements [:Resource]
+   :fields {:gene {:type :Resource
+                   :path [:cg/gene]}}})
