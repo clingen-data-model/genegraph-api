@@ -18,6 +18,14 @@
     ['proposition :rdf/type 'proposition_type]]
    :params {:proposition_type (rdf/resource argument)}})
 
+(defn argument->kw [a]
+  (-> a rdf/resource rdf/->kw))
+
+(defn proposition-type-pattern-fn [{:keys [argument]}]
+  [:bgp
+   ['x :cg/subject 'proposition]
+   ['proposition :rdf/type (argument->kw argument)]])
+
 (defn resource-type-filter-fn [{:keys [argument]}]
   {:bgp
    [['x :rdf/type 'resource_type]]
@@ -52,8 +60,7 @@
   {"CG:HaploinsufficiencyFeatures" haploinsufficiency-sufficient-feature-pattern
    "CG:TriplosensitivityFeatures" triplosensitivity-sufficient-feature-pattern})
 
-;; TODO start here
-;; Assumption is that 
+
 (defn feature-set-overlap
   [overlap-extent feature-set]
   (tap> feature-set)
@@ -63,8 +70,12 @@
               (into []))
    :params {}})
 
+
+;; TODO Complete filters for other than proposition_type
+;; Clean up legacy implementation
 (def filters
   {:proposition_type {:fn proposition-type-filter-fn
+                      :pattern-fn proposition-type-pattern-fn
                       :description "Type of proposition referred to by the evidence level assertion. Types include CG:VariantPathogenicityProposition, CG:GeneValidityProposition, and CG:ConditionMechanismProposition"}
    :resource_type {:fn resource-type-filter-fn
                    :description "Type of resource to select. Mandatory for most queries. For curated knowledge assertions, use CG:EvidenceStrengthAssertion"}
@@ -99,10 +110,6 @@
            filter-calls)))
 
 
-
-(defn rename-filter-variables [filter-call]
-  )
-
 (->> {:filter :complete_overlap_with_feature_set
       :argument "CG:TriplosensitivityFeatures"
       :operation :union}
@@ -118,6 +125,46 @@
 
 ;; Consider auto-generating enumeration values with description text.
 
+(do
+  (defn filter-call->expr [filter-call]
+    (let [pattern ((-> filter-call :filter filters :pattern-fn) filter-call)]
+      (if (= :not_exists (:operation filter-call))
+        [:not-exists pattern]
+        [:exists pattern])))
+
+  (-> {:filter :proposition_type
+        :argument "CG:VariantPathogenicityProposition"
+        :operation :not_exists}
+       filter-call->expr))
+
+(:pattern-fn (get filters {:filter :proposition_type
+        :argument "CG:VariantPathogenicityProposition"
+        :operation :not_exists}))
+
+
+
+(defn filters->op [pattern filter-calls]
+  (into []
+        (concat
+         [:filter]
+         (mapv filter-call->expr filter-calls)
+         [pattern])))
+
+(defn filtered-query->op [pattern filter-calls]
+  [:project ['x]
+   (filters->op pattern filter-calls)])
+
+(defn compile-filter-query
+  "Pass a BGP PATTERN, with associated filter calls with the form "
+  [pattern filter-calls]
+  (rdf/create-query (filtered-query->op pattern filter-calls)))
+
+
+(compile-filter-query
+ [:bgp ['x :rdf/type :cg/EvidenceStrengthAssertion]]
+ [{:filter :proposition_type
+   :argument "CG:VariantPathogenicityProposition"
+   :operation :exists}])
 
 (comment
   (filter-call->query-params filters
@@ -135,9 +182,9 @@
                  :filters filters}]
     (rdf/tx (:tdb context)
       (take 5
-       (apply-filters context
-                      [{:filter :resource_type
-                        :param "CG:EvidenceStrengthAssertion"}
-                       {:filter :proposition_type
-                        :param "CG:VariantPathogenicityProposition"}]))))
+            (apply-filters context
+                           [{:filter :resource_type
+                             :param "CG:EvidenceStrengthAssertion"}
+                            {:filter :proposition_type
+                             :param "CG:VariantPathogenicityProposition"}]))))
   )

@@ -1,6 +1,7 @@
 (ns genegraph.api.graphql.schema.find
   (:require [genegraph.api.filter :as query-filter]
-            [genegraph.api.hybrid-resource :as hr]))
+            [genegraph.api.hybrid-resource :as hr]
+            [genegraph.framework.storage.rdf :as rdf]))
 
 (def query-result
   {:name :QueryResult
@@ -25,7 +26,11 @@
    :values [{:enum-value :union
              :description "Filters the result using the union of the set returned by this filter and whatever other filters are used."}
             {:enum-value :difference
-             :description "Values matching this filter are removed from the result set"}]})
+             :description "Values matching this filter are removed from the result set"}
+            {:enum-value :exists
+             :description "Filter pattern must exist in result"}
+            {:enum-value :not_exists
+             :description "Filter pattern must not exist in result"}]})
 
 (def filter-call
   {:name :Filter
@@ -36,7 +41,6 @@
             :operation {:type :FilterOps}}})
 
 (defn find-query-fn [context args _]
-  (tap> context)
   (mapv #(hr/hybrid-resource % context)
         (query-filter/apply-filters context (:filters args))))
 
@@ -48,10 +52,16 @@
    :args {:filters {:type '(list :Filter)}}
    :resolve (fn [context args value] (find-query-fn context args value))})
 
+(defn assertions-query-fn [context args _]
+  (let [q (query-filter/compile-filter-query [:bgp ['x :rdf/type :cg/EvidenceStrengthAssertion]]
+                                             (:filters args))]
+    (mapv #(hr/hybrid-resource % context)
+          (q (:tdb context) {::rdf/params {:limit 200}}))))
+
 (def assertions-query
   {:name :assertions
    :graphql-type :query
    :description "Query to find assertions in Genegraph. Apply combinations of filters to limit the available results to the desired set."
    :type '(list :EvidenceStrengthAssertion)
    :args {:filters {:type '(list :Filter)}}
-   :resolve (fn [context args value] (find-query-fn context args value))})
+   :resolve (fn [context args value] (assertions-query-fn context args value))})
