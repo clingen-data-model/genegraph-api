@@ -51,10 +51,11 @@
    model-conflicts/create-annotation
    model-conflicts/assertion-annotation-query
    find-query/query-result
+   find-query/filter-ops
    find-query/filters-enum
    find-query/filter-call
    find-query/find-query
-   ])
+   find-query/assertions-query])
 
 
 (defn schema

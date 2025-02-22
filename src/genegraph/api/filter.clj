@@ -5,10 +5,10 @@
                                           :as filter-call}]
   ((:fn (get filters filter)) filter-call))
 
-(defn compile-jena-query [combined-filters]
+(defn compile-jena-query [union-filters]
   (rdf/create-query
    [:project ['x]
-    (->> (:bgp combined-filters)
+    (->> (:bgp union-filters)
          (cons :bgp)
          (into []))]))
 
@@ -56,9 +56,10 @@
 ;; Assumption is that 
 (defn feature-set-overlap
   [overlap-extent feature-set]
+  (tap> feature-set)
   {:bgp (->>  [['variant overlap-extent 'feature]
                ['proposition :cg/variant 'variant]]
-              (concat (get feature-set-name->bgp feature-set))
+              (concat (get feature-set-name->bgp (:argument feature-set)))
               (into []))
    :params {}})
 
@@ -74,9 +75,10 @@
    :complete_overlap_with_feature_set
    {:fn (fn [feature-set]
           (feature-set-overlap :cg/CompleteOverlap feature-set))
-    :description "Assertion that has complete overlap with the given feature set. Valid arguments include CG:HaploinsufficiencyFeatures and CG:TriplosensitivityFeatures"}})
+    :description "Assertion that has complete overlap with the given feature set. Valid arguments include CG:HaploinsufficiencyFeatures and CG:TriplosensitivityFeatures"
+    :variables [:feature]}})
 
-
+;; may remove
 (defn combine-filters [{:keys [tdb]} filter-calls]
   (reduce
    (fn [m filter-call]
@@ -86,10 +88,32 @@
    {:bgp [] :params {}}
    filter-calls))
 
+(defn combine-union-filters [{:keys [tdb]} filter-calls]
+  (reduce
+   (fn [m filter-call]
+     (merge-with into
+                 m
+                 (filter-call->query-params filters filter-call)))
+   {:bgp [] :params {}}
+   (filter #(contains? #{:union nil} (:operation %))
+           filter-calls)))
+
+
+
+(defn rename-filter-variables [filter-call]
+  )
+
+(->> {:filter :complete_overlap_with_feature_set
+      :argument "CG:TriplosensitivityFeatures"
+      :operation :union}
+     (filter-call->query-params filters)
+     tap>)
+
 (defn apply-filters [context filter-calls]
-  (let [combined-filters (combine-filters context filter-calls)
-        query (compile-jena-query combined-filters)]
-    (query (:tdb context) (assoc (:params combined-filters)
+  (let [union-filters (combine-union-filters context filter-calls)
+        query (compile-jena-query union-filters)]
+    (println (str query))
+    (query (:tdb context) (assoc (:params union-filters)
                                  ::rdf/params {:limit 200}))))
 
 ;; Consider auto-generating enumeration values with description text.

@@ -18,12 +18,22 @@
    :values (mapv (fn [[k v]] {:enum-value k :description (:description v)})
                  query-filter/filters)})
 
+(def filter-ops
+  {:name :FilterOps
+   :graphql-type :enum
+   :description "Operators that can be used with a filter call. Set operations, such as Union and Difference are available."
+   :values [{:enum-value :union
+             :description "Filters the result using the union of the set returned by this filter and whatever other filters are used."}
+            {:enum-value :difference
+             :description "Values matching this filter are removed from the result set"}]})
+
 (def filter-call
   {:name :Filter
    :graphql-type :input-object
    :description "Application of a filter to a query."
    :fields {:filter {:type :FilterNames}
-            :argument {:type 'String}}})
+            :argument {:type 'String}
+            :operation {:type :FilterOps}}})
 
 (defn find-query-fn [context args _]
   (tap> context)
@@ -35,5 +45,13 @@
    :graphql-type :query
    :description "Query to find resources in Genegraph. Apply combinations of filters to limit the available results to the desired set."
    :type '(list :Resource)
+   :args {:filters {:type '(list :Filter)}}
+   :resolve (fn [context args value] (find-query-fn context args value))})
+
+(def assertions-query
+  {:name :assertions
+   :graphql-type :query
+   :description "Query to find assertions in Genegraph. Apply combinations of filters to limit the available results to the desired set."
+   :type '(list :EvidenceStrengthAssertion)
    :args {:filters {:type '(list :Filter)}}
    :resolve (fn [context args value] (find-query-fn context args value))})

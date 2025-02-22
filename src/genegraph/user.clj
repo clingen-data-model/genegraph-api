@@ -110,10 +110,10 @@
             :clinvar-curation
             {:name :clinvar-curation
              :type :simple-queue-topic}}
-   :storage {:api-tdb (assoc api/api-tdb :load-snapshot false :snapshot-handle nil)
+   :storage {:api-tdb (assoc api/api-tdb :load-snapshot false #_#_:snapshot-handle nil)
              :response-cache-db api/response-cache-db
              #_#_:sequence-feature-db api/sequence-feature-db
-             :object-db (assoc api/object-db :load-snapshot false :snapshot-handle nil)}
+             :object-db (assoc api/object-db :load-snapshot false #_#_:snapshot-handle nil)}
    :processors {:fetch-base-file api/fetch-base-processor
                 :import-base-file api/import-base-processor
                 :import-gv-curations api/import-gv-curations
@@ -1138,6 +1138,7 @@ select ?assertion where {
 (comment
     (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
           object-db @(get-in api-test-app [:storage :object-db :instance])
+          hybrid-db {:object-db object-db :tdb tdb}
           query (rdf/create-query "
 select ?assertion where {
 ?annoation a :cg/AssertionAnnotation ;
@@ -1145,7 +1146,18 @@ select ?assertion where {
 }")]
       (rdf/tx tdb
           (->> (query tdb)
-               count)))
+               (mapv #(-> (hr/hybrid-resource
+                           %
+                           hybrid-db)
+                          (hr/path-> hybrid-db [:cg/contributions])
+                          first
+                          (hr/path1-> hybrid-db [:cg/agent])
+                          (hr/path1-> (assoc hybrid-db :primitive true)
+                                      [:rdfs/label])))
+               frequencies
+               (sort-by val)
+               reverse
+               tap>)))
   )
 
 ;; Query statistics.
