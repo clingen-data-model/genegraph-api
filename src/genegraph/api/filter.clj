@@ -37,6 +37,16 @@
     ['variant :ga4gh/copyChange 'copy_change]]
    :params {:copy_change (rdf/resource argument)}})
 
+(defn copy-change-pattern-fn [{:keys [argument]}]
+  [:bgp
+   ['x :cg/subject 'proposition]
+   ['proposition :cg/variant 'variant]
+   ['variant :ga4gh/copyChange (argument->kw argument)]])
+
+(defn assertion-direction-pattern-fn [{:keys [argument]}]
+  [:bgp
+   ['x :cg/direction (argument->kw argument)]])
+
 (defn assertion-direction-fn [{:keys [argument]}]
   {:bgp [['x :cg/direction 'evidence_direction]]
    :params {:evidence_direction (rdf/resource argument)}})
@@ -46,48 +56,98 @@
    ['mechanism_assertion :cg/subject 'dosage_proposition]
    ['mechanism_assertion :cg/evidenceStrength :cg/DosageSufficientEvidence]])
 
-(def haploinsufficiency-sufficient-feature-pattern
+(def haploinsufficiency-pattern
   (conj
    dosage-sufficient-feature-pattern
    ['dosage_proposition :cg/mechanism :cg/Haploinsufficiency]))
 
-(def triplosensitivity-sufficient-feature-pattern
+(def triplosensitivity-pattern
   (conj
    dosage-sufficient-feature-pattern
    ['dosage_proposition :cg/mechanism :cg/Triplosensitivity]))
 
-(def feature-set-name->bgp
-  {"CG:HaploinsufficiencyFeatures" haploinsufficiency-sufficient-feature-pattern
-   "CG:TriplosensitivityFeatures" triplosensitivity-sufficient-feature-pattern})
+#_(def gene-validity-moderate-and-greater
+  [[[:filter
+     [:in 'class :cg/Moderate :cg/Strong :cg/Definitive]]
+    [:bgp
+     ['x :cg/subject 'proposition]
+     ['proposition :cg/variant 'variant]
+     ['variant :cg/CompleteOverlap 'feature]
+     ['gv_prop :cg/gene 'feature]
+     ['gv_assertion :cg/subject 'gv_prop]
+     ['gv_assertion :cg/classification 'class]]]])
 
+(def gene-validity-moderate-and-greater
+  [['gv_prop :cg/gene 'feature]
+   ['gv_assertion :cg/subject 'gv_prop]])
+
+(def feature-set-name->bgp
+  {"CG:HaploinsufficiencyFeatures" haploinsufficiency-pattern
+   "CG:TriplosensitivityFeatures" triplosensitivity-pattern
+   "CG:GeneValidityModerateAndGreater" gene-validity-moderate-and-greater})
+
+(defn feature-set-overlap-pattern
+  [overlap-extent feature-set]
+  (into
+   []
+   (concat [:bgp
+            ['x :cg/subject 'proposition]
+            ['proposition :cg/variant 'variant]
+            ['variant overlap-extent 'feature]]
+           (get feature-set-name->bgp (:argument feature-set)))))
 
 (defn feature-set-overlap
   [overlap-extent feature-set]
-  (tap> feature-set)
-  {:bgp (->>  [['variant overlap-extent 'feature]
-               ['proposition :cg/variant 'variant]]
+  #_(tap> feature-set)
+  {:bgp (->>  [['x :cg/subject 'proposition]
+               ['proposition :cg/variant 'variant]
+               ['variant overlap-extent 'feature]]
               (concat (get feature-set-name->bgp (:argument feature-set)))
               (into []))
    :params {}})
 
 
+(defn gene-count-min-pattern-fn [{:keys [argument]}]
+  [:bgp
+   ['x :cg/subject 'proposition]
+   ['proposition :cg/variant 'variant]
+   ['variant :cg/meetsCriteria (argument->kw argument)]])
+
 ;; TODO Complete filters for other than proposition_type
 ;; Clean up legacy implementation
+
+;; Using _ for filter names, these translate directly to GraphQL enums
+;; so using snake-case to support javascript usage
 (def filters
   {:proposition_type {:fn proposition-type-filter-fn
                       :pattern-fn proposition-type-pattern-fn
                       :description "Type of proposition referred to by the evidence level assertion. Types include CG:VariantPathogenicityProposition, CG:GeneValidityProposition, and CG:ConditionMechanismProposition"}
+   ;; deprecated, remove after cleanup
    :resource_type {:fn resource-type-filter-fn
                    :description "Type of resource to select. Mandatory for most queries. For curated knowledge assertions, use CG:EvidenceStrengthAssertion"}
    :copy_change {:fn copy-change-filter-fn
+                 :pattern-fn copy-change-pattern-fn
                  :description "Copy change of the referred-to variant"}
    :assertion_direction {:fn assertion-direction-fn
+                         :pattern-fn assertion-direction-pattern-fn
                          :description "Direction of the assertion. Requires assertion to be the subject type"}
    :complete_overlap_with_feature_set
    {:fn (fn [feature-set]
           (feature-set-overlap :cg/CompleteOverlap feature-set))
+    :pattern-fn (fn [feature-set]
+                  (feature-set-overlap-pattern :cg/CompleteOverlap feature-set))
     :description "Assertion that has complete overlap with the given feature set. Valid arguments include CG:HaploinsufficiencyFeatures and CG:TriplosensitivityFeatures"
-    :variables [:feature]}})
+    :variables [:feature]}
+   :partial_overlap_with_feature_set
+   {:fn (fn [feature-set]
+          (feature-set-overlap :cg/PartialOverlap feature-set))
+    :pattern-fn (fn [feature-set]
+                  (feature-set-overlap-pattern :cg/PartialOverlap feature-set))
+    :description "Assertion that has partial overlap with the given feature set. Valid arguments include CG:HaploinsufficiencyFeatures and CG:TriplosensitivityFeatures"
+    :variables [:feature]}
+   :gene_count_min
+   {:pattern-fn gene-count-min-pattern-fn
+    :description "Threshold for minimum number of gene features. Valid arguments are CG:Genes25, CG:Genes35, and CG:Genes50"}})
 
 ;; may remove
 (defn combine-filters [{:keys [tdb]} filter-calls]
@@ -109,13 +169,6 @@
    (filter #(contains? #{:union nil} (:operation %))
            filter-calls)))
 
-
-(->> {:filter :complete_overlap_with_feature_set
-      :argument "CG:TriplosensitivityFeatures"
-      :operation :union}
-     (filter-call->query-params filters)
-     tap>)
-
 (defn apply-filters [context filter-calls]
   (let [union-filters (combine-union-filters context filter-calls)
         query (compile-jena-query union-filters)]
@@ -125,23 +178,11 @@
 
 ;; Consider auto-generating enumeration values with description text.
 
-(do
-  (defn filter-call->expr [filter-call]
-    (let [pattern ((-> filter-call :filter filters :pattern-fn) filter-call)]
-      (if (= :not_exists (:operation filter-call))
-        [:not-exists pattern]
-        [:exists pattern])))
-
-  (-> {:filter :proposition_type
-        :argument "CG:VariantPathogenicityProposition"
-        :operation :not_exists}
-       filter-call->expr))
-
-(:pattern-fn (get filters {:filter :proposition_type
-        :argument "CG:VariantPathogenicityProposition"
-        :operation :not_exists}))
-
-
+(defn filter-call->expr [filter-call]
+  (let [pattern ((-> filter-call :filter filters :pattern-fn) filter-call)]
+    (if (= :not_exists (:operation filter-call))
+      [:not-exists pattern]
+      [:exists pattern])))
 
 (defn filters->op [pattern filter-calls]
   (into []
@@ -157,14 +198,8 @@
 (defn compile-filter-query
   "Pass a BGP PATTERN, with associated filter calls with the form "
   [pattern filter-calls]
+  (tap> (filtered-query->op pattern filter-calls))
   (rdf/create-query (filtered-query->op pattern filter-calls)))
-
-
-(compile-filter-query
- [:bgp ['x :rdf/type :cg/EvidenceStrengthAssertion]]
- [{:filter :proposition_type
-   :argument "CG:VariantPathogenicityProposition"
-   :operation :exists}])
 
 (comment
   (filter-call->query-params filters

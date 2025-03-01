@@ -27,6 +27,8 @@
            [java.util.concurrent Executor])
   (:gen-class))
 
+;; TODO need to convert hgnc gene IDs from GV SEPIO to NCBIGENE ids
+
 ;; stuff to make sure Lacinia recieves an executor which can bookend
 ;; database transactions
 
@@ -161,8 +163,8 @@
             hgnc-gene (rdf/ld1-> prop [:cg/gene])
             ncbi-gene (first (same-as-query (get-in event [::storage/storage :api-tdb])
                                             {:y hgnc-gene}))]
-        (.remove m (rdf/construct-statement [prop :sepio/has-subject hgnc-gene]))
-        (.add m (rdf/construct-statement [prop :sepio/has-subject ncbi-gene]))))
+        (.remove m (rdf/construct-statement [prop :cg/gene hgnc-gene]))
+        (.add m (rdf/construct-statement [prop :cg/gene ncbi-gene]))))
   event)
 
 (def replace-hgnc-with-ncbi-gene
@@ -173,10 +175,13 @@
 (defn has-publish-action [m]
   (< 0 (count ((rdf/create-query "select ?x where { ?x :cg/role :cg/Publisher } ") m))))
 
+(defn prop-iri [event]
+  (-> event ::event/data prop-query first str))
+
 (defn store-curation-fn [event]
   (if (has-publish-action (::event/data event))
-    (event/store event :api-tdb (::event/key event) (::event/data event))
-    (event/delete event :api-tdb (::event/key event))))
+    (event/store event :api-tdb (prop-iri event) (::event/data event))
+    (event/delete event :api-tdb (prop-iri event))))
 
 (def store-curation
   (interceptor/interceptor

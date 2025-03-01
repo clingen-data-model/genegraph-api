@@ -191,9 +191,9 @@
                                  [:topics :fetch-base-events])
                          {::event/data %
                           ::event/key (:name %)})))
-
+  
   (->> (-> "base.edn" io/resource slurp edn/read-string)
-       (filter #(= "http://www.ebi.ac.uk/efo"
+       (filter #(= "http://purl.obolibrary.org/obo/mondo.owl"
                    (:name %)))
        (run! #(p/publish (get-in api-test-app
                                  [:topics :fetch-base-events])
@@ -1089,19 +1089,20 @@ values ?strength { :cg/Definitive :cg/Strong }
       [r (str root-data-dir "gg-gvs2-stage-1-2025-01-30.edn.gz")]
       (->> (event-store/event-seq r)
            (take 1)
-           (map event/deserialize)
+           #_(map ::event/key)
+           #_(map event/deserialize)
            #_(map #(api/has-publish-action (::event/data %)))
-           (run! #(rdf/pp-model (::event/data %)))
+           #_(run! #(rdf/pp-model (::event/data %)))
            #_(run! #(p/publish (get-in api-test-app [:topics :gene-validity-sepio]) %))))
-
-  (event-store/with-event-reader
-      [r (str root-data-dir "gg-gvs2-stage-1-2025-01-30.edn.gz")]
-    (->> (event-store/event-seq r)
-         
-         (map event/deserialize)
-         #_(map #(api/has-publish-action (::event/data %)))
-         (run! #(rdf/pp-model (::event/data %)))
-         #_(run! #(p/publish (get-in api-test-app [:topics :gene-validity-sepio]) %))))
+  (time
+   (event-store/with-event-reader
+       [r (str root-data-dir "gg-gvs2-stage-1-2025-02-23.edn.gz")]
+     (->> (event-store/event-seq r)
+          #_(take 1)
+          #_(map event/deserialize)
+          #_(map #(api/has-publish-action (::event/data %)))
+          #_(run! #(rdf/pp-model (::event/data %)))
+          (run! #(p/publish (get-in api-test-app [:topics :gene-validity-sepio]) %)))))
   )
 
 
@@ -1181,20 +1182,202 @@ select ?assertion where {
 (comment
   (-> (QueryFactory/create "
 prefix cg: <http://dataexchange.clinicalgenome.org/terms/>
-select ?x where {
-?x a cg:EvidenceLevelAssertion .
-filter not exists { 
-    ?x cg:subject cg:NotThis .
-  }
-filter not exists {
-    ?x cg:subject cg:ThisEither .
-  }
-filter not exists {
-    ?x cg:subject cg:ForSureNotThis .
-  }
-}")
+select (COUNT(?gene) AS ?geneCount) where {
+  ?x a cg:GeneValidityProposition ;
+  cg:gene ?gene .
+} GROUP BY ?gene ")
       Algebra/compile
       str
       println)
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q "
+prefix cg: <http://dataexchange.clinicalgenome.org/terms/>
+select ?x where {
+  ?x a cg:CanonicalVariant
+{ select ?x (count(?gene) AS ?geneCount)
+  where {
+  ?x cg:CompleteOverlap ?gene .
+  }
+  group by ?x
+}
+filter (?geneCount > 50)
+} limit 5"
+        qe (rdf/create-query q)]
+    (-> (QueryFactory/create q)
+        Algebra/compile
+        str
+        println)
+    (rdf/tx tdb
+      (tap> (qe tdb)))
+    )
   
+  )
+
+
+(comment
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q2 (rdf/create-query
+            [:project ['feature]
+             [:bgp
+              ['x :cg/subject 'proposition]
+              ['proposition :cg/variant 'variant]
+              ['variant :cg/CompleteOverlap 'feature]]])
+        q3 (rdf/create-query
+            [:project ['feature]
+             [:bgp
+              ['gv_prop :cg/gene 'feature]
+              ['gv_prop :rdf/type :cg/GeneValidityProposition]
+              ['gv_assertion :cg/subject 'gv_prop]]])
+        q (rdf/create-query "
+select ?assertion where {
+?prop a :cg/GeneValidityProposition ;
+      :cg/modeOfInheritance :hp/AutosomalDominantInheritance .
+?assertion :cg/subject ?prop ;
+           :cg/evidenceStrength ?strength .
+values ?strength { :cg/Definitive :cg/Strong  :cg/Moderate } 
+}
+")]
+    (rdf/tx tdb
+      (with-open [w (io/writer "/users/tristan/Desktop/moderate+-dn.csv")]
+        (->> (q2 tdb)
+             first))))
+
+ )
+
+
+(comment
+  ;; Request from Erin:
+  "Tristan, how difficult would it be for you to create a report for us with the following gene-disease validity information?
+ 
+For any curation with a classification of Limited, Disputed, or Refuted, could we have a spreadsheet with the following:
+Gene
+Disease
+MOI
+GCEP
+Classification
+Final Approval Date
+Date of First Report (this should be a unique data point from the GCI – we are asked to check which of the publications this is, but let us know if you don’t have this)
+Total points
+Genetic Evidence points
+Experimental Evidence points
+ 
+Additionally, are you able to easily tell if any of these have ever been recurated?  We thought you might be able to with the backfilled versioning information you are working on, but if that part isn’t ready at the moment, disregard.
+ 
+Thanks,
+Erin"
+
+  (def example-query (rdf/create-query "
+select ?assertion where {
+?prop a :cg/GeneValidityProposition ;
+      :cg/modeOfInheritance :hp/AutosomalDominantInheritance .
+?assertion :cg/subject ?prop ;
+           :cg/evidenceStrength ?strength .
+values ?strength { :cg/Definitive :cg/Strong  :cg/Moderate } 
+}
+"))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query [:project ['x]
+                             [:filter
+                              [:in 'classification :cg/Refuted :cg/Disputed :cg/Limited]
+                              [:bgp
+                               ['x :cg/evidenceStrength 'classification]
+                               ['x :rdf/type :cg/EvidenceStrengthAssertion]
+                               ['x :cg/subject 'prop]
+                               ['prop :rdf/type :cg/GeneValidityProposition]]]])
+        approval (rdf/create-query [:project ['x]
+                                    [:bgp
+                                     ['assertion :cg/contributions 'x]
+                                     ['x :cg/role :cg/Approver]]])
+        genetic-evidence (rdf/create-query [:project ['x]
+                                    [:bgp
+                                     ['assertion :cg/evidence 'x]
+                                     ['x
+                                      :cg/specifiedBy
+                                      :cg/GeneValidityOverallGeneticEvidenceCriteria]]])
+        experimental-evidence (rdf/create-query [:project ['x]
+                                            [:bgp
+                                             ['assertion :cg/evidence 'x]
+                                             ['x
+                                              :cg/specifiedBy
+                                              :cg/GeneValidityOverallExperimentalEvidenceCriteria]]])
+        citations (rdf/create-query "
+select ?x where {
+?assertion :cg/evidence * / :dc/source ?x
+}
+")
+        resources (rdf/create-query "
+select ?x where {
+  ?x a :dc/BibliographicResource .
+}")
+        first-publication (fn [a]
+                            (->> #_(citations tdb {:assertion a})
+                                 (storage/read tdb (str (rdf/ld1-> a [:cg/subject])))
+                                 resources
+                                 (mapv (fn [p] {:publication (str p)
+                                                :date (rdf/ld1-> p [:dc/date])}))
+                                 (remove #(nil? (:date %)))
+                                 (sort-by :date)
+                                 first))
+        ->row (fn [a] [(rdf/ld1-> a [:cg/subject
+                                     :cg/gene
+                                     [:owl/sameAs :<]
+                                     :skos/prefLabel])
+                       (rdf/ld1-> a [:cg/subject
+                                     :cg/disease
+                                     :rdfs/label])
+                       (rdf/ld1-> a [:cg/subject
+                                     :cg/modeOfInheritance
+                                     :rdfs/label])
+                       (-> (rdf/ld1-> a [:cg/evidenceStrength])
+                           rdf/->kw
+                           name)
+                       (rdf/ld1-> (first (approval tdb {:assertion a}))
+                                  [:cg/agent
+                                   :rdfs/label])
+                       (rdf/ld1-> (first (approval tdb {:assertion a}))
+                                  [:cg/date])
+                       (:publication (first-publication a))
+                       (:date (first-publication a))
+                       (rdf/ld1-> a [:cg/strengthScore])
+                       (rdf/ld1-> (first (genetic-evidence tdb {:assertion a}))
+                                  [:cg/strengthScore])
+                       (rdf/ld1-> (first (experimental-evidence tdb {:assertion a}))
+                                  [:cg/strengthScore])
+                       (rdf/ld1-> a [:cg/version])])
+        q2  (rdf/create-query "
+select ?x where { ?x a :cg/GeneValidityProposition } limit 1")]
+    (rdf/tx tdb
+      #_(->> (q2 tdb)
+           #_count
+           (take 1)
+           (run! #(rdf/pp-model (storage/read tdb (str %)))))
+      (->> (storage/read
+           tdb
+           "http://dataexchange.clinicalgenome.org/gci/5734978b-bdf9-43e3-baf6-c50b83c15abc")
+           rdf/pp-model
+           )
+      #_(with-open [w (io/writer "/users/tristan/Desktop/limited-.csv")]
+        (->> (q tdb)
+             #_(take 1)
+             (mapv ->row)
+             (cons ["gene"
+                    "disease"
+                    "moi"
+                    "classification"
+                    "gcep"
+                    "approval date"
+                    "first publication"
+                    "publication date"
+                    "overall score"
+                    "genetic evidence score"
+                    "experimental strength score"
+                    "version"])
+             (csv/write-csv w)))))
+  
+
   )

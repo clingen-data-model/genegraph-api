@@ -657,23 +657,40 @@
   (let [loci (variant-loci variant-bundle)]
     (assoc variant-bundle :variant-loci loci)))
 
+(defn dosage-criteria-stmts [variant overlap-stmts]
+  (let [gene-count (->> overlap-stmts
+                        (filter
+                         (fn [[_ o _]]
+                           (= :cg/CompleteOverlap o)))
+                        count)
+        variant-iri (:iri variant)]
+    (->> (cond
+           (< 49 gene-count) [:cg/Genes50 :cg/Genes35 :cg/Genes25]
+           (< 34 gene-count) [:cg/Genes35 :cg/Genes25]
+           (< 24 gene-count) [:cg/Genes25]
+           :default [])
+         (mapv (fn [criteria] [variant-iri :cg/meetsCriteria criteria]))))
+  )
+
 (defn add-gene-overlaps-for-variant [db variant-bundle]
   (let [canonical-variant (get-canonical-variant variant-bundle)
         get-gene (fn [gene] (storage/read db [:objects gene]))
-        vloci (variant-loci canonical-variant)]
-    (update variant-bundle
-            :statements
-            #(reduce (fn [stmts g]
-                      (let [overlap (gene-overlap vloci
-                                                  (get-gene g))]
-                        (if (not= :cg/NoOverlap overlap)
-                          (conj stmts
-                                [(:iri canonical-variant)
-                                 overlap
-                                 (rdf/resource g)])
-                          stmts)))
-                    %
-                    (gene-ids-for-bundle db variant-bundle)))))
+        vloci (variant-loci canonical-variant)
+        gene-ids (gene-ids-for-bundle db variant-bundle)
+        overlap-stmts (reduce (fn [stmts g]
+                                (let [overlap (gene-overlap vloci
+                                                            (get-gene g))]
+                                  (if (not= :cg/NoOverlap overlap)
+                                    (conj stmts
+                                          [(:iri canonical-variant)
+                                           overlap
+                                           (rdf/resource g)])
+                                    stmts)))
+                              []
+                              gene-ids)
+        criteria-stmts (dosage-criteria-stmts canonical-variant overlap-stmts)]
+    #_(tap> overlap-stmts)
+    (update variant-bundle :statements concat overlap-stmts criteria-stmts)))
 
 (defn write-variant-bundle [object-db tdb variant-bundle]
   (let [model (rdf/statements->model (:statements variant-bundle))]
@@ -727,7 +744,9 @@
   (def flagged-submission-xml (get-clinvar-variants ["1412663"] http-client))
 
   (def internal-conflict (get-clinvar-variants ["150155"] http-client))
-  ;;  150155
+
+  (def big-variant (get-clinvar-variants ["3024572"] http-client))
+
   (println internal-conflict)
 
   (println flagged-submission-xml)
@@ -737,13 +756,14 @@
         tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])
         add-gene-overlaps-with-db
         #(add-gene-overlaps-for-variant object-db  %)]
-    (->> (xml/parse-str test-submissions)
+    (->> (xml/parse-str big-variant)
          :content
          (mapv #(-> %
                     clinvar-xml->intermediate-model
                     variant->statements-and-objects
                     add-gene-overlaps-with-db))
-         #_tap>))
+         tap>))
+  
   )
 
 ;; Some template code for extracting statistics from ClinVar

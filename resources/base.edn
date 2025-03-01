@@ -99,11 +99,11 @@
   :source "https://raw.githubusercontent.com/clingen-data-model/SEPIO-ontology/master/src/ontology/extensions/clingen/clingen-gene-validity/sepio-clingen-gene-validity-shapes.ttl"
   :target "sepio-clingen-gene-validity-shapes.ttl"
   :format :genegraph.framework.storage.rdf/turtle}
- #_{:name "http://purl.obolibrary.org/obo/hp.owl"
+ {:name "http://purl.obolibrary.org/obo/hp.owl"
   :source "http://purl.obolibrary.org/obo/hp.owl",
   :target "hp.owl",
   :format :genegraph.framework.storage.rdf/rdf-xml}
- #_{:name "http://purl.obolibrary.org/obo/mondo.owl"
+ {:name "http://purl.obolibrary.org/obo/mondo.owl"
   :source "http://purl.obolibrary.org/obo/mondo.owl",
   :target "mondo.owl",
   :format :genegraph.framework.storage.rdf/rdf-xml}
@@ -139,7 +139,7 @@
   :source "https://storage.googleapis.com/gcp-public-data--gnomad/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz"
   :target "gnomad_v2.1.1.lof_metrics_by_gene.txt.gz"
   :format :loss-intolerance}
- #_{:name "http://dataexchange.clinicalgenome.org/affiliations"
+ {:name "http://dataexchange.clinicalgenome.org/affiliations"
   :source "https://docs.google.com/spreadsheets/d/1IF9GiP8iiFx1CndgqdWNGx4A_uM2GsWnV7GSiUO33bs/gviz/tq?tqx=out:csv&sheet=VCI%2FGCI%20Affiliations%20List"
   :target "affiliations.csv"
   :format :genegraph.api.base/affiliations}
