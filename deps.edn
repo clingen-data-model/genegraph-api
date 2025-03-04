@@ -38,7 +38,7 @@
  {ch.qos.logback/logback-classic                    {:mvn/version "1.5.0"}
   org.clojure/clojure                               {:mvn/version "1.12.0"}
   io.github.clingen-data-model/genegraph-framework
-  {:git/sha "5213420660871d065212d4f242ffc42fe512393b"}
+  {:git/sha "d19a919c3ff164c9eb4f2852ff060fb5c647f88f"}
   com.walmartlabs/lacinia-pedestal {:mvn/version "1.3"}
   hato/hato                                         {:mvn/version "1.0.0"}
   org.clojure/data.csv                              {:mvn/version "1.0.1"}

@@ -57,44 +57,77 @@
    ['mechanism_assertion :cg/evidenceStrength :cg/DosageSufficientEvidence]])
 
 (def haploinsufficiency-pattern
-  (conj
-   dosage-sufficient-feature-pattern
-   ['dosage_proposition :cg/mechanism :cg/Haploinsufficiency]))
+  (into
+   []
+   (concat [:bgp]
+           dosage-sufficient-feature-pattern
+           [['dosage_proposition :cg/mechanism :cg/Haploinsufficiency]])))
 
 (def triplosensitivity-pattern
-  (conj
-   dosage-sufficient-feature-pattern
-   ['dosage_proposition :cg/mechanism :cg/Triplosensitivity]))
-
-#_(def gene-validity-moderate-and-greater
-  [[[:filter
-     [:in 'class :cg/Moderate :cg/Strong :cg/Definitive]]
-    [:bgp
-     ['x :cg/subject 'proposition]
-     ['proposition :cg/variant 'variant]
-     ['variant :cg/CompleteOverlap 'feature]
-     ['gv_prop :cg/gene 'feature]
-     ['gv_assertion :cg/subject 'gv_prop]
-     ['gv_assertion :cg/classification 'class]]]])
+  (into
+   []
+   (concat [:bgp]
+           dosage-sufficient-feature-pattern
+           [['dosage_proposition :cg/mechanism :cg/Triplosensitivity]])))
 
 (def gene-validity-moderate-and-greater
-  [['gv_prop :cg/gene 'feature]
-   ['gv_assertion :cg/subject 'gv_prop]])
+  [:filter
+   [:in 'class :cg/Moderate :cg/Strong :cg/Definitive]
+   [:bgp
+    ['gv_prop :cg/gene 'feature]
+    ['gv_assertion :cg/subject 'gv_prop]
+    ['gv_assertion :cg/evidenceStrength 'class]]])
+
+(def gene-validity-moderate-and-greater-ad-xl
+  [:join
+   gene-validity-moderate-and-greater
+   [:filter
+    [:in 'moi :hp/XLinkedInheritance :hp/AutosomalDominantInheritance]
+    [:bgp
+     ['gv_prop :cg/modeOfInheritance 'moi]]]])
+
+
+(def gene-validity-moderate-and-greater-ar
+  [:join
+   gene-validity-moderate-and-greater
+   [:filter
+    [:in 'moi :hp/AutosomalRecessiveInheritance]
+    [:bgp
+     ['gv_prop :cg/modeOfInheritance 'moi]]]])
+
+(def dosage-ar-linked
+  [:bgp
+   ['dosage_proposition :cg/feature 'feature]
+   ['mechanism_assertion :cg/subject 'dosage_proposition]
+   ['mechanism_assertion :cg/evidenceStrength :cg/DosageAutosomalRecessive]])
+
+(def ar-gene
+  [:union
+   gene-validity-moderate-and-greater-ar
+   dosage-ar-linked])
 
 (def feature-set-name->bgp
   {"CG:HaploinsufficiencyFeatures" haploinsufficiency-pattern
    "CG:TriplosensitivityFeatures" triplosensitivity-pattern
-   "CG:GeneValidityModerateAndGreater" gene-validity-moderate-and-greater})
+   "CG:GeneValidityModerateAndGreater" gene-validity-moderate-and-greater
+   "CG:GeneValidityModerateAndGreaterADXL" gene-validity-moderate-and-greater-ad-xl
+   "CG:GeneValidityModerateAndGreaterAR" gene-validity-moderate-and-greater-ad-xl
+   "CG:ARGene" ar-gene})
 
+;; TODO start here, rewrite as a JOIN between the feature and the
+;; feature set. Needed to cover use case where the feature set is defined
+;; by more than just a simple set of triples, for example GV moderate and
+;; greater (above), as well as the AR/X + Dosage 30 set.
 (defn feature-set-overlap-pattern
   [overlap-extent feature-set]
   (into
    []
-   (concat [:bgp
-            ['x :cg/subject 'proposition]
-            ['proposition :cg/variant 'variant]
-            ['variant overlap-extent 'feature]]
-           (get feature-set-name->bgp (:argument feature-set)))))
+   [:join
+    [:bgp
+     ['x :cg/subject 'proposition]
+     ['proposition :cg/variant 'variant]
+     ['variant overlap-extent 'feature]]
+    (get feature-set-name->bgp (:argument feature-set))]))
 
 (defn feature-set-overlap
   [overlap-extent feature-set]

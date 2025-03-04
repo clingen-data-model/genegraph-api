@@ -1189,6 +1189,19 @@ select (COUNT(?gene) AS ?geneCount) where {
       Algebra/compile
       str
       println)
+
+    (-> (QueryFactory/create "
+prefix cg: <http://dataexchange.clinicalgenome.org/terms/>
+select ?x where {
+  ?x a cg:EvidenceStrengthAssertion ;
+  cg:contributions ?contrib .
+  ?contrib cg:role cg:Approver ;
+  cg:date ?date .
+  filter (?date > \"2020\")
+} ")
+      Algebra/compile
+      str
+      println)
   (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
         object-db @(get-in api-test-app [:storage :object-db :instance])
         q "
