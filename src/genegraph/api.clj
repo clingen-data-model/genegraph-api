@@ -42,7 +42,7 @@
 (def admin-env
   (if (or (System/getenv "DX_JAAS_CONFIG_DEV")
           (System/getenv "DX_JAAS_CONFIG")) ; prevent this in cloud deployments
-    {:platform "local"
+    {:platform "stage"
      :dataexchange-genegraph (System/getenv "DX_JAAS_CONFIG")
      :local-data-path "data/"}
     {}))
@@ -385,18 +385,6 @@
                   dosage/add-dosage-indexes
                   response-cache/invalidate-cache]})
 
-;; todo start here, bring GV import in
-#_(def import-gv-curations
-    {:type :processor
-     :subscribe :gene-validity-sepio
-     :name :gene-validity-sepio-reader
-     :backing-store :api-tdb
-     #_#_:init-fn (init-await-genes ::import-gv-curations-await-genes)
-     :interceptors [await-genes
-                    replace-hgnc-with-ncbi-gene
-                    store-curation
-                    response-cache/invalidate-cache]})
-
 (def query-timer-interceptor
   (interceptor/interceptor
    {:name ::query-timer-interceptor
@@ -613,12 +601,15 @@
             :base-data
             (assoc base-data-topic
                    :type :kafka-reader-topic)
-            :clinvar-curation clinvar-curation-topic}
+            :clinvar-curation clinvar-curation-topic
+            :gene-validity-complete (assoc gene-validity-sepio-topic
+                                           :type :kafka-reader-topic)}
    :processors {:import-base-file import-base-processor
                 :graphql-api graphql-api
                 :graphql-ready graphql-ready
                 :import-dosage-curations import-dosage-curations
-                :read-clinvar-curations read-clinvar-curations}
+                :read-clinvar-curations read-clinvar-curations
+                :import-gv-curations import-gv-curations}
    :http-servers http-server})
 
 (def genegraph-function
