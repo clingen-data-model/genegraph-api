@@ -40,18 +40,6 @@
             :argument {:type 'String}
             :operation {:type :FilterOps}}})
 
-(defn find-query-fn [context args _]
-  (mapv #(hr/hybrid-resource % context)
-        (query-filter/apply-filters context (:filters args))))
-
-(def find-query
-  {:name :find
-   :graphql-type :query
-   :description "Query to find resources in Genegraph. Apply combinations of filters to limit the available results to the desired set."
-   :type '(list :Resource)
-   :args {:filters {:type '(list :Filter)}}
-   :resolve (fn [context args value] (find-query-fn context args value))})
-
 (defn assertions-query-fn [context args _]
   (let [q (query-filter/compile-filter-query [:bgp ['x :rdf/type :cg/EvidenceStrengthAssertion]]
                                              (:filters args))]

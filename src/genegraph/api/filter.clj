@@ -12,12 +12,6 @@
          (cons :bgp)
          (into []))]))
 
-(defn proposition-type-filter-fn [{:keys [argument]}]
-  {:bgp
-   [['x :cg/subject 'proposition]
-    ['proposition :rdf/type 'proposition_type]]
-   :params {:proposition_type (rdf/resource argument)}})
-
 (defn argument->kw [a]
   (-> a rdf/resource rdf/->kw))
 
@@ -25,17 +19,6 @@
   [:bgp
    ['x :cg/subject 'proposition]
    ['proposition :rdf/type (argument->kw argument)]])
-
-(defn resource-type-filter-fn [{:keys [argument]}]
-  {:bgp
-   [['x :rdf/type 'resource_type]]
-   :params {:resource_type (rdf/resource argument)}})
-
-(defn copy-change-filter-fn [{:keys [argument]}]
-  {:bgp
-   [['proposition :cg/variant 'variant]
-    ['variant :ga4gh/copyChange 'copy_change]]
-   :params {:copy_change (rdf/resource argument)}})
 
 (defn copy-change-pattern-fn [{:keys [argument]}]
   [:bgp
@@ -46,10 +29,6 @@
 (defn assertion-direction-pattern-fn [{:keys [argument]}]
   [:bgp
    ['x :cg/direction (argument->kw argument)]])
-
-(defn assertion-direction-fn [{:keys [argument]}]
-  {:bgp [['x :cg/direction 'evidence_direction]]
-   :params {:evidence_direction (rdf/resource argument)}})
 
 (def dosage-sufficient-feature-pattern
   [['dosage_proposition :cg/feature 'feature]
@@ -125,17 +104,6 @@
      ['variant overlap-extent 'feature]]
     (get feature-set-name->bgp (:argument feature-set))]))
 
-(defn feature-set-overlap
-  [overlap-extent feature-set]
-  #_(tap> feature-set)
-  {:bgp (->>  [['x :cg/subject 'proposition]
-               ['proposition :cg/variant 'variant]
-               ['variant overlap-extent 'feature]]
-              (concat (get feature-set-name->bgp (:argument feature-set)))
-              (into []))
-   :params {}})
-
-
 (defn gene-count-min-pattern-fn [{:keys [argument]}]
   [:bgp
    ['x :cg/subject 'proposition]
@@ -161,29 +129,19 @@
 ;; Using _ for filter names, these translate directly to GraphQL enums
 ;; so using snake-case to support javascript usage
 (def filters
-  {:proposition_type {:fn proposition-type-filter-fn
-                      :pattern-fn proposition-type-pattern-fn
+  {:proposition_type {:pattern-fn proposition-type-pattern-fn
                       :description "Type of proposition referred to by the evidence level assertion. Types include CG:VariantPathogenicityProposition, CG:GeneValidityProposition, and CG:ConditionMechanismProposition"}
-   ;; deprecated, remove after cleanup
-   :resource_type {:fn resource-type-filter-fn
-                   :description "Type of resource to select. Mandatory for most queries. For curated knowledge assertions, use CG:EvidenceStrengthAssertion"}
-   :copy_change {:fn copy-change-filter-fn
-                 :pattern-fn copy-change-pattern-fn
+   :copy_change {:pattern-fn copy-change-pattern-fn
                  :description "Copy change of the referred-to variant"}
-   :assertion_direction {:fn assertion-direction-fn
-                         :pattern-fn assertion-direction-pattern-fn
+   :assertion_direction {:pattern-fn assertion-direction-pattern-fn
                          :description "Direction of the assertion. Requires assertion to be the subject type"}
    :complete_overlap_with_feature_set
-   {:fn (fn [feature-set]
-          (feature-set-overlap :cg/CompleteOverlap feature-set))
-    :pattern-fn (fn [feature-set]
+   {:pattern-fn (fn [feature-set]
                   (feature-set-overlap-pattern :cg/CompleteOverlap feature-set))
     :description "Assertion that has complete overlap with the given feature set. Valid arguments include CG:HaploinsufficiencyFeatures and CG:TriplosensitivityFeatures"
     :variables [:feature]}
    :partial_overlap_with_feature_set
-   {:fn (fn [feature-set]
-          (feature-set-overlap :cg/PartialOverlap feature-set))
-    :pattern-fn (fn [feature-set]
+   {:pattern-fn (fn [feature-set]
                   (feature-set-overlap-pattern :cg/PartialOverlap feature-set))
     :description "Assertion that has partial overlap with the given feature set. Valid arguments include CG:HaploinsufficiencyFeatures and CG:TriplosensitivityFeatures"
     :variables [:feature]}
@@ -193,35 +151,6 @@
    :date_evaluated_min
    {:pattern-fn min-last-evaluted-date-pattern-fn
     :description "Filter for classifications evaluated after the given date (in ISO format"}})
-
-;; may remove
-(defn combine-filters [{:keys [tdb]} filter-calls]
-  (reduce
-   (fn [m filter-call]
-     (merge-with into
-                 m
-                 (filter-call->query-params filters filter-call)))
-   {:bgp [] :params {}}
-   filter-calls))
-
-(defn combine-union-filters [{:keys [tdb]} filter-calls]
-  (reduce
-   (fn [m filter-call]
-     (merge-with into
-                 m
-                 (filter-call->query-params filters filter-call)))
-   {:bgp [] :params {}}
-   (filter #(contains? #{:union nil} (:operation %))
-           filter-calls)))
-
-(defn apply-filters [context filter-calls]
-  (let [union-filters (combine-union-filters context filter-calls)
-        query (compile-jena-query union-filters)]
-    (println (str query))
-    (query (:tdb context) (assoc (:params union-filters)
-                                 ::rdf/params {:limit 200}))))
-
-;; Consider auto-generating enumeration values with description text.
 
 (defn filter-call->expr [filter-call]
   (let [pattern ((-> filter-call :filter filters :pattern-fn) filter-call)]
