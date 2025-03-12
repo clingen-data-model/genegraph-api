@@ -1394,3 +1394,21 @@ select ?x where { ?x a :cg/GeneValidityProposition } limit 1")]
   
 
   )
+
+
+(comment
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        protein-coding-gene-query (rdf/create-query
+            [:project ['x]
+             [:bgp
+              ['x :rdf/type :so/GeneWithProteinProduct]]])]
+    (rdf/tx tdb
+      (->> (protein-coding-gene-query tdb {::rdf/params {:limit 5}})
+           (mapv #(hr/hybrid-resource % hybrid-db))
+           first
+           tap>)))
+
+ )

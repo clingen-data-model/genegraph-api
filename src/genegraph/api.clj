@@ -42,7 +42,7 @@
 (def admin-env
   (if (or (System/getenv "DX_JAAS_CONFIG_DEV")
           (System/getenv "DX_JAAS_CONFIG")) ; prevent this in cloud deployments
-    {:platform "stage"
+    {:platform "local"
      :dataexchange-genegraph (System/getenv "DX_JAAS_CONFIG")
      :local-data-path "data/"}
     {}))
@@ -602,7 +602,7 @@
             (assoc base-data-topic
                    :type :kafka-reader-topic)
             :clinvar-curation clinvar-curation-topic
-            :gene-validity-complete (assoc gene-validity-sepio-topic
+            :gene-validity-sepio (assoc gene-validity-sepio-topic
                                            :type :kafka-reader-topic)}
    :processors {:import-base-file import-base-processor
                 :graphql-api graphql-api

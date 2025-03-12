@@ -56,7 +56,7 @@
   (let [q (query-filter/compile-filter-query [:bgp ['x :rdf/type :cg/EvidenceStrengthAssertion]]
                                              (:filters args))]
     (mapv #(hr/hybrid-resource % context)
-          (q (:tdb context) {::rdf/params {:limit 200}}))))
+          (q (:tdb context) {::rdf/params {:limit 500}}))))
 
 (def assertions-query
   {:name :assertions

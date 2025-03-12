@@ -349,12 +349,15 @@
               :cg/condition :mondo/HereditaryDisease}]
     (assoc prop :iri (id/iri prop))))
 
+(defn scv-agent-iri [scv]
+  (str "https://identifiers.org/clinvar.submitter:"
+       (:OrgID scv)))
+
 (defn scv-contributions [scv]
   (let [role-mapping {:DateCreated :cg/Creator
                       :DateLastEvaluated :cg/Evaluator
                       :DateUpdated :cg/Submitter}
-        scv-agent (str "https://identifiers.org/clinvar.submitter:"
-                       (:OrgID scv))]
+        scv-agent (scv-agent-iri scv)]
     (->> (select-keys scv [:DateCreated :DateLastEvaluated :DateUpdated])
          (remove #(nil? (val %)))
          (mapv (fn [[k v]]
@@ -370,7 +373,8 @@
                     Comment
                     ReviewStatus
                     Version
-                    SimpleAllele]
+                    SimpleAllele
+                    DateLastEvaluated]
              :as scv}]
   (let [classification (get clinvar-class->acmg-class
                             Classification
@@ -378,6 +382,8 @@
     {:type :cg/EvidenceStrengthAssertion
      :iri (str "https://identifiers.org/clinvar.submission:"
                Accession)
+     :cg/dateLastEvaluated DateLastEvaluated
+     :cg/submitter (scv-agent-iri scv)
      :cg/subject prop-iri
      :cg/classification classification
      :dc/description Comment
@@ -407,13 +413,20 @@
           variant
           prop)))
 
+(def literal-attrs
+  #{:cg/dateLastEvaluated})
 
 (defn attrs->statements [attrs]
   (let [iri (:iri attrs)]
     (mapv
-     (fn [[k v]] [iri k (rdf/resource v)])
-     (set/rename-keys (dissoc attrs :iri)
-                      {:type :rdf/type}))))
+     (fn [[k v]]
+       (if (literal-attrs k)
+         [iri k v]
+         [iri k (rdf/resource v)]))
+     (remove
+      (fn [[_ v]] (nil? v))
+      (set/rename-keys (dissoc attrs :iri)
+                       {:type :rdf/type})))))
 
 (defn canonical-variant->statements [cv]
   (attrs->statements
@@ -427,7 +440,9 @@
                  :cg/subject
                  :cg/direction
                  :cg/classification
-                 :cg/reviewStatus])))
+                 :cg/reviewStatus
+                 :cg/dateLastEvaluated
+                 :cg/submitter])))
 
 (defn clinvar-variant->statements [clinvar-variant]
   (concat
@@ -689,7 +704,6 @@
                               []
                               gene-ids)
         criteria-stmts (dosage-criteria-stmts canonical-variant overlap-stmts)]
-    #_(tap> overlap-stmts)
     (update variant-bundle :statements concat overlap-stmts criteria-stmts)))
 
 (defn write-variant-bundle [object-db tdb variant-bundle]
@@ -756,7 +770,7 @@
         tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])
         add-gene-overlaps-with-db
         #(add-gene-overlaps-for-variant object-db  %)]
-    (->> (xml/parse-str big-variant)
+    (->> (xml/parse-str test-submissions)
          :content
          (mapv #(-> %
                     clinvar-xml->intermediate-model

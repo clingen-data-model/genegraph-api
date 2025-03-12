@@ -166,6 +166,7 @@
   :so/Assembly "http://purl.obolibrary.org/obo/SO_0001248"
   :so/ChromosomeBand "http://purl.obolibrary.org/obo/SO_0000341"
   :so/Gene "http://purl.obolibrary.org/obo/SO_0000704"
+  :so/GeneWithProteinProduct "http://purl.obolibrary.org/obo/SO_0001217"
   :so/SequenceFeature "http://purl.obolibrary.org/obo/SO_0000110"
   :stato/Cohort "http://purl.obolibrary.org/obo/STATO_0000203"
   :stato/lower-confidence-limit "http://purl.obolibrary.org/obo/STATO_0000315"

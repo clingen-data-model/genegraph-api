@@ -114,10 +114,6 @@
    "CG:GeneValidityModerateAndGreaterAR" gene-validity-moderate-and-greater-ad-xl
    "CG:ARGene" ar-gene})
 
-;; TODO start here, rewrite as a JOIN between the feature and the
-;; feature set. Needed to cover use case where the feature set is defined
-;; by more than just a simple set of triples, for example GV moderate and
-;; greater (above), as well as the AR/X + Dosage 30 set.
 (defn feature-set-overlap-pattern
   [overlap-extent feature-set]
   (into
@@ -145,6 +141,19 @@
    ['x :cg/subject 'proposition]
    ['proposition :cg/variant 'variant]
    ['variant :cg/meetsCriteria (argument->kw argument)]])
+
+(defn min-last-evaluted-date-pattern-fn [{:keys [argument]}]
+  [:filter
+   [:< argument 'date]
+   [:bgp
+    ['x :cg/dateLastEvaluated 'date]]])
+
+;; TODO start here
+(defn has-annotation [{:keys [argument]}]
+  [:filter
+   [:< argument 'date]
+   [:bgp
+    ['x :cg/dateLastEvaluated 'date]]])
 
 ;; TODO Complete filters for other than proposition_type
 ;; Clean up legacy implementation
@@ -180,7 +189,10 @@
     :variables [:feature]}
    :gene_count_min
    {:pattern-fn gene-count-min-pattern-fn
-    :description "Threshold for minimum number of gene features. Valid arguments are CG:Genes25, CG:Genes35, and CG:Genes50"}})
+    :description "Threshold for minimum number of gene features. Valid arguments are CG:Genes25, CG:Genes35, and CG:Genes50"}
+   :date_evaluated_min
+   {:pattern-fn min-last-evaluted-date-pattern-fn
+    :description "Filter for classifications evaluated after the given date (in ISO format"}})
 
 ;; may remove
 (defn combine-filters [{:keys [tdb]} filter-calls]
