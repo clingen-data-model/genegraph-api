@@ -118,10 +118,12 @@
 
 ;; TODO start here
 (defn has-annotation [{:keys [argument]}]
-  [:filter
-   [:< argument 'date]
-   [:bgp
-    ['x :cg/dateLastEvaluated 'date]]])
+  (let [base-pattern [:bgp
+                      ['annotation :cg/subject 'x]
+                      ['annotation :rdf/type :cg/AssertionAnnotation]]]
+    (if argument
+      (conj base-pattern ['annotation :cg/classification (argument->kw argument)])
+      base-pattern)))
 
 ;; TODO Complete filters for other than proposition_type
 ;; Clean up legacy implementation
@@ -150,7 +152,10 @@
     :description "Threshold for minimum number of gene features. Valid arguments are CG:Genes25, CG:Genes35, and CG:Genes50"}
    :date_evaluated_min
    {:pattern-fn min-last-evaluted-date-pattern-fn
-    :description "Filter for classifications evaluated after the given date (in ISO format"}})
+    :description "Filter for classifications evaluated after the given date (in ISO format"}
+   :has_annotation
+   {:pattern-fn has-annotation
+    :description "Filter for assertions that have had some annotation made on them."}})
 
 (defn filter-call->expr [filter-call]
   (let [pattern ((-> filter-call :filter filters :pattern-fn) filter-call)]
