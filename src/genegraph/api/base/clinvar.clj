@@ -416,6 +416,7 @@
 (def literal-attrs
   #{:cg/dateLastEvaluated})
 
+;; Borrowed in GenCC too
 (defn attrs->statements [attrs]
   (let [iri (:iri attrs)]
     (mapv
@@ -509,6 +510,8 @@
           :cg/NoOverlap
           :cg/OuterOverlap))
       :cg/NoOverlap))
+
+
 
 (defn overlap-type [loc1 loc2]
   (let [loc1-start (max-coord (:ga4gh/start loc1))
@@ -761,6 +764,9 @@
 
   (def big-variant (get-clinvar-variants ["3024572"] http-client))
 
+  ;; According to gene viewer, is partial overlap with RORB gene
+  (def partial-overlap (get-clinvar-variants ["563652"] http-client))
+
   (println internal-conflict)
 
   (println flagged-submission-xml)
@@ -770,7 +776,7 @@
         tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])
         add-gene-overlaps-with-db
         #(add-gene-overlaps-for-variant object-db  %)]
-    (->> (xml/parse-str test-submissions)
+    (->> (xml/parse-str partial-overlap)
          :content
          (mapv #(-> %
                     clinvar-xml->intermediate-model

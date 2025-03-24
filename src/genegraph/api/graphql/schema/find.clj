@@ -53,3 +53,18 @@
    :type '(list :EvidenceStrengthAssertion)
    :args {:filters {:type '(list :Filter)}}
    :resolve (fn [context args value] (assertions-query-fn context args value))})
+
+(defn sequence-features-query-fn [context args _]
+  (let [q (query-filter/compile-filter-query
+           [:bgp ['x :rdf/type :so/SequenceFeature]]
+           (:filters args))]
+    (mapv #(hr/hybrid-resource % context)
+          (q (:tdb context) {::rdf/params {:limit 50}}))))
+
+(def sequence-features-query
+  {:name :sequenceFeatures
+   :graphql-type :query
+   :description "Query to find sequence features in Genegraph. Apply combinations of filters to limit the available results to the desired set."
+   :type '(list :SequenceFeature)
+   :args {:filters {:type '(list :Filter)}}
+   :resolve (fn [c a v] (sequence-features-query-fn c a v))})

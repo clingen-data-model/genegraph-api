@@ -22,7 +22,8 @@
     [:cg/GeneValidityProposition :GeneValidityProposition]
     [:cg/CanonicalVariant :CanonicalVariant]
     [:ga4gh/CopyNumberChange :CopyNumberChange]
-    [:ga4gh/SequenceLocation :SequenceLocation]]
+    [:ga4gh/SequenceLocation :SequenceLocation]
+    [:so/SequenceFeature :SequenceFeature]]
    :default-type-mapping :GenericResource})
 
 ;; changing to function to benefit from dynamic type bindings
@@ -46,6 +47,7 @@
    assertion/genetic-condition-mechanism-proposition
    assertion/variant-pathogenicity-proposition
    assertion/gene-validity-proposition
+   assertion/assertion-query
    model-conflicts/conflicts-query
    model-conflicts/assertion-annotation
    model-conflicts/create-annotation
@@ -54,7 +56,8 @@
    find-query/filter-ops
    find-query/filters-enum
    find-query/filter-call
-   find-query/assertions-query])
+   find-query/assertions-query
+   find-query/sequence-features-query])
 
 
 (defn schema

@@ -30,7 +30,8 @@
  "ga4gh" "https://terms.ga4gh.org/"
  "cvscv" "https://identifiers.org/clinvar.submission:"
  "oboinowl" "http://www.geneontology.org/formats/oboInOwl#"
- "efo" "http://www.ebi.ac.uk/efo/EFO_"})
+ "efo" "http://www.ebi.ac.uk/efo/EFO_"
+ "gencc" "http://genegraph.clingen.app/gencc/"})
 
 (add-keyword-mappings
  {:mondo/HereditaryDisease "http://purl.obolibrary.org/obo/MONDO_0003847"

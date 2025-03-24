@@ -128,34 +128,53 @@
 ;; TODO Complete filters for other than proposition_type
 ;; Clean up legacy implementation
 
+;; applies only to sequence features
+;; will need alternate paths for
+;; types of assertions other than gene validity
+(defn has-assertion [{:keys [argument]}]
+  [:bgp
+   ['proposition :cg/gene 'x]
+   ['assertion :cg/subject 'proposition]
+   ['assertion :rdf/type :cg/EvidenceStrengthAssertion]])
+
 ;; Using _ for filter names, these translate directly to GraphQL enums
 ;; so using snake-case to support javascript usage
 (def filters
   {:proposition_type {:pattern-fn proposition-type-pattern-fn
-                      :description "Type of proposition referred to by the evidence level assertion. Types include CG:VariantPathogenicityProposition, CG:GeneValidityProposition, and CG:ConditionMechanismProposition"}
+                      :description "Type of proposition referred to by the evidence level assertion. Types include CG:VariantPathogenicityProposition, CG:GeneValidityProposition, and CG:ConditionMechanismProposition"
+                      :domain :cg/EvidenceStrengthAssertion}
    :copy_change {:pattern-fn copy-change-pattern-fn
-                 :description "Copy change of the referred-to variant"}
+                 :description "Copy change of the referred-to variant"
+                 :domain :cg/EvidenceStrengthAssertion}
    :assertion_direction {:pattern-fn assertion-direction-pattern-fn
-                         :description "Direction of the assertion. Requires assertion to be the subject type"}
+                         :description "Direction of the assertion. Requires assertion to be the subject type"
+                         :domain :cg/EvidenceStrengthAssertion}
    :complete_overlap_with_feature_set
    {:pattern-fn (fn [feature-set]
                   (feature-set-overlap-pattern :cg/CompleteOverlap feature-set))
     :description "Assertion that has complete overlap with the given feature set. Valid arguments include CG:HaploinsufficiencyFeatures and CG:TriplosensitivityFeatures"
-    :variables [:feature]}
+    :domain :cg/EvidenceStrengthAssertion}
    :partial_overlap_with_feature_set
    {:pattern-fn (fn [feature-set]
                   (feature-set-overlap-pattern :cg/PartialOverlap feature-set))
     :description "Assertion that has partial overlap with the given feature set. Valid arguments include CG:HaploinsufficiencyFeatures and CG:TriplosensitivityFeatures"
-    :variables [:feature]}
+    :domain :cg/EvidenceStrengthAssertion}
    :gene_count_min
    {:pattern-fn gene-count-min-pattern-fn
-    :description "Threshold for minimum number of gene features. Valid arguments are CG:Genes25, CG:Genes35, and CG:Genes50"}
+    :description "Threshold for minimum number of gene features. Valid arguments are CG:Genes25, CG:Genes35, and CG:Genes50"
+    :domain :cg/EvidenceStrengthAssertion}
    :date_evaluated_min
    {:pattern-fn min-last-evaluted-date-pattern-fn
-    :description "Filter for classifications evaluated after the given date (in ISO format"}
+    :description "Filter for classifications evaluated after the given date (in ISO format"
+    :domain :cg/EvidenceStrengthAssertion}
    :has_annotation
    {:pattern-fn has-annotation
-    :description "Filter for assertions that have had some annotation made on them."}})
+    :description "Filter for assertions that have had some annotation made on them."
+    :domain :cg/EvidenceStrengthAssertion}
+   :has_assertion
+   {:pattern-fn has-assertion
+    :description "Filter for sequence features that are the subject of an assertion."
+    :domain :cg/SequenceFeature}})
 
 (defn filter-call->expr [filter-call]
   (let [pattern ((-> filter-call :filter filters :pattern-fn) filter-call)]

@@ -30,7 +30,8 @@
             [nextjournal.clerk :as clerk]
             [genegraph.api.assertion-annotation :as ac]
             [genegraph.api.hybrid-resource :as hr]
-            [genegraph.api.ga4gh :as ga4gh])
+            [genegraph.api.ga4gh :as ga4gh]
+            [genegraph.api.base.gencc :as gencc])
   (:import [ch.qos.logback.classic Logger Level]
            [org.slf4j LoggerFactory]
            [java.time Instant LocalDate]
@@ -1412,3 +1413,78 @@ select ?x where { ?x a :cg/GeneValidityProposition } limit 1")]
            tap>)))
 
  )
+
+(def genes-query
+  (rdf/create-query
+   [:project ['x]
+    [:bgp
+     ['x :rdf/type :so/Gene]]]))
+
+(defn hgnc->entrez
+  "Generate a map from HGNC IDs (formatted HGNC:1234) to Entrez URLs."
+  [tdb]
+  (let [qr (genes-query tdb)]
+    (zipmap
+     (mapv #(some->> (rdf/ld-> % [:owl/sameAs])
+                     (map (fn [r]
+                            (re-find
+                             #"https://identifiers.org/hgnc:(\d+)"
+                             (str r))))
+                     (remove nil?)
+                     first
+                     second
+                     (str "HGNC:"))
+           qr)
+     (mapv str qr))))
+
+;; Integrating GENCC
+(comment
+
+  (->> (-> "base.edn" io/resource slurp edn/read-string)
+       (filter #(= "https://thegencc.org/"
+                   (:name %)))
+       (run! #(p/publish (get-in api-test-app
+                                 [:topics :fetch-base-events])
+                         {::event/data %
+                          ::event/key (:name %)})))
+
+  (run!
+   #(p/publish (get-in api-test-app [:topics :base-data]) %)
+   (->> "base.edn"
+        io/resource
+        slurp
+        edn/read-string
+        (filter #(= "https://thegencc.org/"
+                    (:name %)))
+        (mapv (fn [e] {::event/data
+                       (assoc e
+                              :source
+                              {:type :file
+                               :base "data/base/"
+                               :path "gencc.csv"})}))))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        gencc-query (rdf/create-query
+                     [:project ['x]
+                      [:bgp
+                       ['x :dc/source :cg/GenCC]
+                       ['x :cg/subject 'prop]]])]
+    (rdf/tx tdb
+      (->> (gencc-query tdb #_{::rdf/params {:limit 5}})
+           #_(mapv #(hr/hybrid-resource % hybrid-db))
+           #_(mapv #(rdf/ld-> % [:cg/contributions]))
+           count
+           )))
+
+
+    
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])]
+    (rdf/tx tdb
+      (with-open [w (io/writer "data/hgnc-entrez.edn")]
+        (binding [*out* w]
+          (clojure.pprint/pprint
+           (hgnc->entrez tdb))))))
+  )
+

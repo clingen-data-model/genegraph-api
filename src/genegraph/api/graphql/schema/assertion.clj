@@ -30,20 +30,20 @@
    :fields {:conflictingAssertions
             {:type '(list :EvidenceStrengthAssertion)
              :resolve (fn [_ _ v] (:conflictingAssertions v))}
-
             :subject
             {:type :Resource
              :path [:cg/subject]}
-
             :annotations
             {:type '(list :AssertionAnnotation)
              :resolve (fn [context _ v]
                         (mapv #(hr/hybrid-resource % context)
                               (rdf/ld-> v [[:cg/subject :<]])))}
-            
             :classification
             {:type :Resource
              :path [:cg/classification]}
+            :evidenceStrength
+            {:type :Resource
+             :path [:cg/evidenceStrength]}
             ;; :comments {}
             ;; :submitter
             ;; {:type :Resource
@@ -69,7 +69,7 @@
   {:name :VariantPathogenicityProposition
    :graphql-type :object
    :implements [:Resource]
-   :fields {:variant {:type :Resource
+   :fields {:variant {:type :CanonicalVariant
                       :path [:cg/variant]}}})
 
 (def genetic-condition-mechanism-proposition
@@ -89,5 +89,16 @@
   {:name :GeneValidityProposition
    :graphql-type :object
    :implements [:Resource]
-   :fields {:gene {:type :Resource
+   :fields {:gene {:type :SequenceFeature
                    :path [:cg/gene]}}})
+
+(defn assertion-query-fn [context args value]
+  (hr/hybrid-resource (:iri args) context))
+
+(def assertion-query
+  {:name :assertion
+   :graphql-type :query
+   :description "Query to find a single assertion in Genegraph."
+   :type :EvidenceStrengthAssertion
+   :args {:iri {:type 'String}}
+   :resolve (fn [context args value] (assertion-query-fn context args value))})

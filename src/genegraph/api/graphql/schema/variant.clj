@@ -8,7 +8,9 @@
    :fields {:includedVariants {:type '(list :Resource)
                                :path [:cg/includedVariants]}
             :copyChange {:type :Resource
-                         :path [:ga4gh/copyChange]}}})
+                         :path [:ga4gh/copyChange]}
+            :overlappingFeatures {:type '(list :SequenceFeature)
+                                  :path [:cg/CompleteOverlap]}}})
 
 (def copy-number-variant
   {:name :CopyNumberChange
