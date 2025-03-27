@@ -65,12 +65,19 @@
             ;; :description {}
             }})
 
+(defn proposition-assertions [context args value]
+  (mapv
+   #(hr/hybrid-resource % context)
+   (rdf/ld-> value [[:cg/subject :<]])))
+
 (def variant-pathogenicity-proposition
   {:name :VariantPathogenicityProposition
    :graphql-type :object
    :implements [:Resource]
    :fields {:variant {:type :CanonicalVariant
-                      :path [:cg/variant]}}})
+                      :path [:cg/variant]}
+            :assertions {:type '(list :EvidenceStrengthAssertion)
+                         :resolve (fn [c a v] (proposition-assertions c a v))}}})
 
 (def genetic-condition-mechanism-proposition
   {:name :GeneticConditionMechanismProposition
@@ -82,7 +89,9 @@
             :mechanism {:type :Resource
                         :path [:cg/mechanism]}
             :condition {:type :Resource
-                        :path [:cg/condition]}}})
+                        :path [:cg/condition]}
+            :assertions {:type '(list :EvidenceStrengthAssertion)
+                         :resolve (fn [c a v] (proposition-assertions c a v))}}})
 
 
 (def gene-validity-proposition
@@ -90,7 +99,13 @@
    :graphql-type :object
    :implements [:Resource]
    :fields {:gene {:type :SequenceFeature
-                   :path [:cg/gene]}}})
+                   :path [:cg/gene]}
+            :disease {:type :Resource
+                      :path [:cg/disease]}
+            :modeOfInheritance {:type :Resource
+                                :path [:cg/modeOfInheritance]}
+            :assertions {:type '(list :EvidenceStrengthAssertion)
+                         :resolve (fn [c a v] (proposition-assertions c a v))}}})
 
 (defn assertion-query-fn [context args value]
   (hr/hybrid-resource (:iri args) context))
