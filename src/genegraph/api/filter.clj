@@ -137,6 +137,17 @@
    ['assertion :cg/subject 'proposition]
    ['assertion :rdf/type :cg/EvidenceStrengthAssertion]])
 
+(defn is-about-gene [{:keys [argument]}]
+  [:bgp
+   ['proposition :cg/gene (argument->kw argument)]
+   ['x :cg/subject 'proposition]])
+
+(defn is-about-gene-symbol [{:keys [argument]}]
+  [:bgp
+   ['gene :skos/prefLabel argument]
+   ['proposition :cg/gene 'gene]
+   ['x :cg/subject 'proposition]])
+
 ;; Using _ for filter names, these translate directly to GraphQL enums
 ;; so using snake-case to support javascript usage
 (def filters
@@ -174,7 +185,15 @@
    :has_assertion
    {:pattern-fn has-assertion
     :description "Filter for sequence features that are the subject of an assertion."
-    :domain :cg/SequenceFeature}})
+    :domain :cg/SequenceFeature}
+   :is_about_gene
+   {:pattern-fn is-about-gene
+    :description "Filter for assertions that are about a specific gene. Expect a gene IRI or CURIE as an argument."
+    :domain :cg/EvidenceStrengthAssertion}
+   :is_about_gene_symbol
+   {:pattern-fn is-about-gene-symbol
+    :description "Filter for assertions that are about a specific gene. Expect a gene symbol as an argument."
+    :domain :cg/EvidenceStrengthAssertion}})
 
 (defn filter-call->expr [filter-call]
   (let [pattern ((-> filter-call :filter filters :pattern-fn) filter-call)]

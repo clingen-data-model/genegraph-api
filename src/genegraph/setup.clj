@@ -43,8 +43,7 @@
 
 (comment
   (run! #(kafka-admin/configure-kafka-for-app! (p/init %))
-        [ggapi/base-app-def
-         ggapi/graphql-endpoint-def])
+        [ggapi/graphql-endpoint-def])
 
   ;; Delete all (or some) Genegraph-created topics
   ;; Use this to fix mistakes.

@@ -1,8 +1,18 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: [ 'build', '.', '-t', 'genegraph-gene-validity:$COMMIT_SHA']
+  args: ['run', '--privileged', 'multiarch/qemu-user-static', '--reset', '-p', 'yes']
 - name: 'gcr.io/cloud-builders/docker'
-  args: [ 'tag', 'genegraph-gene-validity:$COMMIT_SHA', 'us-east1-docker.pkg.dev/clingen-dx/genegraph-prod/genegraph-gene-validity:$COMMIT_SHA']
+  args: ['buildx', 'create', '--name', 'mybuilder', '--use']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['buildx', 'build', 
+         '--platform', 'linux/arm64',
+         '--push',
+         '-t',
+         'us-east1-docker.pkg.dev/clingen-stage/genegraph-stage/genegraph-api:v18arm',
+         '.']
 
+options:
+  machineType: 'E2_HIGHCPU_8'
+  
 images:
-- 'us-east1-docker.pkg.dev/clingen-dx/genegraph-prod/genegraph-gene-validity:$COMMIT_SHA'
+- 'us-east1-docker.pkg.dev/clingen-stage/genegraph-stage/genegraph-api:v18arm'

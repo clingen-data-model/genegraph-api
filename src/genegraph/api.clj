@@ -119,7 +119,7 @@
   {:name :base-data
    :serialization :edn
    :kafka-cluster :data-exchange
-   :kafka-topic (qualified-kafka-name "ggapi-base")
+   :kafka-topic "gg-base"
    :kafka-topic-config {"cleanup.policy" "compact"
                         "delete.retention.ms" "100"}})
 
