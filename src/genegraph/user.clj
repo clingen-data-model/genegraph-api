@@ -37,7 +37,8 @@
            [java.time Instant LocalDate]
            [java.io PushbackReader]
            [org.apache.jena.query Dataset ARQ QueryExecutionFactory QueryFactory]
-           [org.apache.jena.sparql.algebra Algebra]))
+           [org.apache.jena.sparql.algebra Algebra]
+           [org.apache.jena.rdf.model Model]))
 
 ;; Portal
 (comment
@@ -1486,5 +1487,164 @@ select ?x where { ?x a :cg/GeneValidityProposition } limit 1")]
         (binding [*out* w]
           (clojure.pprint/pprint
            (hgnc->entrez tdb))))))
+
+  
   )
 
+;; extracting classes; names for data model
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "select ?class where {
+?x a ?class .
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           (map rdf/->kw)
+           (remove #(= "cg" (namespace %)))
+           sort
+           (into [])
+           clojure.pprint/pprint)))
+
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "select ?class ?label where {
+?x a ?class .
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           (mapv (fn [r] [(rdf/->kw r) (rdf/ld1-> r [:rdfs/label])]))
+           (remove #(= "cg" (namespace (first %))))
+           (sort-by first)
+           (into [])
+           clojure.pprint/pprint)))
+
+  ;; discovered error with many gene validity curations
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "select ?x where {
+?x a <http://purl.obolibrary.org/obo/SEPIO_0004116> .
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           count)))
+
+  
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "select ?x where {
+?x a :cg/MolecularSequenceObservation .
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           count)))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "select ?x where {
+?fa a :dc/BibliographicResource ;
+?x ?o .
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           (mapv rdf/->kw))))
+
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "select ?x where {
+?x a :cg/FamilyCosegregation ;
+:cg/sequencingMethod ?o .
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           (mapv rdf/->kw)
+           count)))
+
+  :cg/SequencingMethod
+
+  [:rdf/type :rdfs/label :dc/source :dc/description :cg/demonstrates :cg/method :cg/statisticalSignificanceType :cg/statisticalSignificanceValueType :cg/caseCohort :cg/controlCohort :cg/statisticalSignificanceValue :cg/lowerConfidenceLimit :cg/upperConfidenceLimit :cg/pValue]
+  )
+
+
+;; Classes in ClinGen namespace
+
+;; I think i'm overcomplicating things, let's just have one schema
+
+[
+ :cg/GeneticConditionMechanismProposition
+ :cg/GeneDosageReport ;; exclude -- or refactor to report
+ :cg/EvidenceStrengthAssertion 
+ :cg/Contribution 
+ :cg/EvidenceLine     ;; add to base 
+ :cg/Agent            ;; Change to Prov? ;; added to base
+ :cg/CanonicalVariant ;; Refactor around CatVRS?
+ :cg/VariantPathogenicityProposition
+ :cg/AssertionAnnotation 
+ :cg/GeneValidityProposition
+ :cg/Observation ;; Maybe want to use just Observation, FHIR style? Let's do that
+ :cg/Proband
+ :cg/FunctionalAlteration
+ :cg/Affiliation ;; Can keep, but 
+ :cg/Finding
+ :cg/FamilyCosegregation
+ :cg/Family
+ :cg/Cohort
+ :cg/UnscoreableEvidence ;; I don't like this, but may need better reason to change.
+ :cg/VariantFunctionalImpactEvidence
+ ]
+
+;; Other classes that need to be represented in GraphQL
+;; CanonicalLocation should be figured out
+[[:dc/AgentClass "Agent Class"] ; don't know where this is used
+ [:dc/BibliographicResource "Bibliographic Resource"] ; need
+ [:ga4gh/CanonicalLocation nil] ; need, but need to think about
+ [:ga4gh/SequenceLocation nil] ; need -- incorporate from ga4gh schema
+ [:ga4gh/VariationDescriptor nil] ; obsolete, but need for now
+ [:oboinowl/Subset nil] ; no
+ [:owl/AllDifferent "AllDifferent"]
+ [:owl/AllDisjointClasses "AllDisjointClasses"]
+ [:owl/AnnotationProperty "AnnotationProperty"]
+ [:owl/AsymmetricProperty "AsymmetricProperty"]
+ [:owl/Axiom "Axiom"]
+ [:owl/Class "Class"]
+ [:owl/DatatypeProperty "DatatypeProperty"]
+ [:owl/FunctionalProperty "FunctionalProperty"]
+ [:owl/InverseFunctionalProperty "InverseFunctionalProperty"]
+ [:owl/IrreflexiveProperty "IrreflexiveProperty"]
+ [:owl/NamedIndividual "NamedIndividual"]
+ [:owl/ObjectProperty "ObjectProperty"]
+ [:owl/Ontology "Ontology"]
+ [:owl/OntologyProperty "OntologyProperty"]
+ [:owl/Restriction "Restriction"]
+ [:owl/SymmetricProperty "SymmetricProperty"]
+ [:owl/TransitiveProperty "TransitiveProperty"]
+ [:rdf/List "List"]
+ [:rdf/Property "Property"] ;; May need? 
+ [:rdfs/Class "Class"] ;; need 
+ [:rdfs/Datatype "Datatype"]
+
+ ;; Found error in GV transform that left the last couple SEPIO types in there
+ [:so/Gene "gene"]
+ [:so/GeneWithProteinProduct "protein_coding_gene"]
+ [:so/SequenceFeature "sequence_feature"] ;; This is the class to use for GraphQL
+ [:void/Dataset nil]] ;; May be useful to use this one
+
+(str (rdf/resource :sepio/VariantEvidenceItem))
+
+
+(comment
+  (let [model (-> "/Users/tristan/code/genegraph-data-model/resources/base.edn"
+           slurp
+           edn/read-string)]
+    (set/difference
+     (->> model
+          :classes
+          vals
+          (mapcat :properties)
+          set)
+     (->> model
+          :properties
+          keys
+          set)))
+  )

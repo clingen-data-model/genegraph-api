@@ -1,4 +1,4 @@
-xo{:mvn/repos {"redplanetlabs" {:url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}}
+{:mvn/repos {"redplanetlabs" {:url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}}
 
  :paths ["src" "resources" "config"]
  

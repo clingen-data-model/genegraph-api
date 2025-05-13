@@ -55,3 +55,23 @@ select ?x where {
                                 {:type 'String
                                  :description "Restrict results to assertions with a given type"}}
                          :resolve (fn [c a v] (feature-assertions-resolver c a v))}}})
+
+
+
+(defn sequence-feature-query-fn
+  [context args value]
+  (if (:iri args)
+    (rdf/resource (:iri args) (:tdb context))
+    (let [q (rdf/create-query "select ?x where { ?x :skos/prefLabel ?symbol }")]
+      (first (q (:tdb context) args)))))
+
+(def sequence-feature-query
+  {:name :sequenceFeatureQuery
+   :graphql-type :query
+   :description "Query to find a sequence feature in Genegraph"
+   :type :SequenceFeature
+   :args {:iri {:type 'String
+                :description "IRI or CURIE identifying the feature."}
+          :symbol {:type 'String
+                   :description "Symbol identifying the feature. Currently only supports gene symbols."}}
+   :resolve (fn [c a v] (sequence-feature-query-fn c a v))})

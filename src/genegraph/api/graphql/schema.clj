@@ -40,6 +40,7 @@
    contribution/contribution
    sequence-annotation/sequence-location
    sequence-annotation/sequence-feature
+   sequence-annotation/sequence-feature-query
    variant/canonical-variant
    variant/copy-number-variant
    ;; model-conflicts/mechanism-assertion
