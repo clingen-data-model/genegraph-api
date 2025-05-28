@@ -149,6 +149,8 @@
 
 ;; Interceptors for reader
 
+;; gv
+
 (def prop-query
   (rdf/create-query "select ?prop where { ?prop a :cg/GeneValidityProposition } "))
 
@@ -187,6 +189,8 @@
   (interceptor/interceptor
    {:name ::store-curation
     :enter (fn [e] (store-curation-fn e))}))
+
+;; /gv
 
 (def jena-transaction-interceptor
   (interceptor/interceptor
@@ -320,6 +324,8 @@
    :subscribe :clinvar-curation
    :interceptors [ac/process-annotation]})
 
+;; gv
+
 (def genes-graph-name
   "https://www.genenames.org/")
 
@@ -357,6 +363,8 @@
     (log/info :fn ::await-genes-fn :msg "Genes loaded")
     (reset! genes-atom true))
   e)
+
+;; /gv
 
 (def await-genes
   (interceptor/interceptor

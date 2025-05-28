@@ -15,6 +15,7 @@
             [genegraph.api.dosage :as dosage]
             [genegraph.api.graphql.response-cache :as response-cache]
             [genegraph.api.graphql.schema.conflicts :as conflicts]
+            [genegraph.api.clingen-gene-validity :as cgv]
             [portal.api :as portal]
             [clojure.data.json :as json]
             [clojure.data.csv :as csv]
@@ -188,6 +189,14 @@
 (comment
   (->> (-> "base.edn" io/resource slurp edn/read-string)
        (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+                   (:name %)))
+       (run! #(p/publish (get-in api-test-app
+                                 [:topics :fetch-base-events])
+                         {::event/data %
+                          ::event/key (:name %)})))
+
+  (->> (-> "base.edn" io/resource slurp edn/read-string)
+       (remove #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
                    (:name %)))
        (run! #(p/publish (get-in api-test-app
                                  [:topics :fetch-base-events])
@@ -1647,4 +1656,53 @@ select ?x where { ?x a :cg/GeneValidityProposition } limit 1")]
           :properties
           keys
           set)))
+  )
+
+(comment
+  (let [t2
+        [{:component :search-dialog}
+         {:component :search-dialog}
+         {:component :search-result}
+         {:component :search-result}
+         {:component :assertion,
+          :iri "https://identifiers.org/clinvar.submission:SCV000080221"}
+         {:component :search-result}
+         {:component :assertion,
+          :iri "https://identifiers.org/clinvar.submission:SCV000266614"}
+         {:component :search-result}
+         {:component :assertion,
+          :iri "https://identifiers.org/clinvar.submission:SCV000266614"}
+         {:component :search-result}
+         {:component :assertion,
+          :iri "https://identifiers.org/clinvar.submission:SCV000266635"}
+         {:component :search-result}
+         {:component :assertion,
+          :iri "https://identifiers.org/clinvar.submission:SCV000081347"}
+         {:component :search-result}
+         {:component :assertion,
+          :iri "https://identifiers.org/clinvar.submission:SCV000081347"}
+         {:component :search-result}
+         {:component :assertion,
+          :iri "https://identifiers.org/clinvar.submission:SCV000080221"}]]
+    (take-while #(not= % {:component :search-result}) t2))
+
+  )
+
+;; Experimentation with importing new gene validity
+;; 
+(comment
+
+  (defn import-gv-curation [e]
+    (p/process (get-in test-app [:processors :import-gv-curations])
+               (assoc e ::event/completion-promise (promise))))
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/abcd1-events2.edn.gz"]
+    (->> (event-store/event-seq r)
+         (take 1)
+         #_(map #(-> %
+                     event/deserialize
+                     cgv/replace-hgnc-with-ncbi-gene-fn
+                     ::event/data))
+         (map #(assoc % ::event/skip-local-effects true))
+         
+         ))
   )

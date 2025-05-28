@@ -23,6 +23,90 @@
         first
         :cg/date)))
 
+(def related-assertions-query
+  (rdf/create-query "
+select ?relatedAssertions where {
+?sourceAssertion :cg/direction ?sourceDirection .
+?sourceAssertion :cg/subject / :cg/variant ?sourceVariant .
+?sourceVariant :cg/CompleteOverlap ?features ;
+:ga4gh/copyChange ?copyChange .
+?relatedVariants :cg/CompleteOverlap ?features ;
+:ga4gh/copyChange ?copyChange .
+?relatedPropositions :cg/variant ?relatedVariants .
+?relatedAssertions :cg/subject ?relatedPropositions ;
+:cg/direction ?relatedAssertionDirection .
+FILTER (?sourceAssertion != ?relatedAssertions)
+FILTER (?relatedAssertionDirection != ?sourceDirection)
+}
+"))
+
+(def assertion-features-query
+  (rdf/create-query "
+select ?features where {
+?sourceAssertion :cg/subject / :cg/variant / :cg/CompleteOverlap ?features .
+}
+"))
+
+
+(defn related-assertions
+  "Build a list of assertions that are similar enough to include in a list of related assertions. May be expanded to include arguments to filters. Currently only supports assertions on variant pathogenicity propositions."
+  [context args value]
+  (let [initial-set (reduce
+                     (fn [m a] (assoc m
+                                      a
+                                      (assertion-features-query
+                                       (:tdb context)
+                                       {:sourceAssertion a})))
+                     {}
+                     (related-assertions-query
+                      (:tdb context)
+                      {:sourceAssertion value}))
+        source-assertion-genes (assertion-features-query
+                         (:tdb context)
+                         {:sourceAssertion value})
+        max-gene-count (count source-assertion-genes)]
+    (->> initial-set
+         (filter (fn [[assertion genes]]
+                    (<= (count genes) max-gene-count)))
+         (mapv key))))
+
+(comment
+  (let [tdb @(get-in genegraph.user/api-test-app
+                     [:storage :api-tdb :instance])
+        source (rdf/resource "https://identifiers.org/clinvar.submission:SCV000108561")
+        p22q112 (rdf/resource "https://identifiers.org/clinvar.submission:SCV000080221")]
+    (rdf/tx tdb
+      (->> (related-assertions {:tdb tdb} nil p22q112)
+           #_(into [])
+           tap>)))
+
+    (let [tdb @(get-in genegraph.user/api-test-app
+                     [:storage :api-tdb :instance])
+        source (rdf/resource "https://identifiers.org/clinvar.submission:SCV000108561")
+        p22q112 (rdf/resource "https://identifiers.org/clinvar.submission:SCV000080221" tdb)]
+    (rdf/tx tdb
+      (->> (rdf/ld1-> p22q112 [:cg/direction]))))
+  
+  (let [tdb @(get-in genegraph.user/api-test-app
+                     [:storage :api-tdb :instance])
+        source (rdf/resource "https://identifiers.org/clinvar.submission:SCV000108561")]
+    (rdf/tx tdb
+      (->> (related-assertions-query tdb {:sourceAssertion source})
+           (mapv (fn [a]
+                   [(str a)
+                    (count (assertion-features-query tdb {:sourceAssertion a}))]))
+           (sort-by second)
+           tap>
+           #_count
+           #_(mapv #(rdf/ld-> % [:rdf/type])))))
+  )
+
+;; Duplicates
+;; VCV000441983.3
+;; VCV000441984.3
+
+
+
 (def assertion
   {:name :EvidenceStrengthAssertion
    :graphql-type :object
@@ -44,6 +128,9 @@
             :evidenceStrength
             {:type :Resource
              :path [:cg/evidenceStrength]}
+            :relatedAssertions
+            {:type '(list :EvidenceStrengthAssertion)
+             :resolve (fn [c a v] (related-assertions c a v))}
             ;; :comments {}
             ;; :submitter
             ;; {:type :Resource

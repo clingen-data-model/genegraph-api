@@ -83,8 +83,12 @@
 (def cert-name
   (str app-name "-cert"))
 
-(def domain-name
+#_(def domain-name
   "genegraph-api.prod.clingen.app")
+
+(def domain-name
+  "genegraph.clinicalgenome.org")
+
 
 (defn cert []
   {:apiVersion "networking.gke.io/v1"

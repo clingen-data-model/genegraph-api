@@ -41,6 +41,11 @@ select ?x where {
                                 (rdf/resource proposition_type))
                          params)))))
 
+(defn overlapping-variants-fn [context args value]
+  (mapv
+   #(hr/hybrid-resource % context)
+   (rdf/ld-> value [[:cg/CompleteOverlap :<]])))
+
 (def sequence-feature
   {:name :SequenceFeature
    :graphql-type :object
@@ -49,6 +54,9 @@ select ?x where {
                        :path [:ga4gh/location]}
             :subjectOf {:type '(list :Resource)
                         :resolve (fn [c a v] (sequence-subject-resolver c a v))}
+            :overlappingVariants {:type '(list :CanonicalVariant)
+                                  :resolve
+                                  (fn [c a v] (overlapping-variants-fn c a v))}
             :assertions {:type '(list :EvidenceStrengthAssertion)
                          :description "Evidence Strength Assertions about the given resource."
                          :args {:proposition_type
