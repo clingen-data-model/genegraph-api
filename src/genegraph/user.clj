@@ -119,7 +119,7 @@
              :object-db (assoc api/object-db :load-snapshot false #_#_:snapshot-handle nil)}
    :processors {:fetch-base-file api/fetch-base-processor
                 :import-base-file api/import-base-processor
-                :import-gv-curations api/import-gv-curations
+                :import-gv-curations cgv/import-gv-curations
                 :graphql-api (assoc api/graphql-api
                                     ::event/metadata
                                     {::response-cache/skip-response-cache true})
@@ -168,7 +168,7 @@
 ;; Event Writers
 
 (comment
-
+  (time (get-events-from-topic api/gene-validity-sepio-topic))
   (get-events-from-topic api/actionability-topic)
   (time (get-events-from-topic api/gene-validity-complete-topic))
   (get-events-from-topic api/gene-validity-raw-topic)
@@ -178,7 +178,7 @@
    (Thread/new (fn []
                  (println "getting topic")
                  (time (get-events-from-topic api/gene-validity-sepio-topic))
-                 (println "complete)"))))
+                 (println "complete"))))
   (time (get-events-from-topic api/gene-validity-sepio-topic))
   
   (time (get-events-from-topic api/clinvar-curation-topic))
@@ -1693,8 +1693,91 @@ select ?x where { ?x a :cg/GeneValidityProposition } limit 1")]
 (comment
 
   (defn import-gv-curation [e]
-    (p/process (get-in test-app [:processors :import-gv-curations])
+    (p/process (get-in api-test-app [:processors :import-gv-curations])
                (assoc e ::event/completion-promise (promise))))
+  (time
+   (def revisions
+     (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene-validity-sepio-2025-05-30.edn.gz"]
+       (->> (event-store/event-seq r)
+            #_(take 100)
+            (mapv #(-> %
+                       (assoc ::event/skip-local-effects true)
+                       event/deserialize
+                       cgv/main-record-iri))
+            frequencies))))
+  (->> revisions
+       (sort-by val)
+       reverse
+       (take 20))
+
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene-validity-sepio-2025-05-30.edn.gz"]
+    (->> (event-store/event-seq r)
+         (run! import-gv-curation)))
+
+  (+ 1 1)
+
+  (def example-set
+    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene-validity-sepio-2025-05-30.edn.gz"]
+      (->> (event-store/event-seq r)
+           (filterv #(= (-> % event/deserialize cgv/main-record-iri)
+                        "http://dataexchange.clinicalgenome.org/gci/1bb8bc84-fe02-4a05-92a0-c0aacf897b6e"))
+           )))
+
+  (count example-set)
+
+  ;; import all records in example set. guard against race condition with sleep
+  (run! #(do
+           (import-gv-curation %)
+           (println "import 1")
+           (Thread/sleep 1000))
+        example-set)
+
+  ;; import all, screw race conditions
+  (run! import-gv-curation example-set)
+
+  ;; delete all records in example set
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        main-record (-> example-set first event/deserialize cgv/main-record-iri)]
+    (rdf/tx tdb
+      (->> example-set
+           (map #(-> %
+                     event/deserialize
+                     cgv/assertion-iri))
+           (run! #(do (storage/delete tdb %)
+                      (storage/delete object-db [:models %]))))
+      (storage/delete tdb main-record)
+      (storage/delete object-db [:models main-record])))
+
+  ;; test to see if all historic records are included
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}]
+    (rdf/tx tdb
+      (->> example-set
+           (mapv #(-> %
+                      event/deserialize
+                      cgv/assertion-iri
+                      (rdf/resource tdb)
+                      (rdf/ld1-> [:rdf/type]))))))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}]
+    (rdf/tx tdb
+      (->> example-set
+           (map #(-> %
+                     event/deserialize
+                     cgv/assertion-iri))
+           (map #(storage/read tdb %))
+           first
+           rdf/pp-model)))
+
+
+
+
+  
   (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/abcd1-events2.edn.gz"]
     (->> (event-store/event-seq r)
          (take 1)
@@ -1705,4 +1788,180 @@ select ?x where { ?x a :cg/GeneValidityProposition } limit 1")]
          (map #(assoc % ::event/skip-local-effects true))
          
          ))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}]
+    (rdf/tx tdb
+      #_(->> (storage/read object-db [:models "http://dataexchange.clinicalgenome.org/gci/55ca8d81-f718-428e-ab59-75f7a9182d08v1.0"])
+           type)
+      (-> (storage/read tdb "http://dataexchange.clinicalgenome.org/gci/55ca8d81-f718-428e-ab59-75f7a9182d08")
+          (cgv/construct-minimized-assertion-query {:newAssertion (rdf/resource "http://dataexchange.clinicalgenome.org/gci/55ca8d81-f718-428e-ab59-75f7a9182d08v2.0")})
+          rdf/pp-model)))
+  
+  )
+
+
+(comment
+
+  ;; working out Erin's queries
+
+  "
+Hi Tristan – our requests for a recuration spreadsheet (summarizing our 5/19 gene curation small call).
+ 
+This information is requested for discussion on the June 11 gene curation large working group call.  Ideally, we would like this information by June 2 so the small group can begin preparing a presentation with the data.
+ 
+Group of genes to focus on: Genes with a classification of LIMITED that are >3 years past the classification date (~460 per our previous discussion).
+ 
+Tab 1 of the spreadsheet: Eligible Limiteds that HAVE undergone recuration.  The columns would include:
+Gene
+Disease
+MOI
+GCEP
+Date of 1st Publication (there will only be one of these)
+A repeating set of columns for every available classification (1st, 2nd, 3rd, etc.):
+Classification
+Date
+Total points
+Genetic points
+Experimental points
+ 
+Tab 2 of the spreadsheet: Eligible Limiteds that HAVE NOT undergone recuration.  The columns would include:
+Gene
+Disease
+MOI
+GCEP
+Date of 1st Publication (there will only be one of these)
+A single set of columns since there is theoretically only one curation available:
+Classification
+Date
+Total points
+Genetic points
+Experimental points
+"
+  (def main-id-query
+    (rdf/create-query "
+select ?x where {
+?assertion a :cg/EvidenceStrengthAssertion ;
+ :cg/subject / a :cg/GeneValidityProposition ;
+ :dc/isVersionOf ?x .
+}
+"))
+  (def curation-versions
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+          object-db @(get-in api-test-app [:storage :object-db :instance])
+          hybrid-db {:tdb tdb :object-db object-db}
+          main-id-query
+          (rdf/create-query "
+select ?assertion where {
+?assertion a :cg/EvidenceStrengthAssertion ;
+ :cg/subject ?prop ;
+ :dc/isVersionOf ?x .
+?prop a :cg/GeneValidityProposition .
+}
+")
+          approval-query (rdf/create-query "
+select ?contrib where {
+?a :cg/contributions ?contrib .
+?contrib :cg/role :cg/Approver .
+}
+")
+          experimental-evidence-query (rdf/create-query "
+select ?el where {
+?el :cg/specifiedBy :cg/GeneValidityOverallExperimentalEvidenceCriteria .
+}
+")
+          genetic-evidence-query (rdf/create-query "
+select ?el where {
+?el :cg/specifiedBy :cg/GeneValidityOverallGeneticEvidenceCriteria .
+}
+")
+          pubs-query (rdf/create-query "
+select ?pub where {
+?pub a :dc/BibliographicResource .
+}
+")]
+      (rdf/tx tdb
+        (->> (main-id-query tdb)
+             (mapv (fn [a]
+                     (let [m (storage/read object-db [:models (str a)])]
+                       {:gene (rdf/ld1-> a [:cg/subject :cg/gene :skos/prefLabel])
+                        :disease (rdf/ld1-> a [:cg/subject :cg/disease :rdfs/label])
+                        :moi (rdf/ld1-> a [:cg/subject :cg/modeOfInheritance :rdfs/label])
+                        :gcep (some-> (approval-query tdb {:a a})
+                                      first
+                                      (rdf/ld1-> [:cg/agent :rdfs/label]))
+                        :classification (rdf/->kw (rdf/ld1-> a [:cg/evidenceStrength]))
+                        :version (rdf/ld1-> a [:cg/version])
+                        :date (or (rdf/ld1-> a [:dc/dateAccepted])
+                                  (-> (approval-query tdb {:a a})
+                                      first
+                                      (rdf/ld1-> [:cg/date])))
+                        :total-points (rdf/ld1-> a [:cg/strengthScore])
+                        :experimental-points (some-> (experimental-evidence-query m)
+                                                     first
+                                                     (rdf/ld1-> [:cg/strengthScore]))
+                        :genetic-points (some-> (genetic-evidence-query m)
+                                                first
+                                                (rdf/ld1-> [:cg/strengthScore]))
+                        :earliest-publication (->> (pubs-query m)
+                                                   (mapv #(rdf/ld1-> % [:dc/date]))
+                                                   sort
+                                                   first)
+                        :iri (rdf/curie a)
+                        :version-of (rdf/curie (rdf/ld1-> a [:dc/isVersionOf]))})))))))
+
+  (defn latest-version [curations]
+    (->> curations (sort-by :version) reverse first))
+  
+  (defn latest-major-versions [curations]
+    (->> curations
+         (group-by #(subs (:version %) 0 1))
+         vals
+         (mapv latest-version)))
+
+  (defn recuration-column [versions]
+    (let [latest (latest-version versions)]
+      (concat
+       [(:gene latest)
+        (:disease latest)
+        (:moi latest)
+        (:earliest-publication latest)]
+       (mapcat
+        (fn [v]
+          [(name (:classification v))
+           (subs (:date v) 0 10)
+           (:total-points v)
+           (:genetic-points v)
+           (:experimental-points v)])
+        versions))))
+
+  
+  (with-open [w (io/writer "/Users/tristan/Desktop/recurated.csv")]
+    (->> curation-versions
+         (group-by :version-of)
+         (filter #(< 1 (count (val %))))
+         (filter (fn [[_ curations]]
+                   (some #(not= "1" (subs (:version %) 0 1)) curations)))
+         vals
+         (map latest-major-versions)
+         (map recuration-column)
+         (csv/write-csv w)))
+
+  (with-open [w (io/writer "/Users/tristan/Desktop/not-recurated.csv")]
+    (->> curation-versions
+         (group-by :version-of)
+         #_(filter #(< 1 (count (val %))))
+         (remove (fn [[_ curations]]
+                   (some #(not= "1" (subs (:version %) 0 1)) curations)))
+         vals
+         (map latest-major-versions)
+         (map recuration-column)
+         (csv/write-csv w)))
+
+
+  (tap> curation-versions)
+
+  (+ 1 1)
+
   )

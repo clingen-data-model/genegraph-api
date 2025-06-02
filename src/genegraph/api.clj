@@ -13,6 +13,7 @@
             [genegraph.api.names]
             [genegraph.api.base.gff]
             [genegraph.api.assertion-annotation :as ac]
+            [genegraph.api.common :as common]
             [com.walmartlabs.lacinia.pedestal2 :as lacinia-pedestal]
             [com.walmartlabs.lacinia.pedestal.internal :as internal]
             [io.pedestal.http :as http]
@@ -127,7 +128,7 @@
   {:name :gene-validity-sepio
    :kafka-cluster :data-exchange
    :serialization ::rdf/n-triples
-   :kafka-topic "gg-gvs2-stage-1"
+   :kafka-topic "gene-validity-sepio"#_"gg-gvs2-stage-1"
    :kafka-topic-config {}})
 
 (def api-log-topic
