@@ -104,7 +104,7 @@
    :serialization :json
    :create-producer true
    :kafka-cluster :data-exchange
-   :kafka-topic (qualified-kafka-name "ggapi-clinvar-curation")
+   :kafka-topic #_(qualified-kafka-name "ggapi-clinvar-curation") "ggapi-clinvar-curation-stage-1"
    :kafka-topic-config {}})
 
 

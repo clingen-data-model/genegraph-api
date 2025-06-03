@@ -23,8 +23,10 @@
         first
         :cg/date)))
 
-(def related-assertions-query
-  (rdf/create-query "
+(defn related-assertions
+  "Build a list of assertions that are similar enough to include in a list of related assertions. May be expanded to include arguments to filters. Currently only supports assertions on variant pathogenicity propositions."
+  [context args value]
+  (let [related-assertions-query (rdf/create-query "
 select ?relatedAssertions where {
 ?sourceAssertion :cg/direction ?sourceDirection .
 ?sourceAssertion :cg/subject / :cg/variant ?sourceVariant .
@@ -38,20 +40,14 @@ select ?relatedAssertions where {
 FILTER (?sourceAssertion != ?relatedAssertions)
 FILTER (?relatedAssertionDirection != ?sourceDirection)
 }
-"))
-
-(def assertion-features-query
+")
+        assertion-features-query
   (rdf/create-query "
 select ?features where {
 ?sourceAssertion :cg/subject / :cg/variant / :cg/CompleteOverlap ?features .
 }
-"))
-
-
-(defn related-assertions
-  "Build a list of assertions that are similar enough to include in a list of related assertions. May be expanded to include arguments to filters. Currently only supports assertions on variant pathogenicity propositions."
-  [context args value]
-  (let [initial-set (reduce
+")
+        initial-set (reduce
                      (fn [m a] (assoc m
                                       a
                                       (assertion-features-query

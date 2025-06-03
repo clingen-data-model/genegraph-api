@@ -174,6 +174,8 @@
   (get-events-from-topic api/gene-validity-raw-topic)
   (time (get-events-from-topic api/gene-validity-legacy-complete-topic))
   (time (get-events-from-topic api/dosage-topic))
+
+  (+ 1 1)
   (.start 
    (Thread/new (fn []
                  (println "getting topic")
@@ -182,6 +184,7 @@
   (time (get-events-from-topic api/gene-validity-sepio-topic))
   
   (time (get-events-from-topic api/clinvar-curation-topic))
+  (+ 1 1)
 )
 
 
@@ -892,9 +895,11 @@ select ?x where {
   
   (time
    (event-store/with-event-reader
-       [r (str root-data-dir "gene_dosage_raw-2025-01-15.edn.gz")]
+       [r (str root-data-dir "gene_dosage_raw-2025-06-03.edn.gz")]
        (->> (event-store/event-seq r)
             (run! #(p/publish (get-in api-test-app [:topics :dosage]) %)))))
+
+  (+ 1 1)
 
   
   ;; Building query for region conflict overlaps
@@ -1964,4 +1969,11 @@ select ?pub where {
 
   (+ 1 1)
 
+  )
+
+;; estimate how many curations we can flag
+(comment
+  (event-store/with-event-reader [r (str root-data-dir "ggapi-clinvar-curation-stage-1-2025-06-02.edn.gz")]
+    (->> (event-store/event-seq r)
+         count))
   )
