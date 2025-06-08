@@ -183,8 +183,10 @@ filter not exists { ?x :prov/wasInvalidatedBy ?newerx }
   (if-let [m (prior-version-model event)]
     (event/store event
                  :api-tdb
-                 (assertion-iri event)
-                 (construct-minimized-assertion-query m))
+                 (-> m assertion-query first str)
+                 (construct-minimized-assertion-query
+                  m
+                  {:newAssertion (assertion-resource event)}))
     event))
 
 (def add-minimized-prior-version

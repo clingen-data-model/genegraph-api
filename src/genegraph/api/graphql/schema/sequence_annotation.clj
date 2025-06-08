@@ -31,7 +31,15 @@ select ?x where {
 
 (defn feature-assertions-resolver
   [context {:keys [proposition_type]} value]
-  (let [params {:feature value}]
+  (let [params {:feature value}
+        assertions-query
+        (rdf/create-query "
+select ?x where {
+?prop :cg/gene | :cg/feature | :cg/subject ?feature .
+?prop :rdf/type ?proposition_type .
+?x :cg/subject ?prop .
+filter not exists { ?x :prov/wasInvalidatedBy ?otherx }
+}")]
     (mapv
      #(hr/hybrid-resource % context)
      (assertions-query (:tdb context)

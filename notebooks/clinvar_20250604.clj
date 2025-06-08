@@ -9,15 +9,11 @@
             [genegraph.api.graphql.schema.conflicts :as conflicts]))
 
 
-;; ClinVar
+;; # ClinVar Copy Number Variation
 
-;; What information about CNVs is in ClinVar?
+;; ### Overview
 
-;; How can it be used?
-
-;; How can it be improved?
-
-;; What's in there?
+;; We would like contribute towards making ClinVar a more useful resource for the clinical evaluation of copy number variants. We've spent some time looking at the data in ClinVar to get a sense for how we might be able to improve things in terms of the quantity, quality, and accessibility of submissions.
 
 ^{::clerk/visibility {:result :hide}}
 (def tdb @(get-in gg/api-test-app [:storage :api-tdb :instance]))
@@ -60,37 +56,38 @@ select ?x where {
    (count cnv-assertions)]
   [:span.mt-0.text-sm "Copy number variant submissions in ClinVar" ]])
 
-;; cnvs without a date
+^{::clerk/visibility {:result :hide}}
 (->> cnv-assertions
      (filter :cg/dateLastEvaluated)
      count
      (- (count cnv-assertions)))
 
-;; CNVs evaluated 2016 and later
+;; ### CNVs evaluated 2010 and later
 (let [cnv-submission-dates (->> cnv-assertions
                                 (filter :cg/dateLastEvaluated)
                                 (mapv #(subs (get % :cg/dateLastEvaluated "1900") 0 4))
                                 frequencies
                                 (sort-by key)
-                                (take-last 10))]
+                                (take-last 16))]
   #_(mapv val cnv-submission-dates)
   (clerk/plotly {:data [{:x (mapv key cnv-submission-dates)
                          :y (mapv val cnv-submission-dates)
                          :type "bar"}]}))
 
+;; ### Top submitting labs, all time
 (rdf/tx
- tdb
- (let [cnv-submitters (->> cnv-assertions
-                           (mapv #(-> % :cg/contributions first :cg/agent))
-                           frequencies
-                           (sort-by val)
-                           (take-last 10))]
-   (clerk/plotly
-    {:data
-     [{:x (mapv #(-> % key (rdf/resource tdb) (rdf/ld1-> [:rdfs/label]))
-         cnv-submitters)
-       :y (mapv val cnv-submitters)
-       :type "bar"}]})))
+    tdb
+    (let [cnv-submitters (->> cnv-assertions
+                              (mapv #(-> % :cg/contributions first :cg/agent))
+                              frequencies
+                              (sort-by val)
+                              (take-last 10))]
+      (clerk/plotly
+       {:data
+        [{:x (mapv #(-> % key (rdf/resource tdb) (rdf/ld1-> [:rdfs/label]))
+                   cnv-submitters)
+          :y (mapv val cnv-submitters)
+          :type "bar"}]})))
 
 ^{::clerk/visibility {:result :hide}}
 (defn newer-than [assertion date]
@@ -98,24 +95,8 @@ select ?x where {
     (<= 0 (compare assertion-date date))
     false))
 
-;; all submissions
 
-(rdf/tx
- tdb
- (let [cnv-submitters (->> cnv-assertions
-                           (mapv #(-> % :cg/contributions first :cg/agent))
-                           frequencies
-                           (sort-by val)
-                           (take-last 10))]
-   (clerk/plotly
-    {:data
-     [{:x (mapv #(-> % key (rdf/resource tdb) (rdf/ld1-> [:rdfs/label]))
-                cnv-submitters)
-       :y (mapv val cnv-submitters)
-       :type "bar"}]})))
-
-
-;; All submissions since the beginning of 2019
+;; ### Top submitting labs, since 2019
 (rdf/tx
  tdb
  (let [cnv-submitters (->> cnv-assertions
@@ -131,7 +112,7 @@ select ?x where {
        :y (mapv val cnv-submitters)
        :type "bar"}]})))
 
-;; All submissions since the beginning of 2024
+;; ### Top submitting labs, since 2024
 (rdf/tx
  tdb
  (let [cnv-submitters (->> cnv-assertions
@@ -147,6 +128,7 @@ select ?x where {
        :y (mapv val cnv-submitters)
        :type "bar"}]})))
 
+^{::clerk/visibility {:result :hide}}
 (def queries
   [{:label "Deletions with >= 35 Genes"
     :description "Copy Number Loss variants in ClinVar that meet the criteria for Likely Pathogenic according to the ACMG guidelines based on gene count alone."
@@ -298,13 +280,7 @@ select ?x where {
                 {:filter :has_annotation
                  :argument "CG:NoAssessment"}]}])
 
-(rdf/tx
- tdb
- (let [q (filters/compile-filter-query
-          [:bgp ['x :rdf/type :cg/EvidenceStrengthAssertion]]
-          (-> queries first :filters))]
-   (count (q tdb))))
-
+^{::clerk/visibility {:result :hide}}
 (defn filter-result [query]
   (rdf/tx
    tdb
@@ -313,6 +289,7 @@ select ?x where {
             (:filters query))]
      (into [] (q tdb)))))
 
+^{::clerk/visibility {:result :hide}}
 (defn add-variant [assertion]
   (assoc assertion
          :variant
@@ -337,38 +314,52 @@ select ?x where {
          (count result)]
         [:p
          {:class "mt-1 text-sm/6 text-gray-500 text-wrap"}
-         (:description query)]]
-       [:div
-        {:class "mt-6 border-t border-gray-100"}
-        [:dl
-         {:class "divide-y divide-gray-100"}
-         (for [a sample]
-           [:div
-            {:class "px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0"}
-            
-            [:dt
-             {:class "text-sm/6 font-medium text-gray-900"}]
-            [:dd
-             {:class "mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0"}
-             "Margot Foster"]])]]
-       #_[:div
-          {:class "mt-6 border-t border-gray-100"}
-          [:dl
-           {:class "divide-y divide-gray-100"}
-           [:div
-            {:class "px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0"}
-            [:dt {:class "text-sm/6 font-medium text-gray-900"} "Full name"]
-            [:dd
-             {:class "mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0"}
-             "Margot Foster"]]]]]))))
+         (:description query)]]]))))
 
 
-(query-detail (first queries))
+#_(query-detail (first queries))
 
-(query-detail (second queries))
+#_(query-detail (second queries))
+
+(defn query-distribution [query]
+  (rdf/tx tdb
+    (let [result (filter-result query)]
+
+      (->> result
+           (mapv (fn [a]
+                   (rdf/ld1-> a [:cg/classification])))
+           frequencies))))
+
+(query-distribution
+  {:label "Recent Deletions not in HI3"
+  :description "Copy Number Loss variants in ClinVar that meet the criteria for Likely Pathogenic according to the ACMG guidelines based on gene count alone."
+  :filters [{:filter :proposition_type
+             :argument "CG:VariantPathogenicityProposition"}
+            {:filter :copy_change
+             :argument "EFO:0030067"}
+            #_{:filter :gene_count_min
+               :argument "CG:Genes35"}
+            {:filter :complete_overlap_with_feature_set
+             :argument "CG:HaploinsufficiencyFeatures"
+             :operation "not_exists"}
+            {:filter :date_evaluated_min
+             :argument "2020"}]})
+
+(query-detail
+ {:label "Recent Deletions not in HI3"
+  :description "Copy Number Loss variants in ClinVar that meet the criteria for Likely Pathogenic according to the ACMG guidelines based on gene count alone."
+  :filters [{:filter :proposition_type
+             :argument "CG:VariantPathogenicityProposition"}
+            {:filter :copy_change
+             :argument "EFO:0030067"}
+            #_{:filter :gene_count_min
+               :argument "CG:Genes35"}
+            {:filter :complete_overlap_with_feature_set
+             :argument "CG:HaploinsufficiencyFeatures"
+             :operation "not_exists"}
+            {:filter :date_evaluated_min
+             :argument "2020"}]})
 
 
-
-
-#_(for [q (take 3 queries)]
+(for [q queries]
     (query-detail q))

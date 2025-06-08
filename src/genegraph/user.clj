@@ -32,7 +32,8 @@
             [genegraph.api.assertion-annotation :as ac]
             [genegraph.api.hybrid-resource :as hr]
             [genegraph.api.ga4gh :as ga4gh]
-            [genegraph.api.base.gencc :as gencc])
+            [genegraph.api.base.gencc :as gencc]
+            [genegraph.api.graphql.schema.sequence-annotation :as sa])
   (:import [ch.qos.logback.classic Logger Level]
            [org.slf4j LoggerFactory]
            [java.time Instant LocalDate]
@@ -1714,10 +1715,24 @@ select ?x where { ?x a :cg/GeneValidityProposition } limit 1")]
        (sort-by val)
        reverse
        (take 20))
-
+  
+  ;; store all records in import set
   (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene-validity-sepio-2025-05-30.edn.gz"]
     (->> (event-store/event-seq r)
          (run! import-gv-curation)))
+
+  ;; delete all records in import set
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene-validity-sepio-2025-05-30.edn.gz"]
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+          object-db @(get-in api-test-app [:storage :object-db :instance])
+          hybrid-db {:tdb tdb :object-db object-db}]
+      (rdf/tx tdb
+        (->> (event-store/event-seq r)
+             (map event/deserialize)
+             (run! #(do (storage/delete tdb (cgv/assertion-iri %))
+                        (storage/delete tdb (cgv/main-record-iri %))
+                        (storage/delete object-db [:models (cgv/assertion-iri %)])
+                        (storage/delete object-db [:models (cgv/main-record-iri %)])))))))
 
   (+ 1 1)
 
@@ -1725,8 +1740,7 @@ select ?x where { ?x a :cg/GeneValidityProposition } limit 1")]
     (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene-validity-sepio-2025-05-30.edn.gz"]
       (->> (event-store/event-seq r)
            (filterv #(= (-> % event/deserialize cgv/main-record-iri)
-                        "http://dataexchange.clinicalgenome.org/gci/1bb8bc84-fe02-4a05-92a0-c0aacf897b6e"))
-           )))
+                        "http://dataexchange.clinicalgenome.org/gci/1bb8bc84-fe02-4a05-92a0-c0aacf897b6e")))))
 
   (count example-set)
 
@@ -1975,5 +1989,89 @@ select ?pub where {
 (comment
   (event-store/with-event-reader [r (str root-data-dir "ggapi-clinvar-curation-stage-1-2025-06-02.edn.gz")]
     (->> (event-store/event-seq r)
-         count))
+         (run! #(p/publish (get-in api-test-app [:topics :clinvar-curation]) %))))
+
+    (event-store/with-event-reader [r (str root-data-dir "ggapi-clinvar-curation-stage-1-2025-06-02.edn.gz")]
+    (->> (event-store/event-seq r)
+         (mapv event/deserialize)
+         (remove #(get-in % [::event/data :classification]))
+         first
+         tap>))
+
+    (event-store/with-event-reader [r (str root-data-dir "ggapi-clinvar-curation-stage-1-2025-06-02.edn.gz")]
+      (->> (event-store/event-seq r)
+           (mapv event/deserialize)
+           (mapv #(get-in % [::event/data :classification]))
+           set
+           tap>))
+
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+          object-db @(get-in api-test-app [:storage :object-db :instance])
+          hybrid-db {:tdb tdb :object-db object-db}
+          q (rdf/create-query "select ?x where { ?x a :cg/AssertionAnnotation }")]
+      (rdf/tx tdb
+        (->> (q tdb)
+             (take 5)
+             (mapv #(rdf/ld1-> % [:dc/description]))
+             tap>)))
+  )
+
+;; testing version relationships
+(comment
+  
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (rdf/create-query "
+select ?x where {
+ ?x a :cg/EvidenceStrengthAssertion ;
+ :prov/wasInvalidatedBy ?otherx
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           count)))
+ )
+
+;; troubleshooting issues with assertions on features
+(comment
+  "https://identifiers.org/ncbigene:215"
+
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+          object-db @(get-in api-test-app [:storage :object-db :instance])
+          hybrid-db {:tdb tdb :object-db object-db}
+          f (rdf/resource "https://identifiers.org/ncbigene:215")
+          test-query (rdf/create-query "
+select ?x where {
+?prop :cg/gene | :cg/feature | :cg/subject ?feature .
+?prop :rdf/type ?proposition_type .
+?x :cg/subject ?prop .
+}")]
+    (rdf/tx tdb
+      (->> (test-query tdb {:feature f})
+           count))))
+
+
+(comment
+  (rdf/resource "GENCC:000110")
+  (rdf/resource)"http://www.orpha.net/ORDO/Orphanet_"
+  (rdf/resource "http://www.orpha.net/ORDO/Orphanet_43")
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        abcd1 (rdf/resource "https://identifiers.org/ncbigene:215")
+        orphanet (rdf/resource "GENCC:000110")
+        test-query (rdf/create-query "
+select ?disease where {
+?prop :cg/gene | :cg/feature | :cg/subject ?feature .
+?prop :rdf/type ?proposition_type ;
+:cg/disease ?disease .
+?x :cg/subject ?prop .
+}")]
+    (rdf/tx tdb
+      (test-query tdb {:feature abcd1}))
+    #_(rdf/tx tdb
+        (-> (rdf/resource "OMIM:300100" tdb)
+            (rdf/ld1-> [[:skos/exactMatch :<]])
+            (rdf/ld-> [:skos/exactMatch]))))
   )

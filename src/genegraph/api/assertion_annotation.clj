@@ -12,7 +12,7 @@
        [iri :cg/contributions contrib-iri]
        [iri :cg/subject (rdf/resource (:subject ann))]
        [iri :dc/description (:description ann "")]
-       [iri :cg/classification (rdf/resource (:classification ann))]
+       [iri :cg/classification (rdf/resource (:classification ann :cg/NoAssessment))]
        [contrib-iri :cg/agent (rdf/resource (:agent ann))]
        [contrib-iri :cg/role :cg/Author]
        [contrib-iri :cg/date (:date ann)]]

@@ -217,7 +217,7 @@
   "Make a best-effort to convert the value for a field (expressed as a curie)
    into a full URL (expressed as a string)"
   [field]
-  (-> field s/trim rdf/resource str))
+  (-> field s/trim s/upper-case rdf/resource str))
 
 (defn record->proposition [record hgnc->entrez-map]
   (let [prop {:cg/gene (-> record :gene s/trim hgnc->entrez-map)

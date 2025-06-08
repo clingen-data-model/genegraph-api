@@ -177,6 +177,13 @@ select ?features where {
                          :resolve (fn [c a v] (proposition-assertions c a v))}}})
 
 
+(defn gv-disease [context args value]
+  #_(rdf/ld1-> value [:cg/disease])
+  (let [disease (rdf/ld1-> value [:cg/disease])]
+    (if (rdf/ld1-> disease [:rdfs/label])
+      disease
+      (rdf/ld1-> disease [[:skos/exactMatch :<]]))))
+
 (def gene-validity-proposition
   {:name :GeneValidityProposition
    :graphql-type :object
@@ -184,7 +191,8 @@ select ?features where {
    :fields {:gene {:type :SequenceFeature
                    :path [:cg/gene]}
             :disease {:type :Resource
-                      :path [:cg/disease]}
+                      #_#_:path [:cg/disease]
+                      :resolve (fn [c a v] (gv-disease c a v))}
             :modeOfInheritance {:type :Resource
                                 :path [:cg/modeOfInheritance]}
             :assertions {:type '(list :EvidenceStrengthAssertion)

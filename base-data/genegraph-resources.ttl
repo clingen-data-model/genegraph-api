@@ -1,5 +1,8 @@
 @prefix cg: <http://dataexchange.clinicalgenome.org/terms/>
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+@prefix gencc: <http://genegraph.clingen.app/gencc/>
+
+# Change gencc to something else in the future...
 
 ## Classifications ##
 
@@ -15,3 +18,18 @@ cg:LikelyPathogenic rdfs:label "Likely Pathogenic" .
 
 cg:Pathogenic rdfs:label "Pathogenic" .
 
+
+gencc:000111 rdfs:label "PanelApp Australia" .
+gencc:000115 rdfs:label "Broad Center for Mendelian Genomics" .
+gencc:000104 rdfs:label "Genomics England PanelApp" .
+gencc:000116 rdfs:label "Baylor College of Medicine Research Center" .
+gencc:000112 rdfs:label "G2P" .
+gencc:000113 rdfs:label "Franklin by Genoox" .
+gencc:000105 rdfs:label "Illumina" .
+gencc:000107 rdfs:label "Laboratory for Molecular Medicine" .
+gencc:000102 rdfs:label "ClinGen" .
+gencc:000106 rdfs:label "Invitae" .
+gencc:000110 rdfs:label "Orphanet" .
+gencc:000108 rdfs:label "Myriad Women’s Health" .
+gencc:000101 rdfs:label "Ambry Genetics" .
+gencc:000114 rdfs:label "King Faisal Specialist Hospital and Research Center" .

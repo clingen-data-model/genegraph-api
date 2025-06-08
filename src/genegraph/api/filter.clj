@@ -148,10 +148,16 @@
    ['proposition :cg/gene 'gene]
    ['x :cg/subject 'proposition]])
 
+(defn is-obsolete [{:keys [argument]}]
+  [:bgp ['x :prov/wasInvalidatedBy 'otherx]])
+
 ;; Using _ for filter names, these translate directly to GraphQL enums
 ;; so using snake-case to support javascript usage
 (def filters
-  {:proposition_type {:pattern-fn proposition-type-pattern-fn
+  {:is_obsolete {:pattern-fn is-obsolete
+                 :description "Selects only assertions that have been invalidated by other assertions. Generally included for negation purposes, in order to select only current curations."
+                 :domain :cg/EvidenceStrengthAssertion}
+   :proposition_type {:pattern-fn proposition-type-pattern-fn
                       :description "Type of proposition referred to by the evidence level assertion. Types include CG:VariantPathogenicityProposition, CG:GeneValidityProposition, and CG:ConditionMechanismProposition"
                       :domain :cg/EvidenceStrengthAssertion}
    :copy_change {:pattern-fn copy-change-pattern-fn
