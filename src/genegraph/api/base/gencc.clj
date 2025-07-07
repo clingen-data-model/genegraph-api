@@ -279,7 +279,7 @@
            (map #(-> %
                      row->record
                      (record->assertion hgnc->entrez-map)))
-           (remove #(= "http://genegraph.clingen.app/gencc/000102"
+           (remove #(= "https://genegraph.clinicalgenome.org/r/000102"
                        (:cg/agent %))) ; remove ClinGen ones
            (mapcat map->statements)
            (into [])

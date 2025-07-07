@@ -54,11 +54,11 @@
   :source "https://raw.githubusercontent.com/clingen-data-model/SEPIO-ontology/master/src/ontology/extensions/clingen/clingen-dosage/sepio-clingen-dosage.owl"
   :target "sepio-clingen-dosage.owl"
   :format :genegraph.framework.storage.rdf/rdf-xml}
- #_{:name "http://dataexchange.clinicalgenome.org/models/sepio-clingen-dosage-shapes.ttl"
+ #_{:name "https://genegraph.clinicalgenome.org/r/models/sepio-clingen-dosage-shapes.ttl"
   :source "https://raw.githubusercontent.com/clingen-data-model/SEPIO-ontology/master/src/ontology/extensions/clingen/clingen-dosage/sepio-clingen-dosage-shapes.ttl"
   :target "sepio-clingen-dosage-shapes.ttl"
   :format :genegraph.framework.storage.rdf/turtle}
- #_{:name "http://dataexchange.clinicalgenome.org/models/sepio-clingen-actionability-shapes.ttl"
+ #_{:name "https://genegraph.clinicalgenome.org/r/models/sepio-clingen-actionability-shapes.ttl"
   :source "https://raw.githubusercontent.com/clingen-data-model/SEPIO-ontology/master/src/ontology/extensions/clingen/clingen-actionability/sepio-clingen-actionability-shapes.ttl"
   :target "sepio-clingen-actionability-shapes.ttl"
   :format :genegraph.framework.storage.rdf/turtle}
@@ -66,7 +66,7 @@
   :source "https://raw.githubusercontent.com/clingen-data-model/SEPIO-ontology/master/src/ontology/extensions/clingen/clingen-actionability/sepio-clingen-actionability.ttl"
   :target "sepio-clingen-actionability.ttl"
   :format :genegraph.framework.storage.rdf/turtle}
- #_{:name "http://dataexchange.clinicalgenome.org/models/sepio-clingen-actionability-valueset"
+ #_{:name "https://genegraph.clinicalgenome.org/r/models/sepio-clingen-actionability-valueset"
   :source "https://raw.githubusercontent.com/clingen-data-model/SEPIO-ontology/master/src/ontology/extensions/clingen/clingen-actionability/sepio-clingen-actionability-valueset.ttl"
   :target "sepio-clingen-actionability-valueset.ttl"
   :format :genegraph.framework.storage.rdf/turtle}
@@ -115,11 +115,11 @@
   :source "https://storage.googleapis.com/public-download-files/hgnc/json/json/hgnc_complete_set.json"
   :target "hgnc.json",
   :format :genegraph.api.base/hgnc}
- #_{:name "http://dataexchange.clinicalgenome.org/terms"
+ #_{:name "https://genegraph.clinicalgenome.org/r/terms"
   :source "https://raw.githubusercontent.com/clingen-data-model/clingen-terms/master/clingen-terms.ttl"
   :target "clingen-terms.ttl"
   :format :genegraph.framework.storage.rdf/turtle}
- #_{:name "http://dataexchange.clinicalgenome.org/build-assembly-chr.ttl"
+ #_{:name "https://genegraph.clinicalgenome.org/r/build-assembly-chr.ttl"
   :source "https://raw.githubusercontent.com/clingen-data-model/clingen-terms/master/build-assembly-chr.ttl"
   :target "build-assembly-chr.ttl"
   :format :genegraph.framework.storage.rdf/turtle}
@@ -139,7 +139,7 @@
   :source "https://storage.googleapis.com/gcp-public-data--gnomad/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz"
   :target "gnomad_v2.1.1.lof_metrics_by_gene.txt.gz"
   :format :loss-intolerance}
- {:name "http://dataexchange.clinicalgenome.org/affiliations"
+ {:name "https://genegraph.clinicalgenome.org/r/affiliations"
   :source "https://docs.google.com/spreadsheets/d/1IF9GiP8iiFx1CndgqdWNGx4A_uM2GsWnV7GSiUO33bs/gviz/tq?tqx=out:csv&sheet=VCI%2FGCI%20Affiliations%20List"
   :target "affiliations.csv"
   :format :genegraph.api.base/affiliations}
@@ -153,11 +153,11 @@
   :target "ucsc_cytoband_hg38.txt.gz"
   :format :genegraph.gene-validity.base/ucsc-cytoband
   :genegraph.gene-validity.base.ucsc-cytoband/assembly :hg38}
- #_{:name "http://dataexchange.clinicalgenome.org/gci-express"
+ #_{:name "https://genegraph.clinicalgenome.org/r/gci-express"
   :source "https://raw.githubusercontent.com/clingen-data-model/data-exchange-shared-json/master/json-from-gene-express/gci-express-with-entrez-ids.json"
   :target "gci-express-with-entrez-ids.json"
   :format :genegraph.api.base/gci-express}
- #_{:name "http://dataexchange.clinicalgenome.org/missing-dosage-curations"
+ #_{:name "https://genegraph.clinicalgenome.org/r/missing-dosage-curations"
   :source "https://raw.githubusercontent.com/clingen-data-model/genegraph-gene-validity/main/resources/missing-dosage-curations.ttl"
   :target "missing-dosage-curations.ttl"
   :format :genegraph.framework.storage.rdf/turtle}

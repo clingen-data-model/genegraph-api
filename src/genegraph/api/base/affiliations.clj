@@ -5,7 +5,8 @@
             [genegraph.framework.storage.rdf :as rdf]
             [genegraph.framework.storage :as storage]))
 
-(def affiliation-prefix "http://dataexchange.clinicalgenome.org/agent/")
+(def affiliation-prefix #_"http://dataexchange.clinicalgenome.org/agent/"
+  "https://genegraph.clinicalgenome.org/r/agent/")
 
 (defn affiliation [[id label]]
   (if (and (> (count id) 0)

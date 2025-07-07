@@ -1,4 +1,4 @@
-@prefix cg: <http://dataexchange.clinicalgenome.org/terms/>
+@prefix cg: <https://genegraph.clinicalgenome.org/r/terms/>
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 @prefix gencc: <http://genegraph.clingen.app/gencc/>
 

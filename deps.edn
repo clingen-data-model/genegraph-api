@@ -41,14 +41,23 @@
  {ch.qos.logback/logback-classic                    {:mvn/version "1.5.0"}
   org.clojure/clojure                               {:mvn/version "1.12.0"}
   io.github.clingen-data-model/genegraph-framework
-  {:git/sha "d19a919c3ff164c9eb4f2852ff060fb5c647f88f"}
+  {:git/sha "2d993dead593c0f97968deb645679ad32d39b23e"}
   com.walmartlabs/lacinia-pedestal {:mvn/version "1.3"}
   hato/hato                                         {:mvn/version "1.0.0"}
   org.clojure/data.csv                              {:mvn/version "1.0.1"}
   org.clojure/data.zip {:mvn/version "1.0.0"}
   org.clojure/data.xml {:mvn/version "0.0.8"}
 
+
   ;; Experimenting with new Lucene features
+
+  org.apache.lucene/lucene-core {:mvn/version "10.2.1"}
+  org.apache.lucene/lucene-queryparser {:mvn/version "10.2.1"}
+  org.apache.lucene/lucene-analysis-common {:mvn/version "10.2.1"}
+
+  ;; Experimenting with Google genai apis
+
+  com.google.genai/google-genai {:mvn/version "1.6.0"}
   
   }
  }

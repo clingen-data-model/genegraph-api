@@ -36,7 +36,7 @@
             [genegraph.api.graphql.schema.sequence-annotation :as sa])
   (:import [ch.qos.logback.classic Logger Level]
            [org.slf4j LoggerFactory]
-           [java.time Instant LocalDate]
+           [java.time Instant LocalDate LocalDateTime ZoneOffset]
            [java.io PushbackReader]
            [org.apache.jena.query Dataset ARQ QueryExecutionFactory QueryFactory]
            [org.apache.jena.sparql.algebra Algebra]
@@ -114,10 +114,17 @@
             :clinvar-curation
             {:name :clinvar-curation
              :type :simple-queue-topic}}
-   :storage {:api-tdb (assoc api/api-tdb :load-snapshot false #_#_:snapshot-handle nil)
-             :response-cache-db api/response-cache-db
+   :storage {:api-tdb (assoc api/api-tdb
+                             :load-snapshot false
+                             #_#_:snapshot-handle nil
+                             :reset-opts {})
+             :response-cache-db (assoc api/response-cache-db
+                                       :reset-opts {})
              #_#_:sequence-feature-db api/sequence-feature-db
-             :object-db (assoc api/object-db :load-snapshot false #_#_:snapshot-handle nil)}
+             :object-db (assoc api/object-db
+                               :load-snapshot false
+                               #_#_:snapshot-handle nil
+                               :reset-opts {})}
    :processors {:fetch-base-file api/fetch-base-processor
                 :import-base-file api/import-base-processor
                 :import-gv-curations cgv/import-gv-curations
@@ -134,6 +141,8 @@
   (def api-test-app (p/init api-test-app-def))
   (p/start api-test-app)
   (p/stop api-test-app)
+
+  (p/reset api-test-app)
 
   (defn process-dosage [event]
     (try
@@ -190,60 +199,78 @@
 
 
 ;; restructuring base, adding ClinVar
-(comment
-  (->> (-> "base.edn" io/resource slurp edn/read-string)
-       (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
-                   (:name %)))
-       (run! #(p/publish (get-in api-test-app
-                                 [:topics :fetch-base-events])
-                         {::event/data %
-                          ::event/key (:name %)})))
+comment
+(->> (-> "base.edn" io/resource slurp edn/read-string)
+     (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+                 (:name %)))
+     (run! #(p/publish (get-in api-test-app
+                               [:topics :fetch-base-events])
+                       {::event/data %
+                        ::event/key (:name %)})))
 
-  (->> (-> "base.edn" io/resource slurp edn/read-string)
-       (remove #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
-                   (:name %)))
-       (run! #(p/publish (get-in api-test-app
-                                 [:topics :fetch-base-events])
-                         {::event/data %
-                          ::event/key (:name %)})))
-  
-  (->> (-> "base.edn" io/resource slurp edn/read-string)
-       (filter #(= "http://purl.obolibrary.org/obo/mondo.owl"
-                   (:name %)))
-       (run! #(p/publish (get-in api-test-app
-                                 [:topics :fetch-base-events])
-                         {::event/data %
-                          ::event/key (:name %)})))
+(->> (-> "base.edn" io/resource slurp edn/read-string)
+     (remove #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+                 (:name %)))
+     (run! #(p/publish (get-in api-test-app
+                               [:topics :fetch-base-events])
+                       {::event/data %
+                        ::event/key (:name %)})))
 
-  (->> (-> "base.edn" io/resource slurp edn/read-string)
-       (filter #(= "https://www.genenames.org/"
+(->> (-> "base.edn" io/resource slurp edn/read-string)
+     #_(remove #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
                    (:name %)))
-       (run! #(p/publish (get-in api-test-app
-                                 [:topics :fetch-base-events])
-                         {::event/data %
-                          ::event/key (:name %)})))
-  
-  (tap>
-   (p/process
-    (get-in api-test-app [:processors :import-base-file])
-    {::event/data
-     (assoc (first (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
-                               (:name %))
-                           (-> "base.edn" io/resource slurp edn/read-string)))
-            :source
-            {:type :file
-             :base "data/base"
-             :file "clinvar.xml.gz"})}))
-  
-  (tap>
-   (count (storage/scan @(get-in api-test-app [:storage :object-db :instance])
-                       ["clinvar"])))
-  (count
-   (rocksdb/range-get @(get-in api-test-app [:storage :object-db :instance])
-                      {:prefix ["clinvar"]
-                       :return :ref}))
-  
-  )
+     (run! #(p/publish (get-in api-test-app
+                               [:topics :fetch-base-events])
+                       {::event/data %
+                        ::event/key (:name %)})))
+
+(->> (-> "base.edn" io/resource slurp edn/read-string)
+     (filter #(= "http://purl.obolibrary.org/obo/mondo.owl"
+                 (:name %)))
+     (run! #(p/publish (get-in api-test-app
+                               [:topics :fetch-base-events])
+                       {::event/data %
+                        ::event/key (:name %)})))
+
+
+(->> (-> "base.edn" io/resource slurp edn/read-string)
+     (filter #(= "http://dataexchange.clinicalgenome.org/affiliations"
+                 (:name %)))
+     (run! #(p/publish (get-in api-test-app
+                               [:topics :fetch-base-events])
+                       {::event/data %
+                        ::event/key (:name %)})))
+
+
+(->> (-> "base.edn" io/resource slurp edn/read-string)
+     (filter #(= "https://www.genenames.org/"
+                 (:name %)))
+     (run! #(p/publish (get-in api-test-app
+                               [:topics :fetch-base-events])
+                       {::event/data %
+                        ::event/key (:name %)})))
+
+(tap>
+ (p/process
+  (get-in api-test-app [:processors :import-base-file])
+  {::event/data
+   (assoc (first (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+                             (:name %))
+                         (-> "base.edn" io/resource slurp edn/read-string)))
+          :source
+          {:type :file
+           :base "data/base"
+           :file "clinvar.xml.gz"})}))
+
+(tap>
+ (count (storage/scan @(get-in api-test-app [:storage :object-db :instance])
+                      ["clinvar"])))
+(count
+ (rocksdb/range-get @(get-in api-test-app [:storage :object-db :instance])
+                    {:prefix ["clinvar"]
+                     :return :ref}))
+
+
 
 (+ 1 1)
 ;; Dosage modifications
@@ -1457,12 +1484,20 @@ select ?x where { ?x a :cg/GeneValidityProposition } limit 1")]
 (comment
 
   (->> (-> "base.edn" io/resource slurp edn/read-string)
-       (filter #(= "https://thegencc.org/"
+       (filter #(= "https://genegraph.app/resources"
                    (:name %)))
        (run! #(p/publish (get-in api-test-app
                                  [:topics :fetch-base-events])
                          {::event/data %
                           ::event/key (:name %)})))
+
+(->> (-> "base.edn" io/resource slurp edn/read-string)
+     (filter #(= "https://thegencc.org/"
+                 (:name %)))
+     (run! #(p/publish (get-in api-test-app
+                               [:topics :fetch-base-events])
+                       {::event/data %
+                        ::event/key (:name %)})))
 
   (run!
    #(p/publish (get-in api-test-app [:topics :base-data]) %)
@@ -1808,12 +1843,142 @@ select ?x where { ?x a :cg/GeneValidityProposition } limit 1")]
          
          ))
 
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02.edn.gz"]
+    (->> (event-store/event-seq r)
+         (filter #(re-find #"founder" (::event/value %)))
+         (take 1)
+         (map event/deserialize)
+         (run! #(rdf/pp-model (::event/data %)))))
+
+  ;; Q2 Reporting
+  
+  (def q2
+    (let
+        [end-epoch-milli   (-> (LocalDateTime/of 2025 7 1 0 0) (.toInstant ZoneOffset/UTC) .toEpochMilli)
+         start-epoch-milli (-> (LocalDateTime/of 2025 4 1 0 0) (.toInstant ZoneOffset/UTC) .toEpochMilli)]
+        (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02.edn.gz"]
+          (->> (event-store/event-seq r)
+               #_(take 1)
+               (map event/deserialize)
+               (filter #(and (< start-epoch-milli (::event/timestamp %))
+                             (< (::event/timestamp %) end-epoch-milli)))
+               (into [])
+               #_(map #(-> %
+                           event/deserialize
+                           cgv/replace-hgnc-with-ncbi-gene-fn
+                           ::event/data))
+               #_count
+               #_(map #(assoc % ::event/skip-local-effects true))
+             
+               ))))
+
+  (defn add-affilation [c]
+    (let [affiliation-query (rdf/create-query "
+select ?a where { ?activity :cg/agent ?a ; :cg/role :cg/Approver }
+")]
+      (assoc c ::affiliation (-> c ::event/data affiliation-query first str))))
+
+  (defn add-gene [c]
+    (let [affiliation-query (rdf/create-query "
+select ?a where { ?prop :cg/gene ?a }
+")]
+      (assoc c ::gene (-> c ::event/data affiliation-query first str))))
+  
+  (defn curation-reasons-set [c]
+    (let [curation-reasons-query (rdf/create-query "
+select ?x where { ?a :cg/curationReasons ?x }
+")]
+      (set (map rdf/->kw (-> c ::event/data curation-reasons-query)))))
+  
+  (defn is-recuration [c]
+    (let [recuration-reasons
+          #{:cg/RecurationCommunityRequest
+            :cg/RecurationDiscrepancyResolution
+            :cg/RecurationErrorAffectingScoreorClassification
+            :cg/RecurationTiming
+            :cg/RecurationNewEvidence}]
+      (seq
+       (set/intersection
+        (::curation-reasons c)
+        recuration-reasons))))
+
+  (defn is-new-curation [c]
+    (let [recuration-reasons
+          #{:cg/NewCuration}]
+      (seq
+       (set/intersection
+        (::curation-reasons c)
+        recuration-reasons))))
+
+  (defn recuration-counts [events]
+    (reduce (fn [a e]
+              (cond
+                (::new-curation e) (update a ::new-curations inc)
+                (::recuration e) (update a ::recurations inc)
+                :default a))
+            {::recurations 0
+             ::new-curations 0}
+            events))
+
+  (defn iri->label [iri]
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+          object-db @(get-in api-test-app [:storage :object-db :instance])
+          hybrid-db {:tdb tdb :object-db object-db}]
+      (rdf/tx tdb
+        (-> (rdf/resource iri tdb)
+            (rdf/ld1-> [:rdfs/label])))))
+
+  (defn recurations-by-affiliation [events]
+    (-> (->> events
+             (map #(assoc % ::curation-reasons (curation-reasons-set %)))
+             (map #(assoc % ::new-curation (is-new-curation %)
+                          ::recuration (is-recuration %)))
+             (filter #(or (::new-curation %) (::recuration %)))
+             (map add-affilation)
+             (map add-gene)
+             (map #(select-keys % [::affiliation ::new-curation ::recuration ::gene]))
+             (group-by ::affiliation))
+        #_(update-vals recuration-counts)
+        (update-keys iri->label)))
+
+
+  (tap> (recurations-by-affiliation q2))
+  
+  (with-open [w (io/writer "/Users/tristan/Desktop/gcep-report-q2.csv")]
+    (csv/write-csv
+     w
+     (->> (recurations-by-affiliation q2)
+          (map (fn [[k v]] [k (::new-curations v) (::recurations v)]))
+          (cons ["GCEP" "New Curations" "Recurations"])))) 
+
+"https://genegraph.clinicalgenome.org/r/agent/10081"
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}]
+    (rdf/tx tdb
+      (-> (rdf/resource "https://genegraph.clinicalgenome.org/r/agent/10081" tdb)
+          (rdf/ld1-> [:rdfs/label]))))
+  
+(->> q2
+     (map #(assoc % ::curation-reasons (curation-reasons-set %)))
+     (map #(assoc % ::new-curation (is-new-curation %)
+                  ::recuration (is-recuration %)))
+     (filter #(or (::new-curation %) (::recuration %)))
+     (map add-affilation)
+     (map #(select-keys % [::affiliation ::new-curation ::recuration]))
+     (group-by ::affiliation))
+
+  (-> (Instant/now) .toEpochMilli)
+
+
+
   (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
         object-db @(get-in api-test-app [:storage :object-db :instance])
         hybrid-db {:tdb tdb :object-db object-db}]
     (rdf/tx tdb
       #_(->> (storage/read object-db [:models "http://dataexchange.clinicalgenome.org/gci/55ca8d81-f718-428e-ab59-75f7a9182d08v1.0"])
-           type)
+             type)
       (-> (storage/read tdb "http://dataexchange.clinicalgenome.org/gci/55ca8d81-f718-428e-ab59-75f7a9182d08")
           (cgv/construct-minimized-assertion-query {:newAssertion (rdf/resource "http://dataexchange.clinicalgenome.org/gci/55ca8d81-f718-428e-ab59-75f7a9182d08v2.0")})
           rdf/pp-model)))
@@ -2075,3 +2240,41 @@ select ?disease where {
             (rdf/ld1-> [[:skos/exactMatch :<]])
             (rdf/ld-> [:skos/exactMatch]))))
   )
+
+(comment
+
+  (do (defn kw->iri-id [k]
+        (-> k str (string/replace #":" "") (string/replace #"/" "_")))
+      (defn iri-id->kw [id]
+        (apply keyword (string/split id #"_")))
+      (iri-id->kw (kw->iri-id :cg/Agent)))
+
+  
+  )
+
+
+
+
+
+(comment
+  (->> schema-in-progress
+       :classes
+       (remove :dc/description)
+       keys
+       (map name)
+       (drop 5)
+       (into []))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}]
+    (rdf/tx tdb
+      (->> schema-in-progress
+           :properties
+           keys
+           (filter #(= "dc" (namespace %)))
+           #_(take 5)
+           (map (fn [t] [t {:description (-> t (rdf/resource tdb) (rdf/ld1-> [:rdfs/comment]))}]))
+           (into []))))
+  )
+
