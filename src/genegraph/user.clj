@@ -199,77 +199,77 @@
 
 
 ;; restructuring base, adding ClinVar
-comment
-(->> (-> "base.edn" io/resource slurp edn/read-string)
-     (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
-                 (:name %)))
-     (run! #(p/publish (get-in api-test-app
-                               [:topics :fetch-base-events])
-                       {::event/data %
-                        ::event/key (:name %)})))
+(comment
+ (->> (-> "base.edn" io/resource slurp edn/read-string)
+      (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+                  (:name %)))
+      (run! #(p/publish (get-in api-test-app
+                                [:topics :fetch-base-events])
+                        {::event/data %
+                         ::event/key (:name %)})))
 
-(->> (-> "base.edn" io/resource slurp edn/read-string)
-     (remove #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
-                 (:name %)))
-     (run! #(p/publish (get-in api-test-app
-                               [:topics :fetch-base-events])
-                       {::event/data %
-                        ::event/key (:name %)})))
+ (->> (-> "base.edn" io/resource slurp edn/read-string)
+      (remove #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+                  (:name %)))
+      (run! #(p/publish (get-in api-test-app
+                                [:topics :fetch-base-events])
+                        {::event/data %
+                         ::event/key (:name %)})))
 
-(->> (-> "base.edn" io/resource slurp edn/read-string)
-     #_(remove #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
-                   (:name %)))
-     (run! #(p/publish (get-in api-test-app
-                               [:topics :fetch-base-events])
-                       {::event/data %
-                        ::event/key (:name %)})))
+ (->> (-> "base.edn" io/resource slurp edn/read-string)
+      #_(remove #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+                    (:name %)))
+      (run! #(p/publish (get-in api-test-app
+                                [:topics :fetch-base-events])
+                        {::event/data %
+                         ::event/key (:name %)})))
 
-(->> (-> "base.edn" io/resource slurp edn/read-string)
-     (filter #(= "http://purl.obolibrary.org/obo/mondo.owl"
-                 (:name %)))
-     (run! #(p/publish (get-in api-test-app
-                               [:topics :fetch-base-events])
-                       {::event/data %
-                        ::event/key (:name %)})))
-
-
-(->> (-> "base.edn" io/resource slurp edn/read-string)
-     (filter #(= "http://dataexchange.clinicalgenome.org/affiliations"
-                 (:name %)))
-     (run! #(p/publish (get-in api-test-app
-                               [:topics :fetch-base-events])
-                       {::event/data %
-                        ::event/key (:name %)})))
+ (->> (-> "base.edn" io/resource slurp edn/read-string)
+      (filter #(= "http://purl.obolibrary.org/obo/mondo.owl"
+                  (:name %)))
+      (run! #(p/publish (get-in api-test-app
+                                [:topics :fetch-base-events])
+                        {::event/data %
+                         ::event/key (:name %)})))
 
 
-(->> (-> "base.edn" io/resource slurp edn/read-string)
-     (filter #(= "https://www.genenames.org/"
-                 (:name %)))
-     (run! #(p/publish (get-in api-test-app
-                               [:topics :fetch-base-events])
-                       {::event/data %
-                        ::event/key (:name %)})))
+ (->> (-> "base.edn" io/resource slurp edn/read-string)
+      (filter #(= "http://dataexchange.clinicalgenome.org/affiliations"
+                  (:name %)))
+      (run! #(p/publish (get-in api-test-app
+                                [:topics :fetch-base-events])
+                        {::event/data %
+                         ::event/key (:name %)})))
 
-(tap>
- (p/process
-  (get-in api-test-app [:processors :import-base-file])
-  {::event/data
-   (assoc (first (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
-                             (:name %))
-                         (-> "base.edn" io/resource slurp edn/read-string)))
-          :source
-          {:type :file
-           :base "data/base"
-           :file "clinvar.xml.gz"})}))
 
-(tap>
- (count (storage/scan @(get-in api-test-app [:storage :object-db :instance])
-                      ["clinvar"])))
-(count
- (rocksdb/range-get @(get-in api-test-app [:storage :object-db :instance])
-                    {:prefix ["clinvar"]
-                     :return :ref}))
+ (->> (-> "base.edn" io/resource slurp edn/read-string)
+      (filter #(= "https://www.genenames.org/"
+                  (:name %)))
+      (run! #(p/publish (get-in api-test-app
+                                [:topics :fetch-base-events])
+                        {::event/data %
+                         ::event/key (:name %)})))
 
+ (tap>
+  (p/process
+   (get-in api-test-app [:processors :import-base-file])
+   {::event/data
+    (assoc (first (filter #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+                              (:name %))
+                          (-> "base.edn" io/resource slurp edn/read-string)))
+           :source
+           {:type :file
+            :base "data/base"
+            :file "clinvar.xml.gz"})}))
+
+ (tap>
+  (count (storage/scan @(get-in api-test-app [:storage :object-db :instance])
+                       ["clinvar"])))
+ (count
+  (rocksdb/range-get @(get-in api-test-app [:storage :object-db :instance])
+                     {:prefix ["clinvar"]
+                      :return :ref}))
+ )
 
 
 (+ 1 1)
@@ -1871,12 +1871,68 @@ select ?x where { ?x a :cg/GeneValidityProposition } limit 1")]
                #_(map #(assoc % ::event/skip-local-effects true))
              
                ))))
+  (def atp8a2
+    (let
+        [end-epoch-milli   (-> (LocalDateTime/of 2025 7 1 0 0) (.toInstant ZoneOffset/UTC) .toEpochMilli)
+         start-epoch-milli (-> (LocalDateTime/of 2025 4 1 0 0) (.toInstant ZoneOffset/UTC) .toEpochMilli)]
+      (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02.edn.gz"]
+        (->> (event-store/event-seq r)
+             #_(take 1)
+             (filter #(re-find #"e6919cb8-703a-4f80-932b-2238f7bc08d6" (::event/value %)))
+             (map event/deserialize)
+             #_(filter #(and (< start-epoch-milli (::event/timestamp %))
+                             (< (::event/timestamp %) end-epoch-milli)))
+             (into [])
+             #_(map #(-> %
+                         event/deserialize
+                         cgv/replace-hgnc-with-ncbi-gene-fn
+                         ::event/data))
+             #_count
+             #_(map #(assoc % ::event/skip-local-effects true))
+             
+             ))))
+
+  (-> atp8a2 first ::event/timestamp Instant/ofEpochMilli)
+
+
+
+  (def dgke
+    (let
+        [end-epoch-milli   (-> (LocalDateTime/of 2025 7 1 0 0) (.toInstant ZoneOffset/UTC) .toEpochMilli)
+         start-epoch-milli (-> (LocalDateTime/of 2025 4 1 0 0) (.toInstant ZoneOffset/UTC) .toEpochMilli)]
+      (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02.edn.gz"]
+        (->> (event-store/event-seq r)
+             #_(take 1)
+             (filter #(re-find #"99d5772a-c32d-4f71-a67c-8820d13e703c" (::event/value %)))
+             (map event/deserialize)
+             #_(filter #(and (< start-epoch-milli (::event/timestamp %))
+                             (< (::event/timestamp %) end-epoch-milli)))
+             (into [])
+             #_(map #(-> %
+                         event/deserialize
+                         cgv/replace-hgnc-with-ncbi-gene-fn
+                         ::event/data))
+             #_count
+             #_(map #(assoc % ::event/skip-local-effects true))
+             
+             ))))
+
+  #_(->> dgke 
+       (mapv #(-> % ::event/timestamp Instant/ofEpochMilli str)))
+
+  (-> dgke last ::event/data rdf/pp-model)
 
   (defn add-affilation [c]
     (let [affiliation-query (rdf/create-query "
 select ?a where { ?activity :cg/agent ?a ; :cg/role :cg/Approver }
 ")]
       (assoc c ::affiliation (-> c ::event/data affiliation-query first str))))
+
+  (defn add-secondary-approver [c]
+    (let [secondary-affiliation-query (rdf/create-query "
+select ?a where { ?activity :cg/agent ?a ; :cg/role :cg/SecondaryContributor }
+")]
+      (assoc c ::secondary-approver (-> c ::event/data secondary-affiliation-query first str))))
 
   (defn add-gene [c]
     (let [affiliation-query (rdf/create-query "
@@ -1935,19 +1991,40 @@ select ?x where { ?a :cg/curationReasons ?x }
                           ::recuration (is-recuration %)))
              (filter #(or (::new-curation %) (::recuration %)))
              (map add-affilation)
+             (map add-secondary-approver)
              (map add-gene)
              (map #(select-keys % [::affiliation ::new-curation ::recuration ::gene]))
              (group-by ::affiliation))
         #_(update-vals recuration-counts)
         (update-keys iri->label)))
 
+  (defn recurations-by-secondary-affiliation [events]
+    (-> (->> events
+             (map #(assoc % ::curation-reasons (curation-reasons-set %)))
+             (map #(assoc % ::new-curation (is-new-curation %)
+                          ::recuration (is-recuration %)))
+             (filter #(or (::new-curation %) (::recuration %)))
+             (map add-affilation)
+             (map add-secondary-approver)
+             (filter ::secondary-approver)
+             (map add-gene)
+             (map #(select-keys % [::secondary-approver ::new-curation ::recuration ::gene]))
+             (group-by ::secondary-approver))
+        (update-vals recuration-counts)
+        (update-keys iri->label)))
 
+  (tap> (recurations-by-secondary-affiliation q2))
+  (tap> (recurations-by-secondary-affiliation dgke))
   (tap> (recurations-by-affiliation q2))
+
+  (->> dgke
+       (mapv add-secondary-approver)
+       (mapv ::secondary-approver))
   
-  (with-open [w (io/writer "/Users/tristan/Desktop/gcep-report-q2.csv")]
+  (with-open [w (io/writer "/Users/tristan/Desktop/gcep-secondary-report-q2.csv")]
     (csv/write-csv
      w
-     (->> (recurations-by-affiliation q2)
+     (->> (recurations-by-secondary-affiliation q2)
           (map (fn [[k v]] [k (::new-curations v) (::recurations v)]))
           (cons ["GCEP" "New Curations" "Recurations"])))) 
 
@@ -1960,17 +2037,14 @@ select ?x where { ?a :cg/curationReasons ?x }
       (-> (rdf/resource "https://genegraph.clinicalgenome.org/r/agent/10081" tdb)
           (rdf/ld1-> [:rdfs/label]))))
   
-(->> q2
-     (map #(assoc % ::curation-reasons (curation-reasons-set %)))
-     (map #(assoc % ::new-curation (is-new-curation %)
-                  ::recuration (is-recuration %)))
-     (filter #(or (::new-curation %) (::recuration %)))
-     (map add-affilation)
-     (map #(select-keys % [::affiliation ::new-curation ::recuration]))
-     (group-by ::affiliation))
-
-  (-> (Instant/now) .toEpochMilli)
-
+  (->> dgke
+       (map #(assoc % ::curation-reasons (curation-reasons-set %)))
+       (map #(assoc % ::new-curation (is-new-curation %)
+                    ::recuration (is-recuration %)))
+       (filter #(or (::new-curation %) (::recuration %)))
+       (map add-affilation)
+       (map #(select-keys % [::affiliation ::new-curation ::recuration]))
+       (group-by ::affiliation))
 
 
   (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
@@ -2277,4 +2351,447 @@ select ?disease where {
            (map (fn [t] [t {:description (-> t (rdf/resource tdb) (rdf/ld1-> [:rdfs/comment]))}]))
            (into []))))
   )
+
+
+
+(comment
+
+
+;;   Tristan, I thought a bit more about our “analysis over time” conversation on the Gene Curation Small Group call. 
+ 
+;; It looks like most of our curations have “first reported” dates in the 2000s.  There are definitely some earlier than this, but I would argue that these will throw off our analyses because we aren’t really expecting tons of new data to emerge prior to that time just due to limitations in testing capabilities.
+ 
+;; So, if we focused our analyses on only those curations with “first reported” years 2000-2025, I’m envisioning a spreadsheet with  the following:
+;; Standard identity fields (gene, disease, MOI)
+;; Year of first report (expect 2000 and later)
+;; Then, a column for each year 2000-2025 with the number of points documented in the curation in that year.  I’m thinking just total points to make it easier to deal with.
+;; Original Total Points
+;; Original Classification
+;; Original Classification Date
+;; Total points, classifications, and dates on any subsequent recurations
+ 
+;; I realize this will make for a sheet with a bunch of 0s (since obviously not every curation will have a start year in 2000), but I think this might be a good way to normalize the information?  So like if a curation was first reported in 2022, it would have 0s in all columns up to 2022, then it would have say 3 points from papers published in 2022, 1 point from papers published in 2023, 3 points from papers published in 2024, etc.
+ 
+;; Does that seem feasible?  We can also discuss further if that doesn’t make sense 😊
+
+;; -Erin
+
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02.edn.gz"]
+    (->> (event-store/event-seq r)
+         #_(filter #(re-find #"founder" (::event/value %)))
+         (take 1)
+         (map event/deserialize)
+         (run! #(rdf/pp-model (::event/data %)))))
+
+    )
+
+(def example
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02.edn.gz"]
+    (->> (event-store/event-seq r)
+         #_(filter #(re-find #"founder" (::event/value %)))
+         (take 1)
+         (map event/deserialize)
+         first)))
+
+(rdf/pp-model (::event/data example))
+
+(comment
+ (do
+
+   (defn unpublish-event? [event]
+     (let [q (rdf/create-query "
+select ?x where {
+ ?x :cg/role ?role
+ filter(?role IN ( :cg/Unpublisher , :cg/UnpublisherRole ))
+}")]
+       (-> event ::event/data q seq)))
+
+   (defn publish-event? [event]
+     (let [q (rdf/create-query "
+select ?x where { ?x :cg/role :cg/Publisher }")]
+       (-> event ::event/data q seq)))
+
+  
+   (defn points-per-paper [paper]
+     (let [q (rdf/create-query "
+select ?ev where 
+{ ?el :cg/evidence ?ev .
+  ?ev :dc/source ?p .
+}")]
+       (q paper {:p paper})))
+
+   (defn add-evidence-items [{:keys [paper] :as m}]
+     (let [q (rdf/create-query "
+select ?ev where 
+{ ?ev :dc/source ?p .}")]
+       (assoc m :evidence-items (q paper {:p paper}))))
+
+   (defn add-evidence-lines [{:keys [paper] :as m}]
+     (let [q (rdf/create-query "
+select ?el where 
+{ ?ev :dc/source ?p .
+  ?el :cg/evidence ?ev .}")]
+       (assoc m :evidence-lines (q paper {:p paper}))))
+
+   (defn add-date [{:keys [paper] :as m}]
+     (assoc m :date (rdf/ld1-> paper [:dc/date])))
+
+   (defn add-scores [{:keys [evidence-lines] :as m}]
+     (let [scores (filter number?
+                          (mapv #(rdf/ld1-> % [:cg/strengthScore])
+                                evidence-lines))]
+       (assoc m
+              :scores scores
+              :total-scores (reduce + scores))))
+
+   (defn add-curation-info [e]
+     (let [q (rdf/create-query "
+select ?x where { ?x a :cg/EvidenceStrengthAssertion }")
+           gcep-q (rdf/create-query "
+select ?gcep where { ?act :cg/agent ?gcep ; :cg/role :cg/Approver}")
+           approval-q (rdf/create-query "
+select ?act where { ?act :cg/agent ?gcep ; :cg/role :cg/Approver}")
+           assertion (first (q (::event/data e)))
+           prop (rdf/ld1-> assertion [:cg/subject])
+           tdb @(get-in api-test-app [:storage :api-tdb :instance])]
+       (rdf/tx tdb
+         (assoc e
+                ::version (rdf/ld1-> assertion [:cg/version])
+                ::gene (rdf/ld1-> (rdf/resource (str (rdf/ld1-> prop [:cg/gene])) tdb)
+                                  [[:owl/sameAs :<] :skos/prefLabel])
+                ::disease (rdf/ld1-> (rdf/resource (str (rdf/ld1-> prop [:cg/disease])) tdb)
+                                     [:rdfs/label])
+                ::moi (rdf/ld1-> (rdf/resource (str (rdf/ld1-> prop [:cg/modeOfInheritance])) tdb)
+                                 [:rdfs/label])
+                ::gcep (rdf/ld1-> (rdf/resource (str (first (gcep-q (::event/data e)))) tdb)
+                                  [:rdfs/label])
+                ::approval-date (rdf/ld1-> (first (approval-q (::event/data e))) [:cg/date])
+                ::classification (rdf/->kw (rdf/ld1-> assertion [:cg/evidenceStrength]))
+                ::record-id (-> assertion (rdf/ld1-> [:dc/isVersionOf]) rdf/->kw)
+                ::total-points (rdf/ld1-> assertion [:cg/strengthScore])))))
+  
+   (defn add-papers [e]
+     (let [papers-query (rdf/create-query "
+select ?p where { ?p a :dc/BibliographicResource }")]
+       (assoc e
+              ::papers
+              (->> (map (fn [p] {:paper p})
+                        (papers-query (::event/data e)))
+                   (map add-evidence-items)
+                   (map add-evidence-lines)
+                   (map add-scores)
+                   (map add-date)
+                   (mapv #(-> (update-in % [:paper] str)
+                              (select-keys [:paper :total-scores :date])))))))
+
+
+
+
+
+   #_(defn compose-aggregate [m]
+       (assoc (select-keys m [:date :total-scores])))
+
+   #_(-> example
+         add-curation-info
+         add-papers
+         (select-keys [::version
+                       ::gene
+                       ::disease
+                       ::moi
+                       ::gcep
+                       ::approval-date
+                       ::classification
+                       ::papers])
+         tap>)
+  
+   #_(-> example
+         add-papers
+         ::papers
+         tap>))
+
+ )
+
+
+#_(let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+      q (rdf/create-query "
+select ?x where { ?x a :cg/Affiliation } limit 5")]
+  (rdf/tx tdb
+    (q tdb)))
+
+  ;; 0. https://genegraph.clinicalgenome.org/r/agent/10138
+  ;; 1. https://genegraph.clinicalgenome.org/r/agent/50160
+  ;; 2. https://genegraph.clinicalgenome.org/r/agent/10120
+  ;; 3. https://genegraph.clinicalgenome.org/r/agent/40022
+  ;; 4. https://genegraph.clinicalgenome.org/r/agent/10069
+  ;;    https://genegraph.clinicalgenome.org/r/agent/10021
+
+;; check for how many have a single variant -- search for founder variants
+;; scored more than zero
+;; note segregrations present 
+
+
+(defn add-earliest-paper-date [e]
+  (assoc e
+         ::earliest-paper-date
+         (->> (::papers e)
+              (map #(-> %
+                        :date
+                        (subs 0 4)
+                        Integer/parseInt))
+              sort
+              first)))
+
+(defn add-segregation-score [event]
+  (assoc
+   event
+   ::segregation-score
+   (let [q (rdf/create-query "
+select ?el where 
+{ ?el :cg/specifiedBy :cg/GeneValiditySegregationEvidencCriteria } ")]
+     (if-let [seg (-> event ::event/data q first)]
+       (rdf/ld1-> seg [:cg/strengthScore])
+       0))))
+
+(defn most-recent-event [event-seq]
+  (->> event-seq
+       (sort-by ::event/timestamp)
+       reverse
+       first))
+
+(defn add-points-by-year
+  "Sequence of points per paper per year"
+  [event]
+  (let [papers-by-year (group-by #(Integer/parseInt (subs (:date %) 0 4))
+                                 (::papers event))]
+    (assoc event
+           ::points-by-year
+           (mapv (fn [year]
+                   (reduce +
+                           (map :total-scores
+                                (get papers-by-year year))))
+                 (range 2000 2026)))))
+
+(def header-row
+  ["last version"
+   "gene"
+   "disease"
+   "moi"
+   "gcep"
+   "approval date"
+   "classification"
+   "earliest publication"
+   "total points"
+   "segregation points"
+   "2000"
+   "2001"
+   "2002"
+   "2003"
+   "2004"
+   "2005"
+   "2006"
+   "2007"
+   "2008"
+   "2009"
+   "2010"
+   "2011"
+   "2012"
+   "2013"
+   "2014"
+   "2015"
+   "2016"
+   "2017"
+   "2018"
+   "2019"
+   "2020"
+   "2021"
+   "2022"
+   "2023"
+   "2024"
+   "2025"
+   "version infos"])
+
+(clojure.pprint/pprint (mapv str (range 2000 2026)))
+
+(defn event->column [e]
+  (concat [(::version e)
+           (::gene e)
+           (::disease e)
+           (::moi e)
+           (::gcep e)
+           (if-let [d (::approval-date e)]
+             (subs d 0 10)
+             "no approval date")
+           (some-> e ::classification name)
+           (::earliest-paper-date e)
+           (::total-points e)
+           (::segregation-score e)]
+          (::points-by-year e)))
+
+(defn event-timestamp->iso-date [event]
+  (-> event ::event/timestamp Instant/ofEpochMilli str (subs 0 10)))
+
+(defn events->summary-column [events]
+  (mapcat
+   (fn [e]
+     [(::version e)
+      (event-timestamp->iso-date e)
+      (name (::classification e))
+      (::total-points e)])
+   (sort-by ::event/timestamp events)))
+
+(defn add-score-difference [event]
+  (assoc event
+         ::score-difference
+         (- (::total-points event)
+            (reduce + (map :total-scores (::papers event))))))
+
+#_(-> nonevent-example ::event/data rdf/pp-model)
+(comment
+  
+"75516cff-17fd-47bd-8873-862b66741de2"
+
+(def mgme1
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02-fixed.edn.gz"]
+    (->> (event-store/event-seq r)
+         (filter #(re-find #"75516cff-17fd-47bd-8873-862b66741de2" (::event/value %)))
+         (map event/deserialize)
+         (filterv publish-event?))))
+
+(-> mgme1
+    first
+    ::event/data
+    rdf/pp-model
+)
+
+(event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02.edn.gz"]
+  (->> (event-store/event-seq r)
+       (filter #(re-find #"0204e276-fa45-4756-a380-eb494f5237f8" (::event/value)))
+       (map event/deserialize)
+       (filter publish-event?)
+       (run! #(rdf/pp-model (::event/data %)))))
+  
+(def event-versions
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02-fixed3.edn.gz"]
+    (->> (event-store/event-seq r)
+         #_(take 10)
+         (map event/deserialize)
+         (filter publish-event?)
+         (map add-curation-info)
+         (map add-papers)
+         (map add-earliest-paper-date)
+         (map add-points-by-year)
+         (map add-score-difference)
+         (map add-segregation-score)
+         (mapv #(select-keys %
+                             [::version
+                              ::gene
+                              ::disease
+                              ::moi
+                              ::gcep
+                              ::approval-date
+                              ::classification
+                              ::papers
+                              ::record-id
+                              ::earliest-paper-date
+                              ::points-by-year
+                              ::total-points
+                              ::segregation-score
+                              ::score-difference
+                              ::event/timestamp])))))
+
+
+
+(->> event-versions
+     (filterv #(< 0.2 (::score-difference %)))
+     (remove #(< 0.1 (::segregation-score %)))
+     (sort-by ::score-difference)
+     reverse
+     tap>)
+
+
+(def big-problems
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02-fixed3.edn.gz"]
+    (->> (event-store/event-seq r)
+         #_(take 10)
+         (map event/deserialize)
+         (filter publish-event?)
+         (map add-curation-info)
+         (map add-papers)
+         (map add-earliest-paper-date)
+         (map add-points-by-year)
+         (map add-score-difference)
+         (filterv #(< 5 (::score-difference %)))
+         #_(mapv #(select-keys %
+                               [::version
+                                ::gene
+                                ::disease
+                                ::moi
+                                ::gcep
+                                ::approval-date
+                                ::classification
+                                ::papers
+                                ::record-id
+                                ::earliest-paper-date
+                                ::points-by-year
+                                ::total-points
+                                ::score-difference
+                                ::event/timestamp])))))
+
+
+(count big-problems)
+(-> big-problems
+    second
+    ::event/data
+    rdf/pp-model)
+
+(->> event-versions
+     (filter #(< 1 (::score-difference %)))
+     (take 1)
+     tap>)
+
+(->> event-versions
+     (filter #(< 5 (::score-difference %)))
+     #_(take 1)
+     tap>)
+
+(->> event-versions
+     (filter #(= "MGME1" (::gene %)))
+     (map ::score-difference))
+
+(do
+
+  (->> event-versions
+       (filter #(= "MGME1" (::gene %)))
+       (mapv add-score-difference)
+       tap>))
+
+  (with-open [w (io/writer "/Users/tristan/Desktop/gene-curation-points-by-year.csv")]
+    (csv/write-csv
+     w
+     (->> event-versions
+          (filter #(and (::earliest-paper-date %) (< 1999 (::earliest-paper-date %))))
+          (group-by ::record-id)
+          vals
+          (map #(concat
+                 (event->column (most-recent-event %))
+                 (events->summary-column %)))
+          (cons header-row))))
+  
+  (count event-versions)
+  (->> event-versions
+       #_(take 10)
+       (map add-earliest-paper-date)
+       (map ::earliest-paper-date)
+       frequencies
+       (sort-by key)
+       tap>)
+
+  (->> event-versions
+       (filter #(= "2001" (::earliest-paper-date %)))
+       (mapv add-points-by-year)
+       (take 10)
+       tap>)
+
+  )
+
 

@@ -23,13 +23,17 @@
                    "-XX:+ZGenerational"
                    "-XX:MaxRAMPercentage=50"
                    "-Djdk.attach.allowAttachSelf"
-                   "-Djava.security.manager=allow"]}}
+                   "-Djava.security.manager=allow"
+                   "--add-modules=jdk.incubator.vector"
+                   "--enable-native-access=ALL-UNNAMED"]}} ;; needed for lucene vector api
  ;; https://nrepl.org/nrepl/installation.html#jvmti
 
  :jvm-opts ["-XX:+UseZGC"
             "-XX:+ZGenerational"
             "-XX:MaxRAMPercentage=75"
-            "-Djava.security.manager=allow"]
+            "-Djava.security.manager=allow"
+            "--add-modules=jdk.incubator.vector"
+            "--enable-native-access=ALL-UNNAMED"]
 
  ;; reference for "-Djava.security.manager=allow" (requried in JDK 23+)
  ;; https://cwiki.apache.org/confluence/display/KAFKA/KIP-1006%3A+Remove+SecurityManager+Support
