@@ -4,6 +4,7 @@
             [genegraph.framework.event :as event]
             [genegraph.framework.storage :as storage]
             [genegraph.framework.storage.rdf :as rdf]
+            [genegraph.api.lucene :as lucene]
             [genegraph.framework.env :as env]
             [genegraph.api.dosage :as dosage] 
             [genegraph.api.base :as base]
@@ -284,30 +285,41 @@
    ::event/metadata {::base/handle
                      (assoc (:fs-handle env) :path "base/")}})
 
+(defn local-path [path]
+  (str (:local-data-path env) path))
+
+(defn snapshot-handle [path]
+  (assoc (:fs-handle env) :path path))
+
 ;;;; GraphQL
 
 (def api-tdb
   {:type :rdf
    :name :api-tdb
-   :snapshot-handle (assoc (:fs-handle env) :path "api-tdb-v3.nq.gz")
-   :path (str (:local-data-path env) "/api-tdb")})
+   :snapshot-handle (snapshot-handle "api-tdb-v3.nq.gz")
+   :path (local-path "/api-tdb")})
 
 (def object-db
   {:type :rocksdb
    :name :object-db
-   :snapshot-handle (assoc (:fs-handle env) :path "object-db-v3.lz4")
-   :path (str (:local-data-path env) "/object-db")})
+   :snapshot-handle (snapshot-handle "object-db-v3.lz4")
+   :path (local-path "/object-db")})
+
+(def text-index
+  {:type :lucene
+   :name :text-index
+   :path (local-path "/object-db")})
 
 (def sequence-feature-db
   {:type :rocksdb
    :name :sequence-feature-db
-   :snapshot-handle (assoc (:fs-handle env) :path "sequence-feature-db.lz4")
-   :path (str (:local-data-path env) "/sequence-feature-db")})
+   :snapshot-handle (snapshot-handle "sequence-feature-db.lz4")
+   :path (local-path "/sequence-feature-db")})
 
 (def response-cache-db
   {:type :rocksdb
    :name :response-cache-db
-   :path (str (:local-data-path env) "/response-cache-db")})
+   :path (local-path "/response-cache-db")})
 
 (def import-base-processor
   {:name :import-base-file

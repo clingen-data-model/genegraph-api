@@ -3,7 +3,8 @@
   (:require [genegraph.framework.storage :as storage]
             [genegraph.framework.protocol :as p]
             [clojure.java.io :as io])
-  (:import [org.apache.lucene.store FSDirectory Directory]
+  (:import [java.util.concurrent ArrayBlockingQueue TimeUnit]
+           [org.apache.lucene.store FSDirectory Directory]
            [java.nio.file Path Paths]
            [org.apache.lucene.analysis Analyzer]
            [org.apache.lucene.analysis.standard StandardAnalyzer]
@@ -54,6 +55,10 @@
   (search [this params]))
 
 
+(defn score-doc->m [score-doc stored-fields]
+  {:iri (document-iri (.document stored-fields (.doc score-doc) #{"iri"}))
+   :score (.score score-doc)})
+
 (defn lucene-search [{:keys [searcher-manager
                              symbol-parser
                              label-parser
@@ -62,34 +67,53 @@
   (let [parser (case field
                  :symbol symbol-parser
                  :label label-parser
-                 :description description-parser)]
-    (->> (.search (.acquire searcher-manager)
+                 :description description-parser)
+        searcher (.acquire searcher-manager)]
+    (->> (.search searcher
                   (.parse parser query)
                   (or max-results 100))
          .scoreDocs
-         (map ))))
+         (mapv #(score-doc->m % (.storedFields searcher))))))
 
 (defrecord LuceneInstance [writer
                            searcher-manager
                            symbol-parser
                            label-parser
-                           description-parser]
+                           description-parser
+                           needs-commit-q
+                           state]
   
   storage/IndexedWrite
   (storage/write [this k v]
     (.updateDocument writer
                      (Term. "iri" k)
-                     (->lucene-document v)))
+                     (->lucene-document v))
+    (.offer needs-commit-q k))
+  (storage/write [this k v commit-promise]
+    (storage/write this k v)
+    (deliver commit-promise true))
 
   Searchable
-  (search [this params]
-    (lucene-search this params)))
+  (search [this {:keys [field query max-results]}]
+    (let [parser (case field
+                   :symbol symbol-parser
+                   :label label-parser
+                   :description description-parser)
+          searcher (.acquire searcher-manager)]
+      (->> (.search (.acquire searcher-manager)
+                    (.parse parser query)
+                    (or max-results 100))
+           .scoreDocs
+           (mapv #(score-doc->m % (.storedFields searcher)))))))
 
 (defrecord LuceneContainer [name
                             type
                             path
                             state
                             instance]
+
+  storage/HasInstance
+  (storage/instance [_] @instance)
 
   p/Lifecycle
   (start [this]
@@ -98,6 +122,7 @@
                   fsd
                   (doto (IndexWriterConfig. (StandardAnalyzer.))
                     (.setOpenMode IndexWriterConfig$OpenMode/CREATE_OR_APPEND)))]
+      (reset! state :running)
       ;; populate with something in case directory is empty
       ;; searchermanager needs an index of something to start
       (.updateDocument writer
@@ -115,13 +140,21 @@
                 :symbol-parser (SimpleQueryParser. (KeywordAnalyzer.) "symbol")
                 :label-parser (SimpleQueryParser. (StandardAnalyzer.) "label")
                 :description-parser (SimpleQueryParser. (StandardAnalyzer.)
-                                                        "description")}))
-      (reset! state :running)))
+                                                        "description")
+                :needs-commit-q (ArrayBlockingQueue. 2)
+                :state state}))
+      (Thread/startVirtualThread
+       (fn []
+         (let [{:keys [writer searcher-manager needs-commit-q]} @instance]
+           (while (= :running @state)
+             (when (.poll needs-commit-q 1 TimeUnit/SECONDS)
+               (.commit writer)
+               (.maybeRefresh searcher-manager))))))))
   
   (stop [this]
-    (.close (:searcher @instance))
-    (.close (:writer @instance))
-    (reset! state :stopped))
+    (reset! state :stopped)
+    (.close (:searcher-manager @instance))
+    (.close (:writer @instance)))
 
   p/Resetable
   (reset [this]
@@ -314,7 +347,23 @@
   
   ;; create an example of a text embedding using the google-genai java api
 
+  (def q (ArrayBlockingQueue. 2))
+  (def run-q-test (atom true))
 
-
+  (reset! run-q-test false)
+  (reset! run-q-test true)
+  
+  (Thread/startVirtualThread
+   (fn []
+     (while @run-q-test
+       (try
+         (if-let [r (.poll q 1 TimeUnit/SECONDS)]
+           (println r)
+           (println "nothing yet"))
+         (catch Exception e (.printStackTrace e))))))
+  (dotimes [i 5]
+    (.offer q (str "try me again " i)))
+  (println (.poll q 500 TimeUnit/MILLISECONDS))
   
   )
+

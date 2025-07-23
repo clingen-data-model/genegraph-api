@@ -114,7 +114,8 @@
  {:name "https://www.genenames.org/"
   :source "https://storage.googleapis.com/public-download-files/hgnc/json/json/hgnc_complete_set.json"
   :target "hgnc.json",
-  :format :genegraph.api.base/hgnc}
+  :format :genegraph.api.base/hgnc
+  :action :genegraph.api.base/load-genes}
  #_{:name "https://genegraph.clinicalgenome.org/r/terms"
   :source "https://raw.githubusercontent.com/clingen-data-model/clingen-terms/master/clingen-terms.ttl"
   :target "clingen-terms.ttl"

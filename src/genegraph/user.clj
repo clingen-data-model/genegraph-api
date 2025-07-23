@@ -33,7 +33,9 @@
             [genegraph.api.hybrid-resource :as hr]
             [genegraph.api.ga4gh :as ga4gh]
             [genegraph.api.base.gencc :as gencc]
-            [genegraph.api.graphql.schema.sequence-annotation :as sa])
+            [genegraph.api.graphql.schema.sequence-annotation :as sa]
+            [genegraph.api.lucene :as lucene]
+            [clojure.tools.namespace.repl :as repl])
   (:import [ch.qos.logback.classic Logger Level]
            [org.slf4j LoggerFactory]
            [java.time Instant LocalDate LocalDateTime ZoneOffset]
@@ -55,6 +57,9 @@
   (clerk/serve! {:watch-paths ["notebooks" "src"]})
   (clerk/build! {:paths ["notebooks/cnv.clj"]
                  :package :single-file})
+  (clerk/build! {:paths ["notebooks/data_exchange.md"]
+                 :package :single-file})
+  
   )
 
 
@@ -120,6 +125,7 @@
                              :reset-opts {})
              :response-cache-db (assoc api/response-cache-db
                                        :reset-opts {})
+             :text-index (assoc api/text-index :reset-opts {})
              #_#_:sequence-feature-db api/sequence-feature-db
              :object-db (assoc api/object-db
                                :load-snapshot false
@@ -260,7 +266,9 @@
            :source
            {:type :file
             :base "data/base"
-            :file "clinvar.xml.gz"})}))
+            :file "clinvar.xml.gz"})})
+
+  )
 
  (tap>
   (count (storage/scan @(get-in api-test-app [:storage :object-db :instance])
@@ -2376,140 +2384,140 @@ select ?disease where {
 
 ;; -Erin
 
-  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02.edn.gz"]
-    (->> (event-store/event-seq r)
-         #_(filter #(re-find #"founder" (::event/value %)))
-         (take 1)
-         (map event/deserialize)
-         (run! #(rdf/pp-model (::event/data %)))))
+
+  (comment
+    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02.edn.gz"]
+      (->> (event-store/event-seq r)
+           #_(filter #(re-find #"founder" (::event/value %)))
+           (take 1)
+           (map event/deserialize)
+           (run! #(rdf/pp-model (::event/data %)))))
 
     )
 
-(def example
-  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02.edn.gz"]
-    (->> (event-store/event-seq r)
-         #_(filter #(re-find #"founder" (::event/value %)))
-         (take 1)
-         (map event/deserialize)
-         first)))
-
-(rdf/pp-model (::event/data example))
+  (def example
+    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02.edn.gz"]
+      (->> (event-store/event-seq r)
+           #_(filter #(re-find #"founder" (::event/value %)))
+           (take 1)
+           (map event/deserialize)
+           first))))
 
 (comment
- (do
+  (do
 
-   (defn unpublish-event? [event]
-     (let [q (rdf/create-query "
+    (defn unpublish-event? [event]
+      (let [q (rdf/create-query "
 select ?x where {
  ?x :cg/role ?role
  filter(?role IN ( :cg/Unpublisher , :cg/UnpublisherRole ))
 }")]
-       (-> event ::event/data q seq)))
+        (-> event ::event/data q seq)))
 
-   (defn publish-event? [event]
-     (let [q (rdf/create-query "
+    (defn publish-event? [event]
+      (let [q (rdf/create-query "
 select ?x where { ?x :cg/role :cg/Publisher }")]
-       (-> event ::event/data q seq)))
+        (-> event ::event/data q seq)))
 
   
-   (defn points-per-paper [paper]
-     (let [q (rdf/create-query "
+    (defn points-per-paper [paper]
+      (let [q (rdf/create-query "
 select ?ev where 
 { ?el :cg/evidence ?ev .
   ?ev :dc/source ?p .
 }")]
-       (q paper {:p paper})))
+        (q paper {:p paper})))
 
-   (defn add-evidence-items [{:keys [paper] :as m}]
-     (let [q (rdf/create-query "
+    (defn add-evidence-items [{:keys [paper] :as m}]
+      (let [q (rdf/create-query "
 select ?ev where 
 { ?ev :dc/source ?p .}")]
-       (assoc m :evidence-items (q paper {:p paper}))))
+        (assoc m :evidence-items (q paper {:p paper}))))
 
-   (defn add-evidence-lines [{:keys [paper] :as m}]
-     (let [q (rdf/create-query "
+    (defn add-evidence-lines [{:keys [paper] :as m}]
+      (let [q (rdf/create-query "
 select ?el where 
 { ?ev :dc/source ?p .
   ?el :cg/evidence ?ev .}")]
-       (assoc m :evidence-lines (q paper {:p paper}))))
+        (assoc m :evidence-lines (q paper {:p paper}))))
 
-   (defn add-date [{:keys [paper] :as m}]
-     (assoc m :date (rdf/ld1-> paper [:dc/date])))
+    (defn add-date [{:keys [paper] :as m}]
+      (assoc m :date (rdf/ld1-> paper [:dc/date])))
 
-   (defn add-scores [{:keys [evidence-lines] :as m}]
-     (let [scores (filter number?
-                          (mapv #(rdf/ld1-> % [:cg/strengthScore])
-                                evidence-lines))]
-       (assoc m
-              :scores scores
-              :total-scores (reduce + scores))))
+    (defn add-scores [{:keys [evidence-lines] :as m}]
+      (let [scores (filter number?
+                           (mapv #(rdf/ld1-> % [:cg/strengthScore])
+                                 evidence-lines))]
+        (assoc m
+               :scores scores
+               :total-scores (reduce + scores))))
 
-   (defn add-curation-info [e]
-     (let [q (rdf/create-query "
+    (defn add-curation-info [e]
+      (let [q (rdf/create-query "
 select ?x where { ?x a :cg/EvidenceStrengthAssertion }")
-           gcep-q (rdf/create-query "
+            gcep-q (rdf/create-query "
 select ?gcep where { ?act :cg/agent ?gcep ; :cg/role :cg/Approver}")
-           approval-q (rdf/create-query "
+            approval-q (rdf/create-query "
 select ?act where { ?act :cg/agent ?gcep ; :cg/role :cg/Approver}")
-           assertion (first (q (::event/data e)))
-           prop (rdf/ld1-> assertion [:cg/subject])
-           tdb @(get-in api-test-app [:storage :api-tdb :instance])]
-       (rdf/tx tdb
-         (assoc e
-                ::version (rdf/ld1-> assertion [:cg/version])
-                ::gene (rdf/ld1-> (rdf/resource (str (rdf/ld1-> prop [:cg/gene])) tdb)
-                                  [[:owl/sameAs :<] :skos/prefLabel])
-                ::disease (rdf/ld1-> (rdf/resource (str (rdf/ld1-> prop [:cg/disease])) tdb)
-                                     [:rdfs/label])
-                ::moi (rdf/ld1-> (rdf/resource (str (rdf/ld1-> prop [:cg/modeOfInheritance])) tdb)
-                                 [:rdfs/label])
-                ::gcep (rdf/ld1-> (rdf/resource (str (first (gcep-q (::event/data e)))) tdb)
+            assertion (first (q (::event/data e)))
+            prop (rdf/ld1-> assertion [:cg/subject])
+            tdb @(get-in api-test-app [:storage :api-tdb :instance])]
+        (rdf/tx tdb
+          (assoc e
+                 ::version (rdf/ld1-> assertion [:cg/version])
+                 ::gene (rdf/ld1-> (rdf/resource (str (rdf/ld1-> prop [:cg/gene])) tdb)
+                                   [[:owl/sameAs :<] :skos/prefLabel])
+                 ::disease (rdf/ld1-> (rdf/resource (str (rdf/ld1-> prop [:cg/disease])) tdb)
+                                      [:rdfs/label])
+                 ::moi (rdf/ld1-> (rdf/resource (str (rdf/ld1-> prop [:cg/modeOfInheritance])) tdb)
                                   [:rdfs/label])
-                ::approval-date (rdf/ld1-> (first (approval-q (::event/data e))) [:cg/date])
-                ::classification (rdf/->kw (rdf/ld1-> assertion [:cg/evidenceStrength]))
-                ::record-id (-> assertion (rdf/ld1-> [:dc/isVersionOf]) rdf/->kw)
-                ::total-points (rdf/ld1-> assertion [:cg/strengthScore])))))
+                 ::gcep (rdf/ld1-> (rdf/resource (str (first (gcep-q (::event/data e)))) tdb)
+                                   [:rdfs/label])
+                 ::approval-date (rdf/ld1-> (first (approval-q (::event/data e))) [:cg/date])
+                 ::classification (rdf/->kw (rdf/ld1-> assertion [:cg/evidenceStrength]))
+                 ::record-id (-> assertion (rdf/ld1-> [:dc/isVersionOf]) rdf/->kw)
+                 ::total-points (rdf/ld1-> assertion [:cg/strengthScore])))))
   
-   (defn add-papers [e]
-     (let [papers-query (rdf/create-query "
+    (defn add-papers [e]
+      (let [papers-query (rdf/create-query "
 select ?p where { ?p a :dc/BibliographicResource }")]
-       (assoc e
-              ::papers
-              (->> (map (fn [p] {:paper p})
-                        (papers-query (::event/data e)))
-                   (map add-evidence-items)
-                   (map add-evidence-lines)
-                   (map add-scores)
-                   (map add-date)
-                   (mapv #(-> (update-in % [:paper] str)
-                              (select-keys [:paper :total-scores :date])))))))
+        (assoc e
+               ::papers
+               (->> (map (fn [p] {:paper p})
+                         (papers-query (::event/data e)))
+                    (map add-evidence-items)
+                    (map add-evidence-lines)
+                    (map add-scores)
+                    (map add-date)
+                    (mapv #(-> (update-in % [:paper] str)
+                               (select-keys [:paper :total-scores :date])))))))
 
 
 
 
 
-   #_(defn compose-aggregate [m]
-       (assoc (select-keys m [:date :total-scores])))
+    #_(defn compose-aggregate [m]
+        (assoc (select-keys m [:date :total-scores])))
 
-   #_(-> example
-         add-curation-info
-         add-papers
-         (select-keys [::version
-                       ::gene
-                       ::disease
-                       ::moi
-                       ::gcep
-                       ::approval-date
-                       ::classification
-                       ::papers])
-         tap>)
+    #_(-> example
+          add-curation-info
+          add-papers
+          (select-keys [::version
+                        ::gene
+                        ::disease
+                        ::moi
+                        ::gcep
+                        ::approval-date
+                        ::classification
+                        ::papers])
+          tap>)
   
-   #_(-> example
-         add-papers
-         ::papers
-         tap>))
+    #_(-> example
+          add-papers
+          ::papers
+          tap>))
 
- )
+  )
 
 
 #_(let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
@@ -2609,8 +2617,6 @@ select ?el where
    "2024"
    "2025"
    "version infos"])
-
-(clojure.pprint/pprint (mapv str (range 2000 2026)))
 
 (defn event->column [e]
   (concat [(::version e)
@@ -2794,4 +2800,92 @@ select ?el where
 
   )
 
+;; indexing genes
+(comment
 
+  (do (p/process
+      (get-in api-test-app [:processors :import-base-file])
+      {::event/data
+       (assoc (first (filter #(= "https://www.genenames.org/"
+                                 (:name %))
+                             (-> "base.edn" io/resource slurp edn/read-string)))
+              :source
+              {:type :file
+               :base "data/base/"
+               :path "hgnc.json"})})
+      (println "done! "))
+
+  (+ 1 1 )
+
+  (def api-test-app (p/init api-test-app-def))
+  (p/start api-test-app)
+  (p/stop api-test-app)
+  (do
+    (defn document-iri [doc]
+      (-> doc (.getField "iri") .stringValue))
+    
+    (defn score-doc->m [score-doc stored-fields]
+      {:iri (document-iri (.document stored-fields (.doc score-doc) #{"iri"}))
+       :score (.score score-doc)})
+    
+    (defn lucene-search [{:keys [searcher-manager
+                                 symbol-parser
+                                 label-parser
+                                 description-parser]}
+                         {:keys [field query max-results]}]
+      (let [parser (case field
+                     :symbol symbol-parser
+                     :label label-parser
+                     :description description-parser)
+            searcher (.acquire searcher-manager)]
+        (->> (.search searcher
+                      (.parse parser query)
+                      (or max-results 100))
+             .scoreDocs
+             count
+             #_(mapv #(score-doc->m % (.storedFields searcher))))))
+
+    (let [lc @(get-in api-test-app [:storage :text-index :instance])]
+      (lucene-search lc {:field :symbol :query "SMAD2"}))
+
+    #_(let [lc @(get-in api-test-app [:storage :text-index :instance])]
+      (-> lc
+          :writer
+          .hasUncommittedChanges))
+ 
+
+    #_(let [lc @(get-in api-test-app [:storage :text-index :instance])]
+      (-> lc
+          :searcher-manager
+          .acquire
+          
+          .getIndexReader
+          .numDocs
+          ))
+
+    #_(let [lc @(get-in api-test-app [:storage :text-index :instance])
+          searcher (.acquire (:searcher-manager lc))]
+      (mapv #(.document (.storedFields searcher) (.doc %))
+            (take 10
+                  (.scoreDocs
+                   (.search searcher (org.apache.lucene.search.MatchAllDocsQuery.) 100))))))
+
+  
+  (let [lc @(get-in api-test-app [:storage :text-index :instance])]
+    (-> lc :writer .commit)
+    (-> lc :searcher-manager .maybeRefresh))
+  (let [lc @(get-in api-test-app [:storage :text-index :instance])]
+      (-> lc
+          :writer
+          .hasUncommittedChanges))
+
+  (storage/as-handle
+   {:type :file
+    :base "data/base/"
+    :de "hgnc.json"})
+  (-> {:type :file
+       :base "data/base/"
+       :path "GRCh38.gff.gz"}
+      storage/as-handle
+      .getAbsolutePath)
+  )
