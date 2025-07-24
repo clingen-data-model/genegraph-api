@@ -1,5 +1,6 @@
 (ns genegraph.api.graphql.schema
-  (:require [genegraph.api.graphql.schema.resource :as model-resource]
+  (:require [genegraph.api.graphql.schema.text-search :as text-search]
+            [genegraph.api.graphql.schema.resource :as model-resource]
             [genegraph.api.graphql.schema.sequence-annotation :as sequence-annotation]
             [genegraph.api.graphql.schema.conflicts :as model-conflicts]
             [genegraph.api.graphql.schema.variant :as variant]
@@ -34,6 +35,7 @@
 (defn model []
   [rdf-to-graphql-type-mappings
    #_agent/agent
+   text-search/text-search-query
    model-resource/resource-interface
    model-resource/generic-resource
    model-resource/resource-query

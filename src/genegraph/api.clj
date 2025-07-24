@@ -199,13 +199,16 @@
    {:name ::jena-transaction-interceptor
     :enter (fn [context]
              (let [api-tdb (get-in context [::storage/storage :api-tdb])
-                   object-db (get-in context [::storage/storage :object-db])]
+                   object-db (get-in context [::storage/storage :object-db])
+                   text-index (get-in context [::storage/storage :text-index])]
                (.begin api-tdb ReadWrite/READ)
                (-> context
                    (assoc-in [:request :lacinia-app-context :tdb]
                              api-tdb)
                    (assoc-in [:request :lacinia-app-context :object-db]
-                             object-db))))
+                             object-db)
+                   (assoc-in [:request :lacinia-app-context :text-index]
+                             text-index))))
     :leave (fn [context]
              (.end (get-in context [::storage/storage :api-tdb]))
              context)
