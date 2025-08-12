@@ -1,6 +1,6 @@
-@prefix cg: <https://genegraph.clinicalgenome.org/r/terms/>
+@prefix cg: <https://genegraph.clinicalgenome.org/terms/>
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-@prefix gencc: <http://genegraph.clingen.app/gencc/>
+@prefix gencc: <http://genegraph.clingen.app/r/gencc/>
 
 # Change gencc to something else in the future...
 
@@ -33,3 +33,64 @@ gencc:000110 rdfs:label "Orphanet" .
 gencc:000108 rdfs:label "Myriad Women’s Health" .
 gencc:000101 rdfs:label "Ambry Genetics" .
 gencc:000114 rdfs:label "King Faisal Specialist Hospital and Research Center" .
+
+###################################
+# Terms specific to Gene Curation #
+###################################
+
+## Gene Validity SOP
+
+# Classification levels
+cg:Definitive rdfs:label "Definitive" .
+cg:Strong rdfs:label "Strong" .
+cg:Moderate rdfs:label "Moderate" .
+cg:Limited rdfs:label "Limited" .
+cg:NoKnownDiseaseRelationship rdfs:label "No Known Disease Relationship" .
+cg:Refuted rdfs:label "Refuted" .
+cg:Disputed rdfs:label "Disputed" .
+
+# Gene validity criteria
+cg:GeneValidityCriteria4 rdfs:label "ClinGen Gene Validity SOP v4" .
+cg:GeneValidityCriteria5 rdfs:label "ClinGen Gene Validity SOP v5" .
+cg:GeneValidityCriteria6 rdfs:label "ClinGen Gene Validity SOP v6" .
+cg:GeneValidityCriteria7 rdfs:label "ClinGen Gene Validity SOP v7" .
+cg:GeneValidityCriteria8 rdfs:label "ClinGen Gene Validity SOP v8" .
+cg:GeneValidityCriteria9 rdfs:label "ClinGen Gene Validity SOP v9" .
+cg:GeneValidityCriteria10 rdfs:label "ClinGen Gene Validity SOP v10" .
+cg:GeneValidityCriteria11 rdfs:label "ClinGen Gene Validity SOP v11" .
+
+# Curation types
+cg:NewCuration rdfs:label "New Curation" .
+cg:DiseaseNameUpdate rdfs:label "Disease Name Update" .
+cg:ErrorClarification rdfs:label "Error Clarification" .
+cg:RecurationCommunityRequest rdfs:label "Community Request" .
+cg:RecurationTiming rdfs:label "Required by Timing" .
+cg:RecurationNewEvidence rdfs:label "New Evidence" .
+cg:RecurationFrameworkChange rdfs:label "Framework Change" .
+cg:RecurationErrorAffectingScoreorClassification rdfs:label "Error affecting score or classification" .
+cg:RecurationDiscrepancyResolution rdfs:label "Discrepancy Resolution" .
+
+# Allelic requirements
+cg:BiallelicCompoundHeterozygous rdfs:label "Biallelic compound heterozygous" .
+cg:BiallelicHomozygous rdfs:label "Biallelic homozygous" .
+cg:MonoallelicHeterozygous rdfs:label "Monoallelic heterozygous" .
+
+# Variant types
+cg:OtherVariant rdfs:label "Other variant type" .
+cg:NullVariant rdfs:label "Predicted or proven null variant" .
+
+# Variant detection methods
+cg:ChromosomalMicroarray rdfs:label "Chromosomal microarray" .
+cg:DenaturingGradientGel rdfs:label "Denaturing gradient gel" .
+cg:ExomeSequencing rdfs:label "Exome sequencing" .
+cg:Genotyping rdfs:label "Genotyping" .
+cg:HighResolutionMelting rdfs:label "High resolution melting" .
+cg:HomozygosityMapping rdfs:label "Homozygosity mapping" .
+cg:LinkageAnalysis rdfs:label "Linkage analysis" .
+cg:GenePanels rdfs:label "Next generation sequencing panels" .
+cg:OtherVariantDetectionMethod rdfs:label "Other" .
+cg:PCR rdfs:label "PCR" .
+cg:RestrictionDigest rdfs:label "Restriction digest" .
+cg:SSCP rdfs:label "SSCP" .
+cg:SangerSequencing rdfs:label "Sanger sequencing" .
+cg:WholeGenomeSequencing rdfs:label "Whole genome shotgun sequencing" .

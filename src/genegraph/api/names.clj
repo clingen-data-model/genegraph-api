@@ -3,13 +3,14 @@
 
 (add-prefixes
 {"genegraph" "https://genegraph.clingen.app/"
+ "gg" "https://genegraph.clinicalgenome.org/r/"
  "dc" "http://purl.org/dc/terms/"
  "hp" "http://purl.obolibrary.org/obo/HP_"
  "sepio" "http://purl.obolibrary.org/obo/SEPIO_"
  "geno" "http://purl.obolibrary.org/obo/GENO_"
  "mondo" "http://purl.obolibrary.org/obo/MONDO_"
  "so" "http://purl.obolibrary.org/obo/SO_"
- "cg" "https://genegraph.clinicalgenome.org/r/terms/"
+ "cg" "https://genegraph.clinicalgenome.org/terms/"
  "cgdosage" "https://genegraph.clinicalgenome.org/r/dci/"
  "cggv" "https://genegraph.clinicalgenome.org/r/gci/"
  "cggciex" "https://genegraph.clinicalgenome.org/r/gci-express/"
@@ -24,7 +25,7 @@
  "omim" "https://omim.org/entry/"
  "cnt" "http://www.w3.org/2011/content#"
  "hgnc" "https://identifiers.org/hgnc:"
- "cgagent" "https://genegraph.clinicalgenome.org/r/agent/"
+ "cgagent" "https://genegraph.clinicalgenome.org/agent/"
  "pubmed" "https://identifiers.org/pubmed:"
  "ro" "http://purl.obolibrary.org/obo/RO_"
  "ga4gh" "https://terms.ga4gh.org/"
@@ -201,6 +202,8 @@
   :sepio/ClinGenGeneValidityEvaluationCriteriaSOP5
   "http://purl.obolibrary.org/obo/SEPIO_0004093"
 
+
+  
   
   :efo/copy-number-loss "http://www.ebi.ac.uk/efo/EFO_0030067"
   :efo/copy-number-gain "http://www.ebi.ac.uk/efo/EFO_0030070"}) ; gci-ex only

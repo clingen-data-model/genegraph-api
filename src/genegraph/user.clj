@@ -157,8 +157,74 @@
                  (assoc event
                         ::event/skip-local-effects true
                         ::event/skip-publish-effects true))
-      (catch Exception e (assoc event ::error e))))
+      (catch Exception e (assoc event ::error e))))  
+  )
+
+;; Reload base data
+
+(comment
+  (with-open [r (-> "base.edn" io/resource io/reader PushbackReader.)]
+    (->> (edn/read r)
+         #_(filter #(= "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+                     (:name %)))
+         (mapv (fn [e] {::event/data
+                        (assoc e
+                               :source
+                               {:type :file
+                                :base "data/base/"
+                                :path (:target e)})}))
+         (run! #(p/publish (get-in api-test-app [:topics :base-data]) %))))
+
+  ;; rename to https://genegraph.clinicalgenome.org/resources at some point
+  (with-open [r (-> "base.edn" io/resource io/reader PushbackReader.)]
+    (->> (edn/read r)
+         (filter #(= "https://genegraph.app/resources"
+                     (:name %)))
+         (mapv (fn [e] {::event/data
+                        (assoc e
+                               :source
+                               {:type :file
+                                :base "data/base/"
+                                :path (:target e)})}))
+         (run! #(p/publish (get-in api-test-app [:topics :base-data]) %))))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (rdf/create-query "
+select ?x where {
+?x a :rdfs/Class .
+}")]
+    (rdf/tx tdb
+      (->>(q tdb)
+          count)))
   
+  (run!
+   #(p/publish (get-in api-test-app [:topics :base-data]) %)
+   (->> "base.edn"
+        io/resource
+        slurp
+        edn/read-string
+        (filter #(= "https://thegencc.org/"
+                    (:name %)))
+        (mapv (fn [e] {::event/data
+                       (assoc e
+                              :source
+                              {:type :file
+                               :base "data/base/"
+                               :path "gencc.csv"})}))))
+  
+  )
+
+;; reload clingen gene validity
+(comment
+  (time
+   (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-29.edn.gz"]
+     (->> (event-store/event-seq r)
+          #_(mapv ::event/key)
+          #_(take 1)
+          (run! #(p/publish (get-in api-test-app [:topics :gene-validity-sepio])
+                            (assoc % ::event/completion-promise (promise)))))))
   )
 
 ;; Downloading events
@@ -269,6 +335,28 @@
             :file "clinvar.xml.gz"})})
 
   )
+
+
+ (p/process
+  (get-in api-test-app [:processors :import-base-file])
+  {::event/data
+   (assoc (first (filter #(= "https://affils.clinicalgenome.org/"
+                             (:name %))
+                         (-> "base.edn" io/resource slurp edn/read-string)))
+          :source
+          {:type :file
+           :base "data/base"
+           :path "affils.json"})})
+
+ (with-open [r (-> {:type :file
+                    :base "data/base/"
+                    :path "affils.json"}
+                   storage/->input-stream
+                   io/reader)]
+   (->> (json/read r :key-fn keyword)
+        #_(map #(get-in % [:subgroups :gcep]))
+        #_(remove nil?)
+        (into [])))
 
  (tap>
   (count (storage/scan @(get-in api-test-app [:storage :object-db :instance])
@@ -1009,10 +1097,19 @@ filter not exists { ?va :cg/direction :cg/Supports }
     (def prod-affils-api "https://affils.clinicalgenome.org/api/")
     (def test-affils-api-key "AwCuqYcu.ZMYcwGsPPzNmQekBLi6EMGflmaRte3Cn")
     (def prod-affils-api-key "TfZhEETS.YUpN38StKbRTNJhZByU5A1XBmh6ZKZQ8")
-    (def test-affils-list "https://affils-test.clinicalgenome.org/api/affiliations_list/"))
+    (def test-affils-list "https://affils-test.clinicalgenome.org/api/affiliations_list/")
+    (def prod-affils-list "https://affils.clinicalgenome.org/api/affiliations_list/"))
   (-> (hc/get
        test-affils-list
        {:headers {"X-Api-Key" test-affils-api-key}
+        :http-client http-client})
+      :body
+      json/read-str
+      tap>)
+
+  (-> (hc/get
+       prod-affils-list
+       {:headers {"X-Api-Key" prod-affils-api-key}
         :http-client http-client})
       :body
       json/read-str
@@ -2385,15 +2482,21 @@ select ?disease where {
 ;; -Erin
 
 
-  (comment
-    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02.edn.gz"]
-      (->> (event-store/event-seq r)
-           #_(filter #(re-find #"founder" (::event/value %)))
-           (take 1)
-           (map event/deserialize)
-           (run! #(rdf/pp-model (::event/data %)))))
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02-fixed3.edn.gz"]
+    (->> (event-store/event-seq r)
+         #_(filter #(re-find #"founder" (::event/value %)))
+         (take 1)
+         (map event/deserialize)
+         (run! #(rdf/pp-model (::event/data %)))))
 
-    )
+
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02-fixed3.edn.gz"]
+    (->> (event-store/event-seq r)
+         #_(filter #(re-find #"founder" (::event/value %)))
+         (take 1)
+         count))
+
+  
 
   (def example
     (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-02.edn.gz"]
@@ -2803,17 +2906,34 @@ select ?el where
 ;; indexing genes
 (comment
 
-  (do (p/process
-      (get-in api-test-app [:processors :import-base-file])
-      {::event/data
-       (assoc (first (filter #(= "https://www.genenames.org/"
-                                 (:name %))
-                             (-> "base.edn" io/resource slurp edn/read-string)))
-              :source
-              {:type :file
-               :base "data/base/"
-               :path "hgnc.json"})})
-      (println "done! "))
+  (def doc
+   (-> (p/process
+        (get-in api-test-app [:processors :import-base-file])
+        {::event/data
+         (assoc (first (filter #(= "https://www.genenames.org/"
+                                   (:name %))
+                               (-> "base.edn" io/resource slurp edn/read-string)))
+                :source
+                {:type :file
+                 :base "data/base/"
+                 :path "hgnc.json"})})
+              :genegraph.api.base.gene/document))
+
+  (filter :entrez_id (get-in doc [:response :docs]))
+  
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (rdf/create-query "select ?x where { ?x a ?type }")]
+    (rdf/tx tdb
+      (rdf/pp-model (storage/read tdb "https://www.genenames.org/"))
+      #_(->> (q tdb {:type :so/Gene })
+             count)
+      #_(-> (rdf/resource "https://identifiers.org/ncbigene:1" tdb)
+            (rdf/ld-> [:rdf/type]))))
+
+
+
 
   (+ 1 1 )
 
@@ -2888,4 +3008,336 @@ select ?el where
        :path "GRCh38.gff.gz"}
       storage/as-handle
       .getAbsolutePath)
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (rdf/create-query "select ?x where { ?x a ?type }")]
+    (rdf/tx tdb
+      #_(->> (q tdb {:type :so/Gene })
+             count)
+      (-> (rdf/resource "https://identifiers.org/ncbigene:1" tdb)
+          (rdf/ld-> [:rdf/type]))))
   )
+
+
+
+;; staging code for composing graphql queries
+
+(def fragments
+  {"SequenceFeature"
+   {3 {:fragment "{
+  assertions {
+    curie
+    iri
+    evidenceStrength {
+      curie
+    }
+    subject {
+      __typename
+      type {
+        curie
+        label
+      }
+      ...GeneValidityProposition1
+      ...GeneticConditionMechanismProposition1
+    }
+    contributions {
+      role {
+        curie
+      }
+      date
+      agent {
+        curie
+        label
+      }
+    }
+  }
+}"
+       :dependencies #{{:typename "GeneValidityProposition" :detail-level  1}
+                       {:typename "GeneticConditionMechanismProposition" :detail-level  1}}}}
+   "GeneValidityProposition"
+   {1 {:fragment "{
+  modeOfInheritance {
+    curie
+    label
+  }
+  disease {
+    curie
+    label
+  }
+}"}}
+   "GeneticConditionMechanismProposition"
+   {1 {:fragment "{
+  mechanism {
+    curie
+  }
+  condition {
+    label
+    curie
+  }
+}"}}
+   "Resource"
+   {1 {:fragment "{
+  __typename
+  iri
+  curie
+  label
+  type {
+    curie
+    label
+  }
+}"}}})
+
+(defn fragment-str [{:keys [typename detail-level]}]
+  (str "\nfragment "
+       typename
+       detail-level
+       " on "
+       typename
+       " "
+       (get-in fragments [typename detail-level :fragment])
+       "\n"))
+
+(def base-resource-query
+  "query ($iri: String) {
+  resource(iri: $iri) {
+    ...Resource1
+    ...SequenceFeature3
+  }
+}")
+
+(defn sub-dependencies [new-deps existing-deps]
+  (let [deps (set/union new-deps existing-deps)
+        sub-deps (set/difference
+                  (apply
+                   set/union
+                   (map #(get-in fragments [(:typename %)
+                                            (:detail-level %)
+                                            :dependencies])
+                        new-deps))
+                  deps)]
+    (if (seq sub-deps)
+      (sub-dependencies sub-deps deps)
+      deps)))
+
+(defn query->direct-dependencies [query]
+  (->> (re-seq #"([A-Za-z]+)(\d)" query)
+       (map (fn [[_ t l]] {:typename t
+                           :detail-level (Integer/parseInt l)}))
+       set))
+
+(defn query->dependencies [query]
+  (sub-dependencies
+   (query->direct-dependencies query)
+   #{}))
+
+(defn compile-query [query]
+  (str
+   query
+   (reduce
+    str
+    (map fragment-str (query->dependencies query)))))
+
+(println (compile-query base-resource-query))
+
+(defn add-direct-dependencies [typename detail-level]
+  (->> (re-seq #"([A-Za-z]+)(\d)" (get-in fragments [typename detail-level]))
+       (map (fn [[_ t l]] [t (Integer/parseInt l)]))
+       set))
+
+;; (defn direct-dependencies [typename detail-level]
+;;   (->> (re-seq #"([A-Za-z]+)(\d)" (get-in fragments [typename detail-level]))
+;;        (map (fn [[_ t l]] [t (Integer/parseInt l)]))
+;;        set))
+
+;; (defn all-dependencies
+;;   ([typename detail-level] (all-dependencies typename detail-level #{}))
+;;   ([typename detail-level existing-deps]
+;;    (let [direct (direct-dependencies typename detail-level)
+;;          all (set/union direct existing-deps)]
+;;      (apply set/union
+;;             all
+;;             (map (fn [[t1 d1]]
+;;                    (all-dependencies t1 d1 all))
+;;                  (set/difference direct existing-deps))))))
+
+;; (all-dependencies "SequenceFeature" 3)
+
+;; (all-dependencies "GeneValidityProposition" 1)
+(comment
+  (println (fragment->str "SequenceFeature" 3))
+  )
+
+;; updating gene validity curations
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (rdf/create-query "select ?x where { ?x a ?type }")]
+    (rdf/tx tdb
+      #_(->> (q tdb {:type :cg/Affiliation })
+           first
+           str)))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (rdf/create-query "select ?x where { ?x a ?type }")]
+    (rdf/tx tdb
+      #_(->> (q tdb {:type :so/Gene })
+             count)
+      (-> (rdf/resource #_"https://identifiers.org/ncbigene:6842"
+                        "http://purl.obolibrary.org/obo/MONDO_0015280"
+                        tdb)
+          (rdf/ld-> [[:cg/disease :<] [:cg/subject :<]]))))
+
+  (let [q (rdf/create-query "select ?x where { ?x :cg/changes ?c } ")]
+    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-29.edn.gz"]
+      (->> (event-store/event-seq r)
+           count)))
+  (time
+   (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-29.edn.gz"]
+     (->> (event-store/event-seq r)
+          #_(mapv ::event/key)
+          #_(take 1)
+          (run! #(p/publish (get-in api-test-app [:topics :gene-validity-sepio])
+                            (assoc % ::event/completion-promise (promise)))))))
+  (->>  (set/difference (set old-keys) (set new-keys))
+        (into [])
+        (spit "/users/tristan/Desktop/missingrecords.edn"))
+
+  (+ 1 1)
+
+
+
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-29.edn.gz"]
+    (->> (event-store/event-seq r)
+         (take 1)
+         (map event/deserialize)
+         (run! #(rdf/pp-model (::event/data %)))))
+
+  (get-in api-test-app [:topics :gene-validity-sepio])
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (rdf/create-query "
+select ?y where {
+?x :prov/wasInvalidatedBy ?y .
+?y :cg/subject ?prop .
+filter not exists { ?y :prov/wasInvalidatedBy ?z . }
+}")]
+    (rdf/tx tdb
+      (->> (q tdb)
+          #_count
+          (take 20)
+          (mapv #(rdf/ld1-> % [:cg/subject :cg/gene :skos/prefLabel])))))
+
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (rdf/create-query "
+select ?x where {
+?x :cg/changes ?y .
+}")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           count
+           #_(take 20)
+           #_(mapv #(rdf/ld1-> % [:cg/subject :cg/gene :skos/prefLabel])))))
+  
+  )
+
+
+;; Investigationg Vibhor's complaints
+
+(comment
+
+;; cggv_00140591-caa8-4d47-b4ca-3f0577b16d73v2.1.json
+
+;;   1) Handling of dc:source within Proband Data
+;; The dc:source attribute is essential for transforming the data into other formats for referencing purposes. However, we have noticed variations in how this attribute is represented:
+
+;; *
+;; In some cases, dc:source is not directly present at the proband level but is instead embedded within the variant/allele attributes, where in other cases this field is attached to an evidenceLine above the description of the proband.
+;; *
+;; Additionally, the format of the dc:source reference varies. Sometimes it points to an object at least somewhere else in the file (for example,
+
+  (def json-base "/Users/tristan/Downloads/gene-validity-jsonld-latest-4/")
+  
+  (with-open [r (io/reader
+                 (str json-base
+                      "cggv_00140591-caa8-4d47-b4ca-3f0577b16d73v2.1.json"))]
+    (-> r
+        (json/read :key-fn keyword)
+        tap>))
+
+  ;; alleleOrigin gives ID field rather than direct IRI reference in
+  ;; JSON-LD
+
+  ;; proband maximum score for AR variants seems not to include strengthScore
+
+
+;; 2) Relationship Between Variants and Alleles
+;; While attempting to capture the variants and alleles for a given proband, we observed that the structural relationship between them is inconsistent. In some files, an allele appears as a child of a variant, whereas in others it is represented as a sibling.
+;; For example:
+
+;;   *
+;; Child of Variant:
+;; File: cggv_0057caed-b37d-41d7-bd79-1e9e19b3c1efv1.0.json
+;; Proband: cggv:329e6a01-1310-465b-9621-69b41858c914
+
+  (with-open [r (io/reader
+                 (str json-base
+                      "cggv_0057caed-b37d-41d7-bd79-1e9e19b3c1efv1.0.json"))]
+    (-> r
+        (json/read :key-fn keyword)
+        tap>))
+  
+;; (This proband also presents the dc:source issue where dc:source is a direct URI: https://nam12.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpubmed.ncbi.nlm.nih.gov%2F7728151&data=05%7C02%7C%7Cbe35ee5dc1504c59deae08ddcf87445b%7C58b3d54f16c942d3af081fcabd095666%7C1%7C0%7C638894902063555441%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=w8iShqKvDPw2jN7RVfw4d9Li6RcgH66X8ktx5qfiEIo%3D&reserved=0)
+;;   *
+;; Sibling of Variant:
+;; File: cggv_00140591-caa8-4d47-b4ca-3f0577b16d73v2.1.json
+;; Proband: cggv:e04f5d2d-93a6-4265-91ef-6ce478fadc3e
+
+  (with-open [r (io/reader
+                 (str json-base
+                      "cggv_00140591-caa8-4d47-b4ca-3f0577b16d73v2.1.json"))]
+    (-> r
+        (json/read :key-fn keyword)
+        (json/write-str :indent 2)
+        println))
+  
+  ;; how do I pretty print json output with clojure data.json?
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (rdf/create-query "
+select ?x where {
+?x a :cg/GeneValidityProposition .
+}")]
+    (rdf/tx tdb
+      (-> (q tdb)
+          first
+          (rdf/ld1-> [:cg/gene :skos/prefLabel]))))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (rdf/create-query "
+select ?x where {
+?x a :cg/GeneValidityProposition .
+}")]
+    (rdf/tx tdb
+      (-> (rdf/resource :cg/Benign tdb)
+          (rdf/ld1-> [:rdfs/label]))))
+
+  "CG:GeneValidityCriteria11"
+
+
+  
+  )
+
+

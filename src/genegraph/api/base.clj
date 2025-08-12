@@ -19,6 +19,7 @@
             [genegraph.api.base.gci-express]
             [genegraph.api.base.gencc]
             [genegraph.api.base.clinvar-submitters]
+            [genegraph.api.base.affils-json]
             [io.pedestal.interceptor :as interceptor]
             [io.pedestal.log :as log])
   (:import [java.io File InputStream OutputStream]

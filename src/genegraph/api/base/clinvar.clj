@@ -811,3 +811,20 @@
                     tap>)))))
 
   )
+
+;; note, may want to refactor out sequence feature overlap code
+;; but using here for nowrap
+
+;; Tristan, would it be possible to get us the following information?
+ 
+;; For the specific 53 recurrent regions listed here: https://search.clinicalgenome.org/kb/gene-dosage/cnv?page=1&size=25&search=, can we get a count of how many dels and dups correspond to these in ClinVar, and what their current classifications are?  Something like (I’m just making this up): 1q21.1 recurrent region (distal, BP3-BP4): 20 dels (10 Path, 5 LP, 5 VUS), 5 dups (5 LB)?
+ 
+;; I want to beef up our section about the recurrent regions expert panel, and make the point that this is necessary because we see conflicting classifications in ClinVar AND they are not being adequately aggregated.  For this latter part, I’d want to know how many (if any) have exact breakpoints that we delineated in our curation, as well as how many are not exact matches but could reasonably be assumed to be the same event.  Christa, for this part, what do you think would be reasonable to include – something like within 50 bp on either side of the boundaries we indicate?  100? Some other parameter?  When I try to, for example, just do a simple search in ClinVar using our coordinates, I get back things that are much, much larger that are not fair to include, but I don’t see a way via the UI to filter these out.
+ 
+;; Let me know if we need to try to set up a time to walk through some of the data points like this that we will need for CNV stuff.
+ 
+;; -Erin
+
+
+
+

@@ -102,6 +102,23 @@ select ?features where {
 ;; VCV000441984.3
 
 
+(defn evidence-fn [context args value]
+  (->> (rdf/ld-> value [:cg/evidence])
+       (mapv #(hr/hybrid-resource % context))))
+
+(defn versions-fn [context args value]
+  (->> (rdf/ld-> value [:dc/isVersionOf [:dc/isVersionOf :<]])
+       (mapv #(hr/hybrid-resource % context))))
+
+(def evidence-def
+  {:type '(list :Resource)
+   :args {:recursive {:type 'Boolean} :type {:type 'String}}
+   :resolve (fn [c a v] (evidence-fn c a v))})
+
+(def strength-score-def
+  {:type 'Float
+   :description "Numeric score of the statement. May be nil, used only when the applicable criteria calls for a numeric score in the assertion or critera assessment."
+   :path [:cg/strengthScore]})
 
 (def assertion
   {:name :EvidenceStrengthAssertion
@@ -113,17 +130,31 @@ select ?features where {
             :subject
             {:type :Resource
              :path [:cg/subject]}
+            :strengthScore strength-score-def
             :annotations
             {:type '(list :AssertionAnnotation)
              :resolve (fn [context _ v]
                         (mapv #(hr/hybrid-resource % context)
                               (rdf/ld-> v [[:cg/subject :<]])))}
+            :version
+            {:type 'String
+             :path [:cg/version]}
+            :curationReasons
+            {:type '(list :Resource)
+             :path [:cg/curationReasons]}
+            :curationReasonDescription
+            {:type 'String
+             :path [:cg/curationReasonDescription]}
             :classification
             {:type :Resource
              :path [:cg/classification]}
             :evidenceStrength
             {:type :Resource
              :path [:cg/evidenceStrength]}
+            :evidence evidence-def
+            :versions
+            {:type '(list :EvidenceStrengthAssertion)
+             :resolve (fn [c a v] (versions-fn c a v))}
             :relatedAssertions
             {:type '(list :EvidenceStrengthAssertion)
              :resolve (fn [c a v] (related-assertions c a v))}
@@ -139,7 +170,8 @@ select ?features where {
             :contributions
             {:type '(list :Contribution)
              :path [:cg/contributions]}
-            
+            :specifiedBy {:type :Resource
+                          :path [:cg/specifiedBy]}
             :date {:type 'String
                    :resolve scv-date}
             :label {:type 'String
@@ -208,3 +240,16 @@ select ?features where {
    :type :EvidenceStrengthAssertion
    :args {:iri {:type 'String}}
    :resolve (fn [context args value] (assertion-query-fn context args value))})
+
+
+(def evidence-line
+  {:name :EvidenceLine
+   :graphql-type :object
+   :description "An evidence line represents an independent and meaningful argument for or against a particular proposition, that is based on the interpretation of one or more pieces of information as evidence."
+   :implements [:Resource]
+   :fields {:evidence evidence-def
+            :evidenceStrength {:type :Resource
+                               :path [:cg/evidenceStrength]}
+            :strengthScore strength-score-def
+            :specifiedBy {:type :Resource
+                          :path [:cg/specifiedBy]}}})

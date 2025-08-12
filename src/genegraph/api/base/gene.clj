@@ -76,7 +76,9 @@
                          (:prev_symbol gene))))))
 
 (defn genes-as-triple [genes-json]
+  (println (keys genes-json))
   (let [genes (filter :entrez_id (get-in genes-json [:response :docs]))]
+    (println "genes count " (count genes))
     (conj (mapcat gene-as-triple genes)
           ["https://www.genenames.org/" :rdf/type :void/Dataset])))
 
@@ -89,6 +91,7 @@
 
 (defmethod rdf/as-model :genegraph.api.base/hgnc [event]
   (log/info :fn ::rdf/as-model :format :genegraph.api.base/hgnc)
+  (println (keys event))
   (-> event
       ::document
       genes-as-triple
@@ -117,14 +120,14 @@
 
 (comment 
   (tap>
-   (hgnc-gene->index-doc
+   (gene-as-triple
     {:gene_group ["Immunoglobulin like domain containing"], :mane_select ["ENST00000263100.8" "NM_130786.4"], :omim_id ["138670"], :pubmed_id [2591067], :ccds_id ["CCDS12976"], :hgnc_id "HGNC:5", :symbol "A1BG", :name "alpha-1-B glycoprotein", :gene_group_id [594], :agr "HGNC:5", :ucsc_id "uc002qsd.5", :rgd_id ["RGD:69417"], :locus_group "protein-coding gene", :entrez_id "1", :mgd_id ["MGI:2152878"], :refseq_accession ["NM_130786"], :ensembl_gene_id "ENSG00000121410", :merops "I43.950", :status "Approved", :locus_type "gene with protein product", :vega_id "OTTHUMG00000183507", :date_modified "2023-01-20", :uniprot_ids ["P04217"], :uuid "fc83f9c0-da0f-4f8e-bfc7-5ef6b7ee052e", :location "19q13.43", :date_approved_reserved "1989-06-30"})))
 
 (defmethod ap/process-base-event :genegraph.api.base/load-genes
   [event]
   (println "processing base event genes")
   (let [event-with-parsed-data (add-document event)
-        m (rdf/as-model (::event/data event-with-parsed-data))]
+        m (-> event-with-parsed-data ::document genes-as-triple rdf/statements->model)]
     (reduce
      (fn [e g] (let [d (hgnc-gene->index-doc g)]
                  (event/store e :text-index (:iri d) d)))

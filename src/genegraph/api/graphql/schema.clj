@@ -17,6 +17,7 @@
 (def rdf-to-graphql-type-mappings
   {:type-mappings
    [[:cg/EvidenceStrengthAssertion :EvidenceStrengthAssertion]
+    [:cg/EvidenceLine :EvidenceLine]
     [:cg/AssertionAnnotation :AssertionAnnotation]
     [:cg/VariantPathogenicityProposition :VariantPathogenicityProposition]
     [:cg/GeneticConditionMechanismProposition :GeneticConditionMechanismProposition]
@@ -47,6 +48,7 @@
    variant/copy-number-variant
    ;; model-conflicts/mechanism-assertion
    assertion/assertion
+   assertion/evidence-line
    assertion/genetic-condition-mechanism-proposition
    assertion/variant-pathogenicity-proposition
    assertion/gene-validity-proposition
