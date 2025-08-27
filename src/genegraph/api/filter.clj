@@ -85,13 +85,20 @@
    gene-validity-moderate-and-greater-ar
    dosage-ar-linked])
 
+
+(def protein-coding-genes-pattern
+  [:filter
+   [:bgp
+    ['feature :rdf/type :so/GeneWithProteinProduct]]])
+
 (def feature-set-name->bgp
   {"CG:HaploinsufficiencyFeatures" haploinsufficiency-pattern
    "CG:TriplosensitivityFeatures" triplosensitivity-pattern
    "CG:GeneValidityModerateAndGreater" gene-validity-moderate-and-greater
    "CG:GeneValidityModerateAndGreaterADXL" gene-validity-moderate-and-greater-ad-xl
    "CG:GeneValidityModerateAndGreaterAR" gene-validity-moderate-and-greater-ad-xl
-   "CG:ARGene" ar-gene})
+   "CG:ARGene" ar-gene
+   "CG:ProteinCodingGenes" protein-coding-genes-pattern})
 
 (defn feature-set-overlap-pattern
   [overlap-extent feature-set]
@@ -148,13 +155,20 @@
    ['proposition :cg/gene 'gene]
    ['x :cg/subject 'proposition]])
 
+(defn submitter [{:keys [argument]}]
+  [:bgp
+   ['x :cg/submitter (argument->kw argument)]])
+
 (defn is-obsolete [{:keys [argument]}]
   [:bgp ['x :prov/wasInvalidatedBy 'otherx]])
 
 ;; Using _ for filter names, these translate directly to GraphQL enums
 ;; so using snake-case to support javascript usage
 (def filters
-  {:is_obsolete {:pattern-fn is-obsolete
+  {:submitter {:pattern-fn submitter
+               :description "Selects assertions that have been contributed to by a specific agent."
+               :comain :cg/EvidenceStrengthAssertion}
+   :is_obsolete {:pattern-fn is-obsolete
                  :description "Selects only assertions that have been invalidated by other assertions. Generally included for negation purposes, in order to select only current curations."
                  :domain :cg/EvidenceStrengthAssertion}
    :proposition_type {:pattern-fn proposition-type-pattern-fn

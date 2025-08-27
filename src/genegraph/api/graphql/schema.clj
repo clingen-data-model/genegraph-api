@@ -25,7 +25,8 @@
     [:cg/CanonicalVariant :CanonicalVariant]
     [:ga4gh/CopyNumberChange :CopyNumberChange]
     [:ga4gh/SequenceLocation :SequenceLocation]
-    [:so/SequenceFeature :SequenceFeature]]
+    [:so/SequenceFeature :SequenceFeature]
+    [:cg/DosageRegion :SequenceFeature]]
    :default-type-mapping :GenericResource})
 
 ;; changing to function to benefit from dynamic type bindings

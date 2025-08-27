@@ -33,9 +33,13 @@
             [genegraph.api.hybrid-resource :as hr]
             [genegraph.api.ga4gh :as ga4gh]
             [genegraph.api.base.gencc :as gencc]
+            [genegraph.api.base.clinvar :as clinvar]
             [genegraph.api.graphql.schema.sequence-annotation :as sa]
             [genegraph.api.lucene :as lucene]
-            [clojure.tools.namespace.repl :as repl])
+            [genegraph.api.filter :as filters]
+            [clojure.tools.namespace.repl :as repl]
+            [genegraph.api.shared-data :as shared-data]
+            [genegraph.api.sequence-index :as idx])
   (:import [ch.qos.logback.classic Logger Level]
            [org.slf4j LoggerFactory]
            [java.time Instant LocalDate LocalDateTime ZoneOffset]
@@ -216,6 +220,8 @@ select ?x where {
   
   )
 
+(def root-data-dir "/Users/tristan/data/genegraph-neo/")
+
 ;; reload clingen gene validity
 (comment
   (time
@@ -224,6 +230,17 @@ select ?x where {
           #_(mapv ::event/key)
           #_(take 1)
           (run! #(p/publish (get-in api-test-app [:topics :gene-validity-sepio])
+                            (assoc % ::event/completion-promise (promise)))))))
+  )
+
+;; reload gene dosage
+(comment
+  (time
+   (event-store/with-event-reader [r (str root-data-dir "gene_dosage_raw-2025-08-13.edn.gz")]
+     (->> (event-store/event-seq r)
+          #_(mapv ::event/key)
+          #_(take 1)
+          (run! #(p/publish (get-in api-test-app [:topics :dosage])
                             (assoc % ::event/completion-promise (promise)))))))
   )
 
@@ -3341,3 +3358,317 @@ select ?x where {
   )
 
 
+;; importing recurrent regions
+;; No longer needed; bringing in recurrent regions from
+;; dosage import
+(comment
+
+  (def recurrent-region-cnvs
+    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene_dosage_raw-2025-08-13.edn.gz"]
+      (->> (event-store/event-seq r)
+           (map event/deserialize)
+           (filter #(and (re-find #"Recurrent" (::event/value %))
+                         (seq (get-in % [::event/data :fields :labels]))))
+           (into []))))
+
+
+  (def recurrent-regions
+    (->> recurrent-region-cnvs
+         (mapv process-dosage)
+         (remove ::spec/invalid)
+         (into [])))
+
+  (count recurrent-regions)
+
+  (tap> (last recurrent-regions))
+  
+  (def region1
+    (->> recurrent-region-cnvs
+         (mapv process-dosage)
+         (remove ::spec/invalid)
+         first
+         #_(map keys)
+         #_(run! #(rdf/pp-model (::dosage/model %)))))
+
+  (->> recurrent-region-cnvs
+       (mapv process-dosage)
+       (remove ::spec/invalid)
+       first
+       tap>)
+
+  (-> region1
+      ::dosage/region)
+
+  (defn max-coord [coord-or-range]
+  (if (vector? coord-or-range)
+    (second coord-or-range)
+    coord-or-range))
+
+(defn min-coord [coord-or-range]
+  (if (vector? coord-or-range)
+    (first coord-or-range)
+    coord-or-range))
+
+;; question for group, how to handle outer overlaps
+(defn outer-overlap? [loc1 loc2]
+    (if (some vector? [(:ga4gh/start loc1)
+                       (:ga4gh/start loc2)
+                       (:ga4gh/end loc1)
+                       (:ga4gh/end loc2)])
+      (let [loc1-start (min-coord (:ga4gh/start loc1))
+            loc2-start (min-coord (:ga4gh/start loc2))
+            loc1-end (max-coord (:ga4gh/end loc1))
+            loc2-end (max-coord (:ga4gh/end loc2))
+            all-coords [loc1-start loc2-start loc1-end loc2-end]]
+        (if (or (some nil? all-coords)
+                (< loc1-end loc2-start)
+                (< loc2-end loc1-start))
+          :cg/NoOverlap
+          :cg/OuterOverlap))
+      :cg/NoOverlap))
+
+
+
+(defn overlap-type [loc1 loc2]
+  (let [loc1-start (max-coord (:ga4gh/start loc1))
+        loc2-start (max-coord (:ga4gh/start loc2))
+        loc1-end (min-coord (:ga4gh/end loc1))
+        loc2-end (min-coord (:ga4gh/end loc2))
+        all-coords [loc1-start loc2-start loc1-end loc2-end]]
+    (cond
+      (some nil? all-coords) :cg/NoOverlap
+      (and (< loc1-start loc2-start)
+           (< loc2-end loc1-end)) :cg/CompleteOverlap
+      (or (and (< loc1-start loc2-start)
+               (< loc2-start loc1-end))
+          (and (< loc2-end loc1-end)
+               (< loc2-start loc2-end))) :cg/PartialOverlap
+      :default (outer-overlap? loc1 loc2))))
+  
+  (defn gene-overlaps-for-location [db location]
+    (->> (mapcat
+          #(rocksdb/range-get
+            db
+            (idx/location->search-params location %))
+          [:so/Gene])
+         (map :iri)
+         set))
+
+
+  (defn protein-coding-gene? [gene tdb]
+    (let [q (rdf/create-query "select ?g where { ?g a :so/GeneWithProteinProduct } ")]
+      (seq (q tdb {:g (rdf/resource gene)}))))
+
+  (let [object-db @(get-in api-test-app [:storage :object-db :instance])
+        tdb @(get-in api-test-app [:storage :api-tdb :instance])]
+    (mapv #(gene-overlaps-for-location object-db %)
+          (get-in region1 [::dosage/region :ga4gh/location])))
+
+  
+  (def last-regions
+    (vals
+     (reduce (fn [a r] (assoc a (:iri r) r))
+             {}
+             (map ::dosage/region recurrent-regions))))
+
+  (tap> last-regions)
+
+
+  ;; 9 regions have different sets of protein coding genes
+  ;; depending on what build they're mapped on
+  (def asymetric-regions
+    (let [object-db @(get-in api-test-app [:storage :object-db :instance])
+          tdb @(get-in api-test-app [:storage :api-tdb :instance])]
+      (rdf/tx tdb
+        (into []
+              (remove 
+               (fn [r]
+                 (apply =
+                        (mapv (fn [l] (count (filterv #(protein-coding-gene? % tdb)
+                                                      (gene-overlaps-for-location object-db l))))
+                              (get-in r [:ga4gh/location]))))
+               last-regions)))))
+
+
+  (let [object-db @(get-in api-test-app [:storage :object-db :instance])
+        tdb @(get-in api-test-app [:storage :api-tdb :instance])]
+    (tap>
+     (rdf/tx tdb
+       (->> asymetric-regions
+            (mapv
+             (fn [r]
+               (mapv (fn [l] (filterv #(protein-coding-gene? % tdb)
+                                  (gene-overlaps-for-location object-db l)))
+                     (get-in r [:ga4gh/location]))))
+            (mapv (fn [[s1 s2]]
+                    [(set/difference (set s1) (set s2))
+                     (set/difference (set s2) (set s1))]))))))
+
+  
+  (tap> (get-in region1 [::dosage/region :ga4gh/location]))
+
+  (tap> asymetric-regions)
+  )
+
+;; Identify gold standard CNV evaluations from ClinVar CNV data set
+(comment
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (rdf/create-query "
+select ?contrib where {
+?x a :cg/EvidenceStrengthAssertion ;
+:cg/contributions ?contrib ;
+:cg/subject ?prop .
+?prop a :cg/VariantPathogenicityProposition .
+} limit 5")]
+    (rdf/tx tdb
+      (->> (q tdb {:agent (rdf/resource "CVAGENT:500031")})
+           (mapv #(rdf/ld1-> % [:cg/agent])))))
+
+  
+
+  (rdf/resource "CVAGENT:500031")
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (filters/compile-filter-query
+           [:bgp ['x :rdf/type :cg/EvidenceStrengthAssertion]]
+           [{:filter :proposition_type
+             :argument "CG:VariantPathogenicityProposition"}
+            {:filter :copy_change
+             :argument "EFO:0030067"}
+            {:filter :partial_overlap_with_feature_set
+             :argument "CG:HaploinsufficiencyFeatures"
+             :operation :not_exists}
+            {:filter :complete_overlap_with_feature_set
+             :argument "CG:HaploinsufficiencyFeatures"
+             :operation :not_exists}
+            #_{:filter :gene_count_min
+             :argument "CG:Genes35"
+             :operation :not_exists}
+            {:filter :assertion_direction
+             :argument :cg/Supports}
+            #_{:filter :assertion_direction
+             :argument :cg/Refutes}
+            {:filter :submitter
+             :argument "CVAGENT:500031"
+             :operation :not_exists}
+            {:filter :date_evaluated_min
+             :argument "2020"}
+            {:filter :complete_overlap_with_feature_set
+             :argument "CG:ProteinCodingGenes"}])]
+    (rdf/tx tdb
+      #_(println q)
+      (->> (q tdb)
+           #_(take 20)
+           #_(into [])
+           count
+           #_(mapv #(hr/hybrid-resource % hybrid-db)))))
+
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (filters/compile-filter-query
+           [:bgp ['x :rdf/type :cg/EvidenceStrengthAssertion]]
+           [{:filter :proposition_type
+             :argument "CG:VariantPathogenicityProposition"}])]
+    (rdf/tx tdb
+      #_(println q)
+      (->> (q tdb)
+           #_(take 20)
+           #_(into [])
+           count
+           #_(mapv #(hr/hybrid-resource % hybrid-db)))))
+
+
+  (-> candidates first tap>)
+  )
+
+;; resolving search issues -- resolved
+(comment
+ (let [s @(get-in api-test-app [:storage :text-index :instance])]
+   (->> (lucene/search s {:field :label :query "recurrent"})
+        #_(take 1)
+        (map :iri))
+   #_(lucene/search s {:field :symbol :query "ISCA-46285"})
+)
+ )
+
+
+;;
+
+(comment
+  (time
+   (get-events-from-topic
+    {:name :precuration-events
+     :type :kafka-reader-topic
+     :serialization :json
+     :create-producer true
+     :kafka-cluster :data-exchange
+     :kafka-topic "gt-precuration-events"
+     :kafka-topic-config {}}))
+  (def zeb2-gt
+    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gt-precuration-events-2025-08-26.edn.gz"]
+      (->> (event-store/event-seq r)
+           (filterv #(re-find #"ZEB2" (::event/value %)))
+           (mapv event/deserialize))))
+
+
+  (def pln-gt
+    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gt-precuration-events-2025-08-26.edn.gz"]
+      (->> (event-store/event-seq r)
+           (filterv #(re-find #"PLN" (::event/value %)))
+           (mapv event/deserialize))))
+
+  (def med12-gt
+    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gt-precuration-events-2025-08-26.edn.gz"]
+      (->> (event-store/event-seq r)
+           (filterv #(re-find #"MED12" (::event/value %)))
+           (mapv event/deserialize))))
+
+  (->> med12-gt
+       (remove #(re-find #"MED12L" (::event/value %)))
+       tap>
+       #_(mapv #(get-in % [::event/data :data :gdm_uuid]))
+       #_set)
+
+  (tap> med12-gt)
+  
+  (+ 1 1 )
+  (->> )
+  ;;CGGV:assertion_cb06ff0d-1cc6-494c-9ce5-f7cb26f34620-2018-05-23T220000.000Z
+  )
+
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (filters/compile-filter-query
+           [:bgp ['x :rdf/type :cg/EvidenceStrengthAssertion]]
+           [{:filter :proposition_type
+             :argument "CG:GeneValidityProposition"}])]
+    (rdf/tx tdb
+      #_(println q)
+      (->> (q tdb)
+           (take 20)
+           (into [])
+           tap>
+           #_(mapv #(hr/hybrid-resource % hybrid-db)))))
+
+  ;; valdiate website legacy id working in current transform
+  
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (rdf/create-query "select ?id where { ?x :cg/websiteLegacyID ?id }")]
+    (rdf/tx tdb
+      #_(println q)
+      (->> (q tdb)
+           (take 20)
+           (into [])
+           
+           #_(mapv #(hr/hybrid-resource % hybrid-db)))))
+  )

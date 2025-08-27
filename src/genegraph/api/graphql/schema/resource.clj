@@ -22,12 +22,14 @@
     (rdf/ld-> value [:rdf/type])))
 
 (defn hybrid-types [{:keys [tdb object-db] :as opts} args value]
+  (tap> value)
   (let [rdf-types (mapv
                    #(hr/hybrid-resource % opts)
                    (rdf-types args value))]
-    (if (seq rdf-types) 
-      rdf-types ; type in Jena
-      [(hr/hybrid-resource (:type value) opts)])))
+    (cond
+      (seq rdf-types) rdf-types ; type in Jena
+      (:type value) [(hr/hybrid-resource (:type value) opts)]
+      :else nil)))
 
 (def resource-interface
   {:name :Resource

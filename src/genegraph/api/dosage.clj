@@ -6,6 +6,7 @@
             [genegraph.framework.event :as event]
             [genegraph.framework.id :as id]
             [genegraph.api.sequence-index :as idx]
+            [genegraph.api.shared-data :as shared-data]
             [clojure.spec.alpha :as spec]
             [io.pedestal.interceptor :as interceptor])
   (:import java.time.Instant
@@ -32,55 +33,6 @@
 
 (def cg-prefix "http://dataexchange.clinicalgenome.org/dci/")
 (def region-prefix (str cg-prefix "region-"))
-
-(def chr-to-ref {:grch37 {"1" "https://identifiers.org/refseq:NC_000001.10"
-                          "2" "https://identifiers.org/refseq:NC_000002.11"
-                          "3" "https://identifiers.org/refseq:NC_000003.11"
-                          "4" "https://identifiers.org/refseq:NC_000004.11"
-                          "5" "https://identifiers.org/refseq:NC_000005.9"
-                          "6" "https://identifiers.org/refseq:NC_000006.11"
-                          "7" "https://identifiers.org/refseq:NC_000007.13"
-                          "8" "https://identifiers.org/refseq:NC_000008.10"
-                          "9" "https://identifiers.org/refseq:NC_000009.11"
-                          "10" "https://identifiers.org/refseq:NC_000010.10"
-                          "11" "https://identifiers.org/refseq:NC_000011.9"
-                          "12" "https://identifiers.org/refseq:NC_000012.11"
-                          "13" "https://identifiers.org/refseq:NC_000013.10"
-                          "14" "https://identifiers.org/refseq:NC_000014.8"
-                          "15" "https://identifiers.org/refseq:NC_000015.9"
-                          "16" "https://identifiers.org/refseq:NC_000016.9"
-                          "17" "https://identifiers.org/refseq:NC_000017.10"
-                          "18" "https://identifiers.org/refseq:NC_000018.9"
-                          "19" "https://identifiers.org/refseq:NC_000019.9"
-                          "20" "https://identifiers.org/refseq:NC_000020.10"
-                          "21" "https://identifiers.org/refseq:NC_000021.8"
-                          "22" "https://identifiers.org/refseq:NC_000022.10"
-                          "X" "https://identifiers.org/refseq:NC_000023.10"
-                          "Y" "https://identifiers.org/refseq:NC_000024.9"}
-                 :grch38 {"1" "https://identifiers.org/refseq:NC_000001.11"
-                          "2" "https://identifiers.org/refseq:NC_000002.12"
-                          "3" "https://identifiers.org/refseq:NC_000003.12"
-                          "4" "https://identifiers.org/refseq:NC_000004.12"
-                          "5" "https://identifiers.org/refseq:NC_000005.10"
-                          "6" "https://identifiers.org/refseq:NC_000006.12"
-                          "7" "https://identifiers.org/refseq:NC_000007.14"
-                          "8" "https://identifiers.org/refseq:NC_000008.11"
-                          "9" "https://identifiers.org/refseq:NC_000009.12"
-                          "10" "https://identifiers.org/refseq:NC_000010.11"
-                          "11" "https://identifiers.org/refseq:NC_000011.10"
-                          "12" "https://identifiers.org/refseq:NC_000012.12"
-                          "13" "https://identifiers.org/refseq:NC_000013.11"
-                          "14" "https://identifiers.org/refseq:NC_000014.9"
-                          "15" "https://identifiers.org/refseq:NC_000015.10"
-                          "16" "https://identifiers.org/refseq:NC_000016.10"
-                          "17" "https://identifiers.org/refseq:NC_000017.11"
-                          "18" "https://identifiers.org/refseq:NC_000018.10"
-                          "19" "https://identifiers.org/refseq:NC_000019.10"
-                          "20" "https://identifiers.org/refseq:NC_000020.11"
-                          "21" "https://identifiers.org/refseq:NC_000021.9"
-                          "22" "https://identifiers.org/refseq:NC_000022.11"
-                          "X" "https://identifiers.org/refseq:NC_000023.11"
-                          "Y" "https://identifiers.org/refseq:NC_000024.10"}})
 
 (def build-location {:grch38 :customfield_10532
                      :grch37 :customfield_10160})
@@ -140,7 +92,7 @@
     (let [[_ chr start-coord end-coord] (re-find #"(\w+):(.+)[-_–](.+)$" loc-str)
           iri (region-iri curation (name build))
           interval-iri (rdf/blank-node)
-          reference-sequence (get-in chr-to-ref
+          reference-sequence (get-in shared-data/chr-to-ref
                                      [build
                                       (subs chr 3)])
           start (-> start-coord (s/replace #"\D" "") Integer.)
@@ -151,8 +103,12 @@
             [iri :ga4gh/end start]]])))
 
 
+(defn recurrent-region? [curation]
+  (some #(= "Recurrent" %)
+        (get-in curation [:fields :labels])))
 
-
+(defn region-label [curation]
+  (get-in curation [:fields :customfield_10202] ""))
 
 (defn location [curation]
   (let [iri (region-iri curation)
@@ -165,11 +121,12 @@
       (concat (map (fn [l] [iri :ga4gh/location (first l)]) locations)
               (mapcat second locations)
               [[iri :ga4gh/definingLocation (-> locations first first)]
-               [iri :rdfs/label (get-in curation
-                                        [:fields :customfield_10202]
-                                        "")]
-               [iri :rdf/type :cg/DosageRegion]])
-      [])))
+               [iri :rdfs/label (region-label curation)]
+               [iri :rdf/type :cg/DosageRegion]
+               [iri :rdf/type :so/SequenceFeature]
+               (if (recurrent-region? curation)
+                 [iri :rdf/type :cg/RecurrentRegion]
+                 [iri :rdf/type :cg/NonRecurrentRegion])]))))
 
 (defn- contribution-iri
   [curation]
@@ -336,14 +293,12 @@
   (when-let [loc-str (get-in curation [:fields (build-location build)])]
     (let [[_ chr start-coord end-coord] (re-find #"(\w+):(.+)[-_–](.+)$" loc-str)
           loc {:type :ga4gh/SequenceLocation
-               :ga4gh/sequenceReference (get-in chr-to-ref
+               :ga4gh/sequenceReference (get-in shared-data/chr-to-ref
                                      [build
                                       (subs chr 3)])
                :ga4gh/start (-> start-coord (s/replace #"\D" "") Long.)
                :ga4gh/end (-> end-coord (s/replace #"\D" "") Long.)}]
       (assoc loc :iri (id/iri loc)))))
-
-
 
 
 (defn add-dosage-model-fn [event]
@@ -378,15 +333,28 @@
 (defn dosage-region [curation]
   {:type :cg/DosageRegion
    :iri (str (region-iri curation))
+   :rdfs/label (region-label curation)
    :ga4gh/location (mapv #(sequence-location-map curation %)
                          (keys build-location))})
+
+
+;; TODO pickup here to make regions searchable
+(defn region->index-doc [region]
+  {:iri (:iri region)
+   :source (:iri region)
+   :symbols [(re-find #"ISCA-\d+" (:iri region))]
+   :labels [(:rdfs/label region)]
+   :types [(-> region :type rdf/resource str)]})
 
 (defn add-dosage-region-fn [event]
   (if (::model event)
     (let [region (dosage-region (::event/data event))] 
       (-> event
           (assoc ::region region)
-          (event/store :object-db [:objects (:iri region)] region)))
+          (event/store :object-db [:objects (:iri region)] region)
+          (event/store :text-index
+                       (:iri region)
+                       (region->index-doc region))))
     event))
 
 (def add-dosage-region
