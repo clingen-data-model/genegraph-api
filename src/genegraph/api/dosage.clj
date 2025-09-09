@@ -7,6 +7,7 @@
             [genegraph.framework.id :as id]
             [genegraph.api.sequence-index :as idx]
             [genegraph.api.shared-data :as shared-data]
+            [genegraph.api.overlaps :as overlaps]
             [clojure.spec.alpha :as spec]
             [io.pedestal.interceptor :as interceptor])
   (:import java.time.Instant
@@ -362,6 +363,41 @@
    {:name ::add-dosage-region
     :enter (fn [e] (add-dosage-region-fn e))}))
 
+#_           (mapv (fn [g]
+                   (filterv #(protein-coding-gene? (get-in % [:gene :iri]) tdb)
+                            g)))
+(defn gene-overlaps [event]
+  (let [db (get-in event [::storage/storage :object-db])
+        tdb (get-in event [::storage/storage :api-tdb])]
+    (rdf/tx tdb
+      (->> (get-in event [::region :ga4gh/location])
+           (overlaps/gene-overlaps-for-loci db)
+           (filterv #(overlaps/protein-coding-gene?
+                      (get-in % [:gene :iri])
+                      tdb))))))
+
+(defn gene-overlap-model [region-iri overlaps]
+  (rdf/statements->model
+   (mapv (fn [{:keys [gene overlap]}]
+           [region-iri
+            overlap
+            (rdf/resource (:iri gene))])
+         overlaps)))
+
+(defn add-gene-overlaps-fn [event]
+  (if-let [region (::region event)]
+    (let [overlaps (gene-overlaps event)]
+      (assoc event
+             ::overlapping-genes overlaps
+             ::model (rdf/union (::model event)
+                                (gene-overlap-model (:iri region) overlaps))))
+    event))
+
+(def add-gene-overlaps
+  (interceptor/interceptor
+   {:name ::add-gene-overlaps
+    :enter (fn [e] (add-gene-overlaps-fn e))}))
+
 ;; this may belong somewhere else at some point soon
 (defmethod idx/sequence-feature->sequence-index :cg/DosageRegion [feature]
   (mapv
@@ -386,7 +422,6 @@
                 ::region
                 idx/sequence-feature->sequence-index))
     event))
-
 
 ;; TODO start here--test this
 (def add-dosage-indexes

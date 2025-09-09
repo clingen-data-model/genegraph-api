@@ -49,10 +49,59 @@ filter not exists { ?x :prov/wasInvalidatedBy ?otherx }
                                 (rdf/resource proposition_type))
                          params)))))
 
-(defn overlapping-variants-fn [context args value]
+(defn overlapping-genes-set [v]
+  (let [q (rdf/create-query "
+select ?g where {
+?v :cg/CompleteOverlap | :cg/PartialOverlap  ?g .
+?g a :so/GeneWithProteinProduct .
+}")]
+    (set (q v {:v v})))
+  #_(->> (rdf/ld-> v [:cg/CompleteOverlap])
+         (concat (rdf/ld-> v
+                           [:cg/PartialOverlap]))
+         set))
+
+(defn same-region-by-genes? [gs v]
+  (let [ogs (overlapping-genes-set v)]
+    (= gs ogs)))
+
+(defn variants-defined-by-feature [context args value]
+  (let [candidates-query (rdf/create-query "
+select ?x where {
+  ?r :cg/CompleteOverlap | :cg/PartialOverlap ?g .
+  ?g a :so/GeneWithProteinProduct .
+  ?x :cg/CompleteOverlap | :cg/PartialOverlap ?g
+}")
+        overlapping-genes (overlapping-genes-set value)
+        candidate-variants (candidates-query value {:r value})]
+    (->> (candidates-query value {:r value})
+         (filter #(same-region-by-genes? overlapping-genes %))
+         (mapv #(hr/hybrid-resource % context)))))
+
+(defn completely-overlapping-variants [context args value]
   (mapv
    #(hr/hybrid-resource % context)
    (rdf/ld-> value [[:cg/CompleteOverlap :<]])))
+
+(defn overlapping-variants-fn [context args value]
+  (case (:overlap_kind args)
+    "equal" (variants-defined-by-feature context args value)
+    (completely-overlapping-variants context args value)))
+
+(defn completely-overlapping-features [context args value]
+  (mapv
+   #(hr/hybrid-resource % context)
+   (rdf/ld-> value [:cg/CompleteOverlap])))
+
+(defn all-overlapping-features [context args value]
+  (->> (rdf/ld-> value [:cg/CompleteOverlap])
+       (concat (rdf/ld-> value [:cg/PartialOverlap]))
+       (mapv #(hr/hybrid-resource % context))))
+
+(defn overlapping-features-fn [context args value]
+  (case (:overlap_kind args)
+    "complete" (completely-overlapping-features context args value)
+    (all-overlapping-features context args value)))
 
 (def sequence-feature
   {:name :SequenceFeature
@@ -63,8 +112,17 @@ filter not exists { ?x :prov/wasInvalidatedBy ?otherx }
             :subjectOf {:type '(list :Resource)
                         :resolve (fn [c a v] (sequence-subject-resolver c a v))}
             :overlappingVariants {:type '(list :CanonicalVariant)
+                                  :args {:overlap_kind
+                                         {:type 'String
+                                          :description "how to determine what is an overlapping variant. currently only supports equal"}}
                                   :resolve
                                   (fn [c a v] (overlapping-variants-fn c a v))}
+            :overlappingFeatures {:type '(list :SequenceFeature)
+                                  :args {:overlap_kind
+                                         {:type 'String
+                                          :description "how to determine what is an overlapping variant. currently only supports equal"}}
+                                  :resolve (fn [c a v]
+                                             (overlapping-features-fn c a v))}
             :assertions {:type '(list :EvidenceStrengthAssertion)
                          :description "Evidence Strength Assertions about the given resource."
                          :args {:proposition_type

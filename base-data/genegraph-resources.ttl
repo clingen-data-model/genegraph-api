@@ -1,5 +1,7 @@
 @prefix cg: <https://genegraph.clinicalgenome.org/terms/>
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+@prefix owl: <http://www.w3.org/2002/07/owl#>
+@prefix dc: <http://purl.org/dc/terms/>
 @prefix gencc: <http://genegraph.clingen.app/r/gencc/>
 
 # Change gencc to something else in the future...
@@ -18,6 +20,9 @@ cg:LikelyPathogenic rdfs:label "Likely Pathogenic" .
 
 cg:Pathogenic rdfs:label "Pathogenic" .
 
+# Curation types
+cg:NewCuration rdfs:label "New Curation" ;
+    dc:description "the curation is published for the first time" .
 
 gencc:000111 rdfs:label "PanelApp Australia" .
 gencc:000115 rdfs:label "Broad Center for Mendelian Genomics" .
@@ -94,3 +99,15 @@ cg:RestrictionDigest rdfs:label "Restriction digest" .
 cg:SSCP rdfs:label "SSCP" .
 cg:SangerSequencing rdfs:label "Sanger sequencing" .
 cg:WholeGenomeSequencing rdfs:label "Whole genome shotgun sequencing" .
+
+## Terms for Dosage Curation
+
+cg:DosageRection a owl:Class ;
+    rdfs:label "Dosage region" .
+
+cg:RecurrentRegion a owl:Class ;
+    rdfs:label "Recurrent region" .
+
+cg:NonRecurrentRegion a owl:Class ;
+    rdfs:label "Non-recurrent region" .
+    

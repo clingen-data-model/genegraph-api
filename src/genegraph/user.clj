@@ -169,7 +169,7 @@
 (comment
   (with-open [r (-> "base.edn" io/resource io/reader PushbackReader.)]
     (->> (edn/read r)
-         #_(filter #(= "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         (filter #(= "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
                      (:name %)))
          (mapv (fn [e] {::event/data
                         (assoc e
@@ -3393,8 +3393,10 @@ select ?x where {
   (->> recurrent-region-cnvs
        (mapv process-dosage)
        (remove ::spec/invalid)
-       first
-       tap>)
+       (take-last 1)
+       (run! #(rdf/pp-model (::dosage/model %)))
+       #_(mapv #(dissoc % ::dosage/model))
+       #_tap>)
 
   (-> region1
       ::dosage/region)
@@ -3457,7 +3459,7 @@ select ?x where {
 
   (defn protein-coding-gene? [gene tdb]
     (let [q (rdf/create-query "select ?g where { ?g a :so/GeneWithProteinProduct } ")]
-      (seq (q tdb {:g (rdf/resource gene)}))))
+      (seq (q tdb {:g (rdf/resource gene)}))))r
 
   (let [object-db @(get-in api-test-app [:storage :object-db :instance])
         tdb @(get-in api-test-app [:storage :api-tdb :instance])]
@@ -3471,7 +3473,7 @@ select ?x where {
              {}
              (map ::dosage/region recurrent-regions))))
 
-  (tap> last-regions)
+  (-> recurrent-regions first ::dosage/model rdf/pp-model)
 
 
   ;; 9 regions have different sets of protein coding genes
@@ -3659,7 +3661,7 @@ select ?contrib where {
            #_(mapv #(hr/hybrid-resource % hybrid-db)))))
 
   ;; valdiate website legacy id working in current transform
-  
+  ;; TLDR, it's not, need to fix
   (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
         object-db @(get-in api-test-app [:storage :object-db :instance])
         hybrid-db {:tdb tdb :object-db object-db}
@@ -3671,4 +3673,49 @@ select ?contrib where {
            (into [])
            
            #_(mapv #(hr/hybrid-resource % hybrid-db)))))
+  )
+
+
+(comment
+  "http://dataexchange.clinicalgenome.org/dci/region-ISCA-37409"
+  (do
+    (defn overlapping-genes-set [v]
+      (let [q (rdf/create-query "
+select ?g where {
+?v :cg/CompleteOverlap | :cg/PartialOverlap  ?g .
+?g a :so/GeneWithProteinProduct .
+}")]
+        (set (q v {:v v})))
+      #_(->> (rdf/ld-> v [:cg/CompleteOverlap])
+           (concat (rdf/ld-> v
+                             [:cg/PartialOverlap]))
+           set))
+
+    (defn same-region-by-genes? [gs v]
+      (let [ogs (overlapping-genes-set v)]
+        (= gs ogs)))
+    
+    (defn variants-defined-by-feature [context args value]
+      (let [candidates-query (rdf/create-query "
+select ?x where {
+  ?r :cg/CompleteOverlap ?g .
+  ?g a :so/GeneWithProteinProduct .
+  ?x :cg/CompleteOverlap ?g
+}")
+            overlapping-genes (overlapping-genes-set value)
+            candidate-variants (candidates-query value {:r value})]
+        #_(tap> overlapping-genes)
+        (->> (candidates-query value {:r value})
+             (filterv #(same-region-by-genes? overlapping-genes %))
+             #_(take 1)
+             #_(mapv overlapping-genes-set))))
+    
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+          object-db @(get-in api-test-app [:storage :object-db :instance])
+          hybrid-db {:tdb tdb :object-db object-db}
+          r (rdf/resource
+               "http://dataexchange.clinicalgenome.org/dci/region-ISCA-37409"
+               tdb)]
+      (rdf/tx tdb
+        (variants-defined-by-feature hybrid-db nil r))))
   )

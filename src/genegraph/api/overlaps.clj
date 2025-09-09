@@ -112,16 +112,15 @@
                   :overlap (gene-overlap loci g)}))
          (remove #(= :cg/NoOverlap (:overlap %))))))
 
+(defn protein-coding-gene? [gene tdb]
+  (let [q (rdf/create-query "select ?g where { ?g a :so/GeneWithProteinProduct } ")]
+    (seq (q tdb {:g (rdf/resource gene)}))))
 
 (comment
   (def chr16p-prox
     (filter  #(re-find #"ISCA-37400" (:iri % ))
              genegraph.user/last-regions))
 
-  (defn protein-coding-gene? [gene tdb]
-    (let [q (rdf/create-query "select ?g where { ?g a :so/GeneWithProteinProduct } ")]
-      (seq (q tdb {:g (rdf/resource gene)}))))
-  
   (let [object-db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])
         tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])]
     (rdf/tx tdb
@@ -129,7 +128,8 @@
            (mapv #(gene-overlaps-for-loci object-db (:ga4gh/location %)))
            (mapv (fn [g]
                    (filterv #(protein-coding-gene? (get-in % [:gene :iri]) tdb)
-                           g)))
+                            g)))
+           tap>
            #_(mapv #(get-in % [:gene :iri])))))
 
 
@@ -264,98 +264,96 @@ select ?g where {
   ;; write a clojure function comparing whether the items in
   ;; set 1 contain most of the elements in set 2
 
-  (defn substantial-overlap [s1 s2])
-
-(defn contains-most? 
-  ([set1 set2] (contains-most? set1 set2 0.5))
-  ([set1 set2 threshold]
-   (let [intersection-count (count (clojure.set/intersection set1 set2))
-         set2-count (count set2)]
-     (>= (/ intersection-count set2-count) threshold))))
+  (defn contains-most? 
+    ([set1 set2] (contains-most? set1 set2 0.5))
+    ([set1 set2 threshold]
+     (let [intersection-count (count (clojure.set/intersection set1 set2))
+           set2-count (count set2)]
+       (>= (/ intersection-count set2-count) threshold))))
 
 
-(do
-  (defn loc->pos [loc cmp]
-    (if (number? loc)
-      loc
-      (->> loc (remove nil?) (apply cmp))))
+  (do
+    (defn loc->pos [loc cmp]
+      (if (number? loc)
+        loc
+        (->> loc (remove nil?) (apply cmp))))
 
-  #_(defn variant-color [v]
-    (if (= :efo/copy-number-loss (:ga4gh/copyChange v))
-      "255,0,0"
-      "0,0,255"))
+    #_(defn variant-color [v]
+        (if (= :efo/copy-number-loss (:ga4gh/copyChange v))
+          "255,0,0"
+          "0,0,255"))
 
-  (defn variant-color [v]
-    (case (:direction v)
-      :cg/Supports  "255,0,0"
-      :cg/Inconclusive "0,0,255"
-      :cg/Refutes "0,255,0"
-      "100,100,100"))
+    (defn variant-color [v]
+      (case (:direction v)
+        :cg/Supports  "255,0,0"
+        :cg/Inconclusive "0,0,255"
+        :cg/Refutes "0,255,0"
+        "100,100,100"))
 
 
 
-  (defn variant->bed-row [v object-db]
-    (let [v-obj (storage/read object-db [:objects v])
-          l
-          (->> (:cg/includedVariants v-obj)
-               (mapv :ga4gh/location)
-               (filter #(= "https://identifiers.org/refseq:NC_000016.9"
-                           (get-in % [:ga4gh/sequenceReference])))
-               first)]
-      (if (and (:ga4gh/start l) (:ga4gh/end l))
-        ["chr16"
-         (loc->pos (:ga4gh/start l) min)
-         (loc->pos (:ga4gh/end l) max)
-         v
-         "500"
-         "."
-         (loc->pos (:ga4gh/start l) min)
-         (loc->pos (:ga4gh/end l) max)
-         (variant-color v-obj)]
-        nil)))
+    (defn variant->bed-row [v object-db]
+      (let [v-obj (storage/read object-db [:objects v])
+            l
+            (->> (:cg/includedVariants v-obj)
+                 (mapv :ga4gh/location)
+                 (filter #(= "https://identifiers.org/refseq:NC_000016.9"
+                             (get-in % [:ga4gh/sequenceReference])))
+                 first)]
+        (if (and (:ga4gh/start l) (:ga4gh/end l))
+          ["chr16"
+           (loc->pos (:ga4gh/start l) min)
+           (loc->pos (:ga4gh/end l) max)
+           v
+           "500"
+           "."
+           (loc->pos (:ga4gh/start l) min)
+           (loc->pos (:ga4gh/end l) max)
+           (variant-color v-obj)]
+          nil)))
 
     (defn variant->bed [v]
-    (let [l
-          (->> (:cg/includedVariants v-obj)
-               (mapv :ga4gh/location)
-               (filter #(= "https://identifiers.org/refseq:NC_000016.9"
-                           (get-in % [:ga4gh/sequenceReference])))
-               first)]
-      (if (and (:ga4gh/start l) (:ga4gh/end l))
-        ["chr16"
-         (loc->pos (:ga4gh/start l) min)
-         (loc->pos (:ga4gh/end l) max)
-         v
-         "500"
-         "."
-         (loc->pos (:ga4gh/start l) min)
-         (loc->pos (:ga4gh/end l) max)
-         (variant-color v-obj)]
-        nil)))
+      (let [l
+            (->> (:cg/includedVariants v-obj)
+                 (mapv :ga4gh/location)
+                 (filter #(= "https://identifiers.org/refseq:NC_000016.9"
+                             (get-in % [:ga4gh/sequenceReference])))
+                 first)]
+        (if (and (:ga4gh/start l) (:ga4gh/end l))
+          ["chr16"
+           (loc->pos (:ga4gh/start l) min)
+           (loc->pos (:ga4gh/end l) max)
+           v
+           "500"
+           "."
+           (loc->pos (:ga4gh/start l) min)
+           (loc->pos (:ga4gh/end l) max)
+           (variant-color v-obj)]
+          nil)))
 
-  (defn variants->bed [path vs]
-    (with-open [w (io/writer path)]
+    (defn variants->bed [path vs]
+      (with-open [w (io/writer path)]
 
-      (mapv #(variant->bed-row % ))))
+        (mapv #(variant->bed-row % ))))
 
-  "chr16:29638676-30188531"
-  (with-open [w (io/writer "/Users/tristan/Desktop/chr16p-prox.bed")]
-    (let [object-db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]
-      (csv/write-csv
-       w
-       (concat
-        [["browser position chr16:29638676-30188531"]]
-        (->> variant-gene-sets
-             (filter #(and (<= (count (:genes %)) 32)
-                           (<= 25 (count (:genes %)))))
-             (filterv #(contains-most? chr16p-prox-genes
-                                       (:genes %)
-                                       0.99))
-             #_(take 5)
-             (mapv :variant)
-             (mapv #(variant->bed-row % object-db))
-             (remove nil?)))
-       :separator \tab))))
+    "chr16:29638676-30188531"
+    (with-open [w (io/writer "/Users/tristan/Desktop/chr16p-prox.bed")]
+      (let [object-db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]
+        (csv/write-csv
+         w
+         (concat
+          [["browser position chr16:29638676-30188531"]]
+          (->> variant-gene-sets
+               (filter #(and (<= (count (:genes %)) 32)
+                             (<= 25 (count (:genes %)))))
+               (filterv #(contains-most? chr16p-prox-genes
+                                         (:genes %)
+                                         0.99))
+               #_(take 5)
+               (mapv :variant)
+               (mapv #(variant->bed-row % object-db))
+               (remove nil?)))
+         :separator \tab))))
 
 
 
