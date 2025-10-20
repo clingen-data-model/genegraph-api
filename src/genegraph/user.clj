@@ -39,7 +39,8 @@
             [genegraph.api.filter :as filters]
             [clojure.tools.namespace.repl :as repl]
             [genegraph.api.shared-data :as shared-data]
-            [genegraph.api.sequence-index :as idx])
+            [genegraph.api.sequence-index :as idx]
+            [genegraph.api.gpm :as gpm])
   (:import [ch.qos.logback.classic Logger Level]
            [org.slf4j LoggerFactory]
            [java.time Instant LocalDate LocalDateTime ZoneOffset]
@@ -76,7 +77,8 @@
               :response-size (:response-size data)
               :handled-by (:handled-by data)
               :status (:status data)
-              :error-message (:error-message data))
+              :error-message (:error-message data)
+              :user-email (:user-email data))
     e))
 
 (def log-api-event
@@ -122,6 +124,9 @@
              :type :simple-queue-topic}
             :clinvar-curation
             {:name :clinvar-curation
+             :type :simple-queue-topic}
+            :gpm-person-events
+            {:name :gpm-person-events
              :type :simple-queue-topic}}
    :storage {:api-tdb (assoc api/api-tdb
                              :load-snapshot false
@@ -144,7 +149,8 @@
                 :graphql-ready api/graphql-ready
                 :import-dosage-curations api/import-dosage-curations
                 :read-api-log read-api-log
-                :read-clinvar-curations read-clinvar-curations}
+                :read-clinvar-curations read-clinvar-curations
+                :import-gpm-people api/import-gpm-people}
    :http-servers api/http-server})
 
 (comment
@@ -169,7 +175,7 @@
 (comment
   (with-open [r (-> "base.edn" io/resource io/reader PushbackReader.)]
     (->> (edn/read r)
-         (filter #(= "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         (filter #(= "https://www.genenames.org/"
                      (:name %)))
          (mapv (fn [e] {::event/data
                         (assoc e
@@ -225,7 +231,7 @@ select ?x where {
 ;; reload clingen gene validity
 (comment
   (time
-   (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gv-sepio-2025-07-29.edn.gz"]
+   (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene-validity-sepio-2025-10-01.edn.gz"]
      (->> (event-store/event-seq r)
           #_(mapv ::event/key)
           #_(take 1)
@@ -283,6 +289,15 @@ select ?x where {
   (time (get-events-from-topic api/gene-validity-sepio-topic))
   
   (time (get-events-from-topic api/clinvar-curation-topic))
+
+  (time (get-events-from-topic api/variant-interpretation-topic))
+  (time (get-events-from-topic api/gpm-general-events-topic))
+  (time (get-events-from-topic api/gpm-person-events-topic))
+  (time (get-events-from-topic api/gt-precuration-events-topic))
+  (time (get-events-from-topic api/gene-validity-legacy-topic))
+  (time (get-events-from-topic api/base-data-topic))
+  
+  
   (+ 1 1)
 )
 
@@ -2935,6 +2950,8 @@ select ?el where
                  :base "data/base/"
                  :path "hgnc.json"})})
               :genegraph.api.base.gene/document))
+  
+  (tap> doc)
 
   (filter :entrez_id (get-in doc [:response :docs]))
   
@@ -3718,4 +3735,271 @@ select ?x where {
                tdb)]
       (rdf/tx tdb
         (variants-defined-by-feature hybrid-db nil r))))
+  )
+
+
+(comment
+  (def snta1
+    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene_validity_complete-2025-09-11.edn.gz"]
+      (->> (event-store/event-seq r)
+           (filterv #(re-find #"9b1ccee8" (::event/value %)))
+           last
+           event/deserialize)))
+
+  (tap> snta1)
+
+  )
+
+(comment
+  (with-open [r (io/reader (str "/Users/tristan/Downloads/gene-validity/https_/genegraph.clinicalgenome.org/r/" "f332bc55-8ea7-40bc-b28b-2149f6ce0a25v1.3.json"))]
+    (-> (json/read r) tap>))
+  )
+
+
+(comment
+)
+
+
+;; I looked into this.  The reason the details page cannot be displayed for this assertion is because genegraph is not populating the legacy_json field when gene_validity_assertion() is called on record:
+;; CGGV:assertion_dd577817-d668-413c-95f9-d3e08a8cf5d3-2020-12-15T002719.834Z
+;; This is an unrecoverable error, hence the "Sorry" message.  
+
+;; Tristan, can you investigate this and fix?  Thanks!
+(comment
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene_validity-2025-09-29.edn.gz"]
+    (->> (event-store/event-seq r)
+         (filter #(re-find #"097e646b-467f-4c08-95d6-958ed324562b" #_"dd577817-d668-413c-95f9-d3e08a8cf5d3" (::event/value %)))
+         #_last
+         #_event/deserialize
+         count))
+
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene_validity_complete-2025-09-11.edn.gz"]
+    (->> (event-store/event-seq r)
+         (filter #(re-find #"dd577817-d668-413c-95f9-d3e08a8cf5d3" (::event/value %)))
+         #_last
+         #_event/deserialize
+         count))
+  )
+
+
+;; Quarterly productivity query
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (rdf/create-query "
+select ?x where {
+ ?x a :cg/EvidenceStrengthAssertion ;
+  :dc/isVersionOf ?v ;
+  :cg/contributions ?contrib ;
+  :cg/subject ?s .
+  ?s a :cg/GeneValidityProposition .
+  ?contrib :cg/role :cg/Publisher ;
+  :cg/date ?date .
+  FILTER(STR(?date) > \"2025-07-01\")
+  FILTER(STR(?date) < \"2025-10-01\")
+ }")
+        role-query (rdf/create-query "
+select ?agent where {
+?assertion :cg/contributions ?contrib .
+?contrib :cg/role ?role ;
+:cg/agent ?agent .
+}")
+        previous-verisons-query (rdf/create-query "
+select ?c where {
+  ?c1 :dc/isVersionOf ?v .
+  ?c :dc/isVersionOf ?v .
+  ?c :dc/dateSubmitted ?date .
+  FILTER(STR(?date) > \"2025-07-01\")
+  FILTER(STR(?date) < \"2025-10-01\")
+}
+")
+        has-original-version-published (fn [c]
+                                         (some
+                                          #(re-find #"\.0$" (rdf/ld1-> % [:cg/version]))
+                                          (previous-verisons-query c {:c1 c})))
+        curations (rdf/tx tdb
+                    (->> (q tdb)
+                         (filterv (fn [c]
+                                    (or
+                                     (re-find #"\.0$" (rdf/ld1-> c [:cg/version]))
+                                     (has-original-version-published c))))))
+        contributions (rdf/tx tdb
+                        (mapv (fn [a] {:approver (some-> (role-query tdb {:assertion a :role :cg/Approver})
+                                                         first
+                                                         (rdf/ld1-> [:rdfs/label]))
+                                       :secondary-contributor (some-> (role-query tdb {:assertion a :role :cg/SecondaryContributor})
+                                                                      first
+                                                                      (rdf/ld1-> [:rdfs/label]))
+                                       :curation (str a)})
+                              curations))
+        approvers (update-vals (frequencies (mapv :approver contributions)) (fn [v] {:approvals v}))
+        secondary-contributors (update-vals (frequencies (mapv :secondary-contributor contributions)) (fn [v] {:secondary-contributions v}))
+        all-contributions (dissoc (merge-with merge approvers secondary-contributors) nil)]
+    (tap> (filter #(= "Myriad Women's Health"
+                      (:secondary-contributor %))  contributions))
+    #_(with-open [w (io/writer "/users/tristan/Desktop/q3-gene-curation-report.csv")]
+        (csv/write-csv
+         w
+         (concat[["GCEP" "Primary Approvals" "Secondary Contributions"]]
+                (mapv (fn [[k m]] [k (:approvals m) (:secondary-contributions m)]) all-contributions)))))
+
+
+  
+  )
+
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])]
+    (rdf/tx tdb
+      (->> (rdf/resource #_"GG:a0a9ec11-ef90-4095-9c9e-696eabd0395b""GG:c4831487-68ed-4667-95e7-2f1805817dafv1.0")
+           str
+           (storage/read tdb)
+           rdf/pp-model)))
+  )
+
+(comment
+  (-> i"/Users/tristan/Downloads/gene-validity-jsonld-latest/gg_a0a9ec11-ef90-4095-9c9e-696eabd0395bv2.1.json"
+      slurp
+      json/read-str
+      tap>)
+
+  )
+
+
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])]
+    (rdf/tx tdb
+      (-> (rdf/resource "NCBIGENE:2664" tdb)
+          (rdf/ld1-> [:rdf/type]))))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])]
+    (rdf/tx tdb
+      (-> (storage/read tdb "https://www.genenames.org/")
+          .size)))
+  )
+
+
+(comment
+  "ggapi-clinvar-curation-stage-1"
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/ggapi-clinvar-curation-stage-1-2025-10-03.edn.gz"]
+    (->> (event-store/event-seq r)
+         count))
+  )
+
+
+(comment
+  (-> "/Users/tristan/data/validity/gg_a0a9ec11-ef90-4095-9c9e-696eabd0395bv2.1.json"
+      slurp
+      json/read-str
+      tap>)
+
+  (-> "/Users/tristan/data/validity/gg_f53cae06-e5d6-4e85-9233-7490cc242418v1.0.json"
+      slurp
+      json/read-str
+      tap>)
+  )
+
+(comment
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gg-base-2025-10-07.edn.gz"]
+    (->> (event-store/event-seq r)
+         (filterv #(= #_"https://ncbi.nlm.nih.gov/genomes/GCF_000001405.25_GRCh37.p13_genomic.gff"
+                      #_"https://ncbi.nlm.nih.gov/genomes/GCF_000001405.40_GRCh38.p14_genomic.gff"
+                      #_"http://purl.obolibrary.org/obo/so.owl"
+                      "https://www.ncbi.nlm.nih.gov/clinvar/"
+                      (::event/key %)))
+         (take 1)
+         (run! #(p/publish (get-in api-test-app [:topics :base-data]) %))))
+
+  (tap> api-test-app)
+
+  )
+
+
+(comment
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gpm-person-events-2025-09-17.edn.gz"]
+    (->> (event-store/event-seq r)
+         #_(take 1)
+         (map event/deserialize)
+         (map #(get-in % [::event/data :data :person :profile_photo]))
+         frequencies
+
+         ))
+
+  (tap> api-test-app)
+  (defn process-gpm-person [e]
+    (p/process (get-in api-test-app [:processors :import-gpm-people])
+               (assoc e
+                      ::event/skip-local-effects true
+                      ::event/skip-publish-effects true)))
+
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gpm-person-events-2025-09-17.edn.gz"]
+    (->> (event-store/event-seq r)
+         (run! #(p/publish (get-in api-test-app [:topics :gpm-person-events]) %))))
+
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "
+select ?x where
+{ ?x :schema/email ?email ;
+     :dc/source :cg/GPM . }")]
+    (rdf/tx tdb
+      (-> (q tdb {:email "clmartin1@geisinger.edu"})
+          count)))
+  
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gpm-person-events-2025-09-17.edn.gz"]
+    (->> (event-store/event-seq r)
+         (map #(assoc ::event/skip-local-effects true
+                      ::event/skip-publish-effects true))
+         (map event/deserialize)
+         (map #(get-in % [::event/data :data :person :profile_photo]))
+         frequencies
+
+         ))
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gpm-person-events-2025-09-17.edn.gz"]
+    (->> (event-store/event-seq r)
+         (map #(assoc ::event/skip-local-effects true
+                      ::event/skip-publish-effects true))
+         (map event/deserialize)
+         (map #(get-in % [::event/data :data :person :profile_photo]))
+         frequencies
+
+         ))
+  
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gpm-person-events-2025-09-17.edn.gz"]
+    (->> (event-store/event-seq r)
+         #_(take 1)
+         (map event/deserialize)
+         (map #(get-in % [::event/data :data :person :profile_photo]))
+         frequencies
+
+         ))
+
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gpm-general-events-2025-09-17.edn.gz"]
+    (->> (event-store/event-seq r)
+         #_(take-last 5)
+         (map event/deserialize)
+         (map #(get-in % [::event/data :event_type]))
+         frequencies
+         tap>))
+
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gt-precuration-events-2025-09-17.edn.gz"]
+    (->> (event-store/event-seq r)
+         #_(take-last 5)
+         (map event/deserialize)
+         (map #(get-in % [::event/data :event_type]))
+         frequencies
+         tap>))
+  )
+
+;; looking into gene overlap issues
+;; I think there aren't any--things seem good from here
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "
+select ?x where
+{ ?x :cg/CompleteOverlap ?feature . }
+ limit 5")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           (mapv #(rdf/ld1-> % [:rdf/type])))))
   )

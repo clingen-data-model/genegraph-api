@@ -34,7 +34,8 @@
  "oboinowl" "http://www.geneontology.org/formats/oboInOwl#"
  "efo" "http://www.ebi.ac.uk/efo/EFO_"
  "gencc" "https://genegraph.clinicalgenome.org/r/gencc/"
- "orphanet" "http://www.orpha.net/ORDO/Orphanet_"})
+ "orphanet" "http://www.orpha.net/ORDO/Orphanet_"
+ "schema" "https://schema.org/"})
 
 (add-keyword-mappings
  {:mondo/HereditaryDisease "http://purl.obolibrary.org/obo/MONDO_0003847"

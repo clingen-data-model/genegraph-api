@@ -22,7 +22,7 @@
     (rdf/ld-> value [:rdf/type])))
 
 (defn hybrid-types [{:keys [tdb object-db] :as opts} args value]
-  (tap> value)
+  #_(tap> value)
   (let [rdf-types (mapv
                    #(hr/hybrid-resource % opts)
                    (rdf-types args value))]

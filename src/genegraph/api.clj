@@ -15,6 +15,8 @@
             [genegraph.api.base.gff]
             [genegraph.api.assertion-annotation :as ac]
             [genegraph.api.common :as common]
+            [genegraph.api.auth :as auth]
+            [genegraph.api.gpm :as gpm]
             [com.walmartlabs.lacinia.pedestal2 :as lacinia-pedestal]
             [com.walmartlabs.lacinia.pedestal.internal :as internal]
             [io.pedestal.http :as http]
@@ -99,6 +101,38 @@
 
 ;; Topics
 
+(def variant-interpretation-topic
+  {:name :variant-interpretation
+   :type :kafka-reader-topic
+   :serialization :json
+   :create-producer true
+   :kafka-cluster :data-exchange
+   :kafka-topic "variant_interpretation"})
+
+(def gpm-general-events-topic
+  {:name :gpm-general-events
+   :type :kafka-reader-topic
+   :serialization :json
+   :create-producer true
+   :kafka-cluster :data-exchange
+   :kafka-topic "gpm-general-events"})
+
+(def gpm-person-events-topic
+  {:name :gpm-person-events
+   :type :kafka-reader-topic
+   :serialization :json
+   :create-producer true
+   :kafka-cluster :data-exchange
+   :kafka-topic "gpm-person-events"})
+
+(def gt-precuration-events-topic
+  {:name :gt-precuration-events
+   :type :kafka-reader-topic
+   :serialization :json
+   :create-producer true
+   :kafka-cluster :data-exchange
+   :kafka-topic "gt-precuration-events"})
+
 (def clinvar-curation-topic
   {:name :clinvar-curation
    :type :kafka-reader-topic
@@ -130,6 +164,20 @@
    :kafka-cluster :data-exchange
    :serialization ::rdf/n-triples
    :kafka-topic "gene-validity-sepio"#_"gg-gvs2-stage-1"
+   :kafka-topic-config {}})
+
+(def gene-validity-complete-topic 
+  {:name :gene-validity-complete
+   :kafka-cluster :data-exchange
+   :serialization :json
+   :kafka-topic "gene_validity_complete"
+   :kafka-topic-config {}})
+
+(def gene-validity-legacy-topic 
+  {:name :gene-validity-legacy
+   :kafka-cluster :data-exchange
+   :serialization :json
+   :kafka-topic "gene_validity"
    :kafka-topic-config {}})
 
 (def api-log-topic
@@ -410,6 +458,13 @@
                   dosage/write-dosage-model-to-db
                   response-cache/invalidate-cache]})
 
+(def import-gpm-people
+  {:type :processor
+   :subscribe :gpm-person-events
+   :name :import-gpm-people
+   :backing-store :api-tdb
+   :interceptors [gpm/import-gdm-person]})
+
 (def query-timer-interceptor
   (interceptor/interceptor
    {:name ::query-timer-interceptor
@@ -417,6 +472,7 @@
     :leave (fn [e] (assoc e ::end-time (.toEpochMilli (Instant/now))))}))
 
 (defn publish-result-fn [e]
+  (tap> (assoc e :fn ::publish-result-fn))
   (event/publish
    e
    {::event/data {:start-time (::start-time e)
@@ -426,7 +482,8 @@
                   :response-size (count (get-in e [:response :body]))
                   :status (get-in e [:response :status])
                   :handled-by (::event/handled-by e)
-                  :error-message (::error-message e)}
+                  :error-message (::error-message e)
+                  :user-email (or (::auth/email e) :unauthenticated-request)}
     ::event/key (str (::start-time e))
     ::event/topic :api-log}))
 
@@ -476,6 +533,7 @@
    :type :processor
    :interceptors [#_lacinia-pedestal/initialize-tracing-interceptor
                   publish-result-interceptor
+                  auth/auth-interceptor
                   query-timer-interceptor
                   lacinia-pedestal/body-data-interceptor
                   #_response-cache/response-cache

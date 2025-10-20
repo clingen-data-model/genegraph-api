@@ -13,7 +13,7 @@
          (lucene/search text-index
                         {:field :label
                          :query query}))]
-    (tap> results)
+    #_(tap> results)
     (mapv #(hr/hybrid-resource (:iri %) context) results)))
 
 (def text-search-query

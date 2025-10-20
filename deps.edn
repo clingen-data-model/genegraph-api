@@ -51,7 +51,9 @@
   org.clojure/data.zip {:mvn/version "1.0.0"}
   org.clojure/data.xml {:mvn/version "0.0.8"}
 
-
+  ;; authentication
+  com.google.firebase/firebase-admin {:mvn/version "9.7.0"}
+  
   ;; Experimenting with new Lucene features
 
   org.apache.lucene/lucene-core {:mvn/version "10.2.1"}
@@ -61,6 +63,8 @@
   ;; Experimenting with Google genai apis
 
   com.google.genai/google-genai {:mvn/version "1.6.0"}
+
+
   
   }
  }

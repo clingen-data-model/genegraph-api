@@ -108,11 +108,25 @@
          (take 1)
          (mapcat gci-express-report-to-triples)
          rdf/statements->model))
+  
+  (-> {:format :genegraph.api.base/gci-express
+       :source   {:type :gcs
+                  :bucket "genegraph-base"
+                  :path "gci-express-with-entrez-ids.json"}}
+      rdf/as-model
+      rdf/pp-model)
+  (-> {:type :gcs
+       :bucket "genegraph-base"
+       :path "gci-express-with-entrez-ids.json"}
+      storage/as-handle
+      slurp)
 
-  (rdf/as-model {:format :genegraph.api.base/gci-express
-                 :source {:type :file
-                          :base "/users/tristan/data/genegraph-neo/"
-                          :path "gci-express-with-entrez-ids.json"}})
+  (with-open [r  (-> {:type :gcs
+                      :bucket "genegraph-base"
+                      :path "gci-express-with-entrez-ids.json"}
+                     storage/as-handle
+                     io/reader)]
+    (slurp r))
   )
 
 ;; (defmethod transform-doc :gci-express [doc-def]
