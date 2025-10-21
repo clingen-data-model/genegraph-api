@@ -2,7 +2,8 @@
   (:require [genegraph.framework.storage.rdf :as rdf]
             [genegraph.framework.storage :as storage]
             [clojure.data.json :as json]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io]
+            [genegraph.framework.id :as id]))
 
 (def gci-express-root "http://dataexchange.clinicalgenome.org/gci-express/")
 (def affiliation-root "http://dataexchange.clinicalgenome.org/agent/")
@@ -12,9 +13,25 @@
     (:scoreJsonSerialized report)
     (:scoreJsonSerializedSop5 report)))
 
-(defn json-content-node [report iri]
+#_(defn json-content-node [report iri]
   [[iri :rdf/type :cnt/ContentAsText]
    [iri :cnt/chars (json-content report)]])
+
+(defn prop [report]
+  (let [gene (rdf/resource (str "https://www.ncbi.nlm.nih.gov/gene/"
+                                (:entrez_id report)))
+        parsed-json (json/read-str (json-content report) :key-fn keyword)
+        moi-string (or (-> parsed-json :data :ModeOfInheritance)
+                       (-> parsed-json :scoreJson :ModeOfInheritance))
+        moi (->> moi-string
+                 (re-find #"\(HP:(\d+)\)")
+                 second
+                 (str "http://purl.obolibrary.org/obo/HP_")
+                 rdf/resource)]
+    {:type :cg/GeneValidityProposition
+     :cg/gene gene
+     :cg/disease (rdf/resource (-> report :conditions :MONDO :iri))
+     :cg/modeOfInheritance moi}))
 
 (defn validity-proposition [report iri]
   (let [gene (rdf/resource (str "https://www.ncbi.nlm.nih.gov/gene/"
@@ -27,11 +44,10 @@
                  second
                  (str "http://purl.obolibrary.org/obo/HP_")
                  rdf/resource)]
-    [[iri :rdf/type :sepio/GeneValidityProposition]
-     [iri :sepio/has-subject gene]
-     [iri :sepio/has-predicate :ro/IsCausalGermlineMutationIn]
-     [iri :sepio/has-object (rdf/resource (-> report :conditions :MONDO :iri))]
-     [iri :sepio/has-qualifier moi]]))
+    [[iri :rdf/type :cg/GeneValidityProposition]
+     [iri :cg/gene gene]
+     [iri :cg/disease (rdf/resource (-> report :conditions :MONDO :iri))]
+     [iri :cg/modeOfInheritance moi]]))
 
 (defn contribution [report iri]
   [[iri :bfo/realizes :sepio/ApproverRole]
@@ -82,7 +98,7 @@
              [iri :bfo/has-part assertion-id]
              [iri :dc/source :cg/GeneCurationExpress]]
             (evidence-level-assertion content assertion-id id)
-            (json-content-node content content-id))))
+            #_(json-content-node content content-id))))
 
 (def same-as-query
   (rdf/create-query "select ?x where { ?x :owl/sameAs ?y }"))

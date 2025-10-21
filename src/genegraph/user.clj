@@ -242,7 +242,8 @@ select ?x where {
 ;; reload gene dosage
 (comment
   (time
-   (event-store/with-event-reader [r (str root-data-dir "gene_dosage_raw-2025-08-13.edn.gz")]
+   (event-store/with-event-reader [r (str root-data-dir
+                                          "gene_dosage_raw-2025-10-21.edn.gz")]
      (->> (event-store/event-seq r)
           #_(mapv ::event/key)
           #_(take 1)
@@ -4003,3 +4004,19 @@ select ?x where
       (->> (q tdb)
            (mapv #(rdf/ld1-> % [:rdf/type])))))
   )
+
+
+;; working on Dosage regions now
+
+
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "
+select ?x where
+{ ?x a ?type . }
+ limit 5")]
+    (rdf/tx tdb
+      (->> (q tdb {:type :cg/GeneticConditionMechanismProposition})
+           count
+           #_(mapv #(rdf/ld1-> % [:rdf/type])))))
+ )
