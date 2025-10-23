@@ -102,7 +102,7 @@ cg:WholeGenomeSequencing rdfs:label "Whole genome shotgun sequencing" .
 
 ## Terms for Dosage Curation
 
-cg:DosageRection a owl:Class ;
+cg:DosageRegion a owl:Class ;
     rdfs:label "Dosage region" .
 
 cg:RecurrentRegion a owl:Class ;
