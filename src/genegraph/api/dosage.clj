@@ -32,7 +32,7 @@
                                        ::status
                                        ::resolution]))
 
-(def cg-prefix "http://genegraph.clinicalgenome.org/r/")
+(def cg-prefix "https://genegraph.clinicalgenome.org/r/")
 (def region-prefix (str cg-prefix "region-"))
 
 (def build-location {:grch38 :customfield_10532

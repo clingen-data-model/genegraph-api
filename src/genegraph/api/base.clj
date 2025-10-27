@@ -35,6 +35,26 @@
 ;; genes
 ;;
 
+(def included-base-files
+  #{"http://www.w3.org/2004/02/skos/core"
+    "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    "http://www.w3.org/2011/content#"
+    "https://www.w3.org/2002/07/owl"
+    "http://www.w3.org/2000/01/rdf-schema#"
+    "http://purl.obolibrary.org/obo/so.owl"
+    "http://purl.obolibrary.org/obo/mondo.owl"
+    "http://purl.obolibrary.org/obo/hp.owl"
+    "https://genegraph.app/resources"
+    "https://www.genenames.org/"
+    "https://ncbi.nlm.nih.gov/genomes/GCF_000001405.40_GRCh38.p14_genomic.gff"
+    "https://ncbi.nlm.nih.gov/genomes/GCF_000001405.25_GRCh37.p13_genomic.gff"
+    "https://affils.clinicalgenome.org/"
+    "https://www.ncbi.nlm.nih.gov/clinvar/submitters"
+    "http://dataexchange.clinicalgenome.org/gci-express"
+    "https://thegencc.org/"
+    "https://www.ncbi.nlm.nih.gov/clinvar/"
+    #_"https://omim.org/genemap"})
+
 (defn output-handle [event]
   (-> event
       ::handle
@@ -101,8 +121,14 @@
       store-model-fn))
 
 (defn base-event-fn [event]
-  (log/info :fn ::base-event-fn)
-  (ap/process-base-event event))
+  (log/info :phase :enter
+            :fn ::base-event-fn
+            :name (get-in event [::event/data :name]))
+  (let [e (ap/process-base-event event)]
+    (log/info :fn ::base-event-fn
+              :phase :complete
+              :name (get-in event [::event/data :name]))
+    e))
 
 (def base-event
   (interceptor/interceptor

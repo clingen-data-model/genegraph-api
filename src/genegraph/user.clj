@@ -40,7 +40,8 @@
             [clojure.tools.namespace.repl :as repl]
             [genegraph.api.shared-data :as shared-data]
             [genegraph.api.sequence-index :as idx]
-            [genegraph.api.gpm :as gpm])
+            [genegraph.api.gpm :as gpm]
+            [genegraph.api.base.gene :as hgnc-gene])
   (:import [ch.qos.logback.classic Logger Level]
            [org.slf4j LoggerFactory]
            [java.time Instant LocalDate LocalDateTime ZoneOffset]
@@ -172,6 +173,135 @@
 
 ;; Reload base data
 
+
+(def base-order
+  ["http://www.w3.org/2004/02/skos/core"
+   "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   "http://www.w3.org/2011/content#"
+   "https://www.w3.org/2002/07/owl"
+   "http://www.w3.org/2000/01/rdf-schema#"
+   "http://purl.obolibrary.org/obo/so.owl"
+   "http://purl.obolibrary.org/obo/mondo.owl"
+   "http://purl.obolibrary.org/obo/hp.owl"
+   "https://genegraph.app/resources"
+   "https://www.genenames.org/"
+   "https://ncbi.nlm.nih.gov/genomes/GCF_000001405.40_GRCh38.p14_genomic.gff"
+   "https://ncbi.nlm.nih.gov/genomes/GCF_000001405.25_GRCh37.p13_genomic.gff"
+   "https://affils.clinicalgenome.org/"
+   "https://www.ncbi.nlm.nih.gov/clinvar/submitters"
+   "http://dataexchange.clinicalgenome.org/gci-express"
+   "https://thegencc.org/"
+   "https://www.ncbi.nlm.nih.gov/clinvar/"])
+#_"https://omim.org/genemap"
+
+
+
+(comment
+
+  ;; to update
+  ;; gsutil cp -r gs://genegraph-base/ /Users/tristan/data/
+  
+  (->> "base.edn"
+       io/resource
+       slurp
+       edn/read-string
+       (filterv #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+                    #_"https://genegraph.app/resources"
+                    (:name %)))
+       (mapv #(assoc % :source {:type :file
+                                :base "/Users/tristan/data/genegraph-base/"
+                                :path (:target %)}))
+       (mapv (fn [x] {::event/data x}))
+       (run! #(p/publish (get-in api-test-app [:topics :base-data]) %)))
+
+  (->> "base.edn"
+       io/resource
+       slurp
+       edn/read-string
+       (filterv #(= "https://genegraph.app/resources" (:name %)))
+       (mapv (fn [x] {:type :file
+                      :base "/Users/tristan/data/genegraph-base/"
+                      :path (:target x)})))
+  (def genes-json 
+    (-> "/Users/tristan/data/genegraph-base/hgnc.json"
+        slurp
+        (json/read-str :key-fn keyword)))
+
+  (->> (filter :entrez_id (get-in genes-json [:response :docs]))
+       count)
+  
+  (def base-event-map
+    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gg-base-2025-10-21.edn.gz"]
+      (->> (event-store/event-seq r)
+           (mapv event/deserialize)
+           (reduce (fn [a e] (assoc a (get-in e [::event/data :name]) e)) {})
+           #_(filterv #(= #_"https://ncbi.nlm.nih.gov/genomes/GCF_000001405.25_GRCh37.p13_genomic.gff"
+                          #_"https://ncbi.nlm.nih.gov/genomes/GCF_000001405.40_GRCh38.p14_genomic.gff"
+                          #_"http://purl.obolibrary.org/obo/so.owl"
+                          #_"https://www.ncbi.nlm.nih.gov/clinvar/"
+                          "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+                          (get-in % [::event/data :name])))
+
+           #_(mapv #(get-in % [::event/data :name]))
+           #_(take 1)
+           #_(into [])
+           #_set
+           #_(run! #(p/publish (get-in api-test-app [:topics :base-data]) %)))))
+  
+
+  (clojure.pprint/pprint base-event-map)
+  
+  (->> base-order
+       (mapv base-event-map)
+       (mapv event/deserialize)
+       (run! #(p/publish (get-in api-test-app [:topics :base-data]) %))
+       
+
+       )
+
+  (mapv #(-> % base-event-map event/deserialize ::event/data (dissoc :source))
+        base-order)
+
+
+  
+
+  (tap> (get base-event-map "https://www.genenames.org/"))
+
+  (p/publish (get-in api-test-app [:topics :base-data])
+             (get base-event-map "https://www.genenames.org/"))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "
+select ?x where
+{ ?x a ?type . }
+ limit 5")]
+    (rdf/tx tdb
+      (->> (q tdb {:type :owl/Class})
+           count
+           #_(mapv #(rdf/ld1-> % [:rdf/type])))))
+  
+  (def hgnc
+    (with-open [r (-> (get base-event-map "https://www.genenames.org/")
+                      event/deserialize
+                      (get-in [::event/data :source])
+                      storage/as-handle
+                      io/reader)]
+      (json/read r :key-fn keyword)))
+
+  (tap> (hgnc-gene/genes-as-triple hgnc))
+
+  (tap> hgnc)
+
+  (-> base-event-map
+      (update-vals event/deserialize)
+      tap>)
+  (p/publish (get-in api-test-app [:topics :base-data])
+             (get base-event-map "https://www.ncbi.nlm.nih.gov/clinvar/"))
+
+  (get base-event-map "https://www.ncbi.nlm.nih.gov/clinvar/")
+  )
+
+;; this bit is obsolete, delete after review
 (comment
   (with-open [r (-> "base.edn" io/resource io/reader PushbackReader.)]
     (->> (edn/read r)
@@ -223,6 +353,8 @@ select ?x where {
                               {:type :file
                                :base "data/base/"
                                :path "gencc.csv"})}))))
+
+  
   
   )
 
@@ -249,6 +381,8 @@ select ?x where {
           #_(take 1)
           (run! #(p/publish (get-in api-test-app [:topics :dosage])
                             (assoc % ::event/completion-promise (promise)))))))
+
+  (+ 1 1)
   )
 
 ;; Downloading events
@@ -4019,4 +4153,23 @@ select ?x where
       (->> (q tdb {:type :cg/GeneticConditionMechanismProposition})
            count
            #_(mapv #(rdf/ld1-> % [:rdf/type])))))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "
+select ?x where
+{ ?x a ?type . }
+ limit 5")]
+    (rdf/tx tdb
+      (->> (q tdb {:type :so/GeneWithProteinProduct})
+           count
+           #_(mapv #(rdf/ld1-> % [:rdf/type])))))
+
+  ;; HGNC not loading?
+  
+  ;; issue with gene overlaps in ClinVar
+  ;; :genegraph.api.dosage/add-gene-overlaps - Wrong number of args (0) passed to: clojure.core/min
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])]
+    (org.apache.jena.tdb2.DatabaseMgr/location (.asDatasetGraph tdb)))
+
  )
