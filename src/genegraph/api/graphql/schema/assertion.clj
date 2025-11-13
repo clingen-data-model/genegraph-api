@@ -3,6 +3,7 @@
             [genegraph.framework.storage :as storage]
             [genegraph.framework.event :as event]
             [genegraph.api.hybrid-resource :as hr]
+            [genegraph.api.conflicts :as conflicts]
             [io.pedestal.log :as log]))
 
 (defn assertion-label [{:keys [object-db]} _ v]
@@ -120,13 +121,17 @@ select ?features where {
    :description "Numeric score of the statement. May be nil, used only when the applicable criteria calls for a numeric score in the assertion or critera assessment."
    :path [:cg/strengthScore]})
 
+
+(defn conflicting-assertions-fn [c a v]
+  (conflicts/conflicting-assertions c a v))
+
 (def assertion
   {:name :EvidenceStrengthAssertion
    :graphql-type :object
    :implements [:Resource]
    :fields {:conflictingAssertions
             {:type '(list :EvidenceStrengthAssertion)
-             :resolve (fn [_ _ v] (:conflictingAssertions v))}
+             :resolve (fn [c a v] (conflicting-assertions-fn c a v))}
             :subject
             {:type :Resource
              :path [:cg/subject]}

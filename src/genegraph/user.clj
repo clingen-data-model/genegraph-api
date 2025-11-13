@@ -171,6 +171,15 @@
       (catch Exception e (assoc event ::error e))))  
   )
 
+;; load curations
+
+(comment
+  (event-store/with-event-reader [r (str root-data-dir
+                                         "ggapi-clinvar-curation-stage-1-2025-10-27.edn.gz")]
+    (->> (event-store/event-seq r)
+         (run! #(p/publish (get-in api-test-app [:topics :clinvar-curation]) %))))
+  )
+
 ;; Reload base data
 
 
@@ -205,8 +214,9 @@
        io/resource
        slurp
        edn/read-string
-       (filterv #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+       (filterv #(= #_"https://www.ncbi.nlm.nih.gov/clinvar/"
                     #_"https://genegraph.app/resources"
+                    "https://thegencc.org/"
                     (:name %)))
        (mapv #(assoc % :source {:type :file
                                 :base "/Users/tristan/data/genegraph-base/"
@@ -363,7 +373,7 @@ select ?x where {
 ;; reload clingen gene validity
 (comment
   (time
-   (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene-validity-sepio-2025-10-01.edn.gz"]
+   (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene-validity-sepio-2025-10-09.edn.gz"]
      (->> (event-store/event-seq r)
           #_(mapv ::event/key)
           #_(take 1)
@@ -1079,12 +1089,14 @@ select ?ann where {
 ;; Troubleshooting 'no comment'
 (comment
   ;; SCV004933996
-  (event-store/with-event-reader [r (str root-data-dir "ggapi-clinvar-curation-stage-1-2024-12-18.edn.gz")]
+  (event-store/with-event-reader [r (str root-data-dir
+                                       "ggapi-clinvar-curation-stage-1-2025-10-27.edn.gz")]
     (->> (event-store/event-seq r)
          count))
 
-  
-  (event-store/with-event-reader [r (str root-data-dir "ggapi-clinvar-curation-stage-1-2024-12-18.edn.gz")]
+   ;; return to here
+  (event-store/with-event-reader [r (str root-data-dir
+                                         "ggapi-clinvar-curation-stage-1-2025-10-27.edn.gz")]
     (->> (event-store/event-seq r)
          #_(filter #(re-find #"SCV004933996" (::event/value %)))
          (take 1)
@@ -4060,6 +4072,14 @@ select ?c where {
 
          ))
 
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gpm-person-events-2025-09-17.edn.gz"]
+    (->> (event-store/event-seq r)
+         (filter #(re-find #"thnelson@geisinger.edu" (::event/value %)))
+         (take-last 1)
+         (mapv event/deserialize)
+         tap>
+         ))
+
   (tap> api-test-app)
   (defn process-gpm-person [e]
     (p/process (get-in api-test-app [:processors :import-gpm-people])
@@ -4160,7 +4180,7 @@ select ?x where
 { ?x a ?type . }
  limit 5")]
     (rdf/tx tdb
-      (->> (q tdb {:type :so/GeneWithProteinProduct})
+      (->> (q tdb {:type :cg/AssertionAnnotation})
            count
            #_(mapv #(rdf/ld1-> % [:rdf/type])))))
 
@@ -4173,3 +4193,16 @@ select ?x where
     (org.apache.jena.tdb2.DatabaseMgr/location (.asDatasetGraph tdb)))
 
  )
+
+
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "
+select ?x where
+{ ?x a e . }
+ limit 5")]
+    (rdf/tx tdb
+      (->> (q tdb {:type :cg/AssertionAnnotation})
+           count
+           #_(mapv #(rdf/ld1-> % [:rdf/type])))))
+  )
