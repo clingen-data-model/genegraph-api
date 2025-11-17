@@ -38,7 +38,12 @@
 (def build-location {:grch38 :customfield_10532
                      :grch37 :customfield_10160})
 
+#_(defn curation-type [curation]
+  (get-in curation [:fields :issuetype :name]))
 
+(defn region-curation? [curation]
+  (= "ISCA Region Curation"
+     (get-in curation [::event/data :fields :issuetype :name])))
 
 (defn- format-jira-datetime-string
   "Corrects flaw in JIRA's formatting of datetime strings. By default JIRA does not
@@ -348,7 +353,7 @@
    :types [(-> region :type rdf/resource str)]})
 
 (defn add-dosage-region-fn [event]
-  (if (::model event)
+  (if (and (::model event) (region-curation? event))
     (let [region (dosage-region (::event/data event))] 
       (-> event
           (assoc ::region region)
@@ -411,7 +416,7 @@
    (mapcat idx/location->index-entries (:ga4gh/location feature))))
 
 (defn add-dosage-indexes-fn [event]
-  (if (::model event)
+  (if (and (::model event) (region-curation? event) (::region event))
     (reduce (fn [e idx] 
               (event/store e
                            :object-db

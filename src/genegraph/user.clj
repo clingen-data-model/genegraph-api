@@ -216,7 +216,8 @@
        edn/read-string
        (filterv #(= #_"https://www.ncbi.nlm.nih.gov/clinvar/"
                     #_"https://genegraph.app/resources"
-                    "https://thegencc.org/"
+                    #_"https://thegencc.org/"
+                    "http://www.ebi.ac.uk/efo/efo-base.owl"
                     (:name %)))
        (mapv #(assoc % :source {:type :file
                                 :base "/Users/tristan/data/genegraph-base/"
@@ -4205,4 +4206,64 @@ select ?x where
       (->> (q tdb {:type :cg/AssertionAnnotation})
            count
            #_(mapv #(rdf/ld1-> % [:rdf/type])))))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        scv (rdf/resource "CVSCV:SCV005044868" tdb)]
+    (rdf/tx tdb
+      (let [r (rdf/ld1-> scv [:cg/subject :cg/variant])]
+        (->> (concat (rdf/ld-> r [:cg/CompleteOverlap])
+                     (rdf/ld-> r [:cg/PartialOverlap]))
+             #_(into [])
+             (mapv #(hr/hybrid-resource % hybrid-db))
+             count))))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        scv (rdf/resource "CVSCV:SCV005044868" tdb)]
+    (rdf/tx tdb
+      (let [r (rdf/ld1-> scv [:cg/subject :cg/variant])]
+        (->> (hr/path-> r hybrid-db [:cg/CompleteOverlap])
+             (mapv #(rdf/curie (:iri %)))
+             (filter nil?)
+             count))))
+
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        #_#_region (rdf/resource "GG:region-ISCA-17168" tdb)
+        region (rdf/resource "GG:region-ISCA-37421" tdb)]
+    (rdf/tx tdb
+      (rdf/ld1-> region [:rdfs/label])))
+  )
+
+
+(comment
+  "GG:region-ISCA-17168" ; no label ;; GJA5 gene--dosage regions being created for genes -- this should not happen
+  "GG:region-ISCA-37421" ; label
+  (def gja5
+    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene_dosage_raw-2025-10-21.edn.gz"]
+      (->> (event-store/event-seq r)
+           (filter #(re-find #"Therefore, increased probe density of this region is warranted but there is no reason to target GJA5 at the exon level." (::event/value %)))
+           last)))
+
+  (-> gja5
+      process-dosage
+      #_::dosage/model
+      
+      #_rdf/pp-model
+      tap>)
+
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene_dosage_raw-2025-10-21.edn.gz"]
+    (->> (event-store/event-seq r)
+         (map event/deserialize)
+         (map #(dosage/curation-type (::event/data %)))
+         frequencies))
+
+  {"ISCA Region Curation" 1499, "ISCA Gene Curation" 18462}
+  
+  
   )

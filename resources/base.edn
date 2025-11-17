@@ -16,6 +16,9 @@
  {:name "http://purl.obolibrary.org/obo/so.owl",
   :target "so.owl",
   :format :genegraph.framework.storage.rdf/rdf-xml}
+ {:name "http://www.ebi.ac.uk/efo/efo-base.owl"
+  :target "efo-base.owl",
+  :format :genegraph.framework.storage.rdf/rdf-xml}
  {:name "http://purl.obolibrary.org/obo/mondo.owl",
   :target "mondo.owl",
   :format :genegraph.framework.storage.rdf/rdf-xml}
