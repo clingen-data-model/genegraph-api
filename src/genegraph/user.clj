@@ -214,16 +214,17 @@
        io/resource
        slurp
        edn/read-string
-       (filterv #(= #_"https://www.ncbi.nlm.nih.gov/clinvar/"
+       (filterv #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
                     #_"https://genegraph.app/resources"
                     #_"https://thegencc.org/"
-                    "http://www.ebi.ac.uk/efo/efo-base.owl"
+                    #_"http://www.ebi.ac.uk/efo/efo-base.owl"
                     (:name %)))
        (mapv #(assoc % :source {:type :file
                                 :base "/Users/tristan/data/genegraph-base/"
                                 :path (:target %)}))
        (mapv (fn [x] {::event/data x}))
        (run! #(p/publish (get-in api-test-app [:topics :base-data]) %)))
+
 
   (->> "base.edn"
        io/resource
@@ -4265,5 +4266,52 @@ select ?x where
 
   {"ISCA Region Curation" 1499, "ISCA Gene Curation" 18462}
   
+  
+  )
+
+(def gs-filters
+  {:label "Candidate Gold Standard"
+   :description "Variants that are not pathogenic due to the gene dosage map but are called as pathogenic in ClinVar. Must be newer than 2020"
+   :filters [{:filter :proposition_type
+              :argument "CG:VariantPathogenicityProposition"}
+             {:filter :copy_change
+              :argument "EFO:0030067"}
+             {:filter :partial_overlap_with_feature_set
+              :argument "CG:HaploinsufficiencyFeatures"
+              :operation :not_exists}
+             {:filter :complete_overlap_with_feature_set
+              :argument "CG:HaploinsufficiencyFeatures"
+              :operation :not_exists}
+             {:filter :gene_count_min
+              :argument "CG:Genes35"
+              :operation :not_exists}
+             {:filter :assertion_direction
+              :argument "CG:Supports"}
+             {:filter :submitter
+              :argument "CVAGENT:500031"
+              :operation :not_exists}
+             {:filter :date_evaluated_min
+              :argument "2020"}
+             {:filter :complete_overlap_with_feature_set
+              :argument "CG:ProteinCodingGenes"}]})
+
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (filters/compile-filter-query
+           [:bgp ['x :rdf/type :cg/EvidenceStrengthAssertion]]
+           (:filters gs-filters))]
+    (rdf/tx tdb
+      (->> (q tdb)
+           (map #(hr/hybrid-resource % hybrid-db))
+           (take 5)
+           tap>
+           #_(mapv (fn [a]
+                   [(str a)
+                    (rdf/ld1-> a [:rdfs/label])
+                    (rdf/ld1-> a [:cg/subject :cg/variant :rdfs/label])])))))
+
+
   
   )

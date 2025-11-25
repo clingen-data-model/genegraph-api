@@ -6,7 +6,7 @@
 
 
 
-(defn conflicting-assertions [{:keys [tdb] :as context} args assertion]
+(defn path-conflicting-assertions [{:keys [tdb] :as context} args assertion]
   (let [candidate-assertion-query (rdf/create-query "
 select ?a2 where {
 ?a a :cg/EvidenceStrengthAssertion ;
@@ -41,13 +41,105 @@ select ?gene where {
                 {}
                 candidate-assertions)
         error-factor (* (count origin-genes) 0.1)]
-    #_[]
     (->> candidate-assertion-genes
          (filter (fn [[a gs]]
                    (-> (set/difference origin-genes gs)
                        count
                        (<= error-factor))))
          (mapv #(hr/hybrid-resource (key %) context )))))
+
+(defn conflicting-assertions [context args assertion]
+  (path-conflicting-assertions context args assertion))
+
+
+(defn candidate-assertions [{:keys [tdb]}]
+  (let [q (rdf/create-query "
+select ?a where {
+?a a :cg/EvidenceStrengthAssertion ;
+:cg/direction ?direction  ;
+:cg/subject ?prop1 .
+?prop1 a :cg/VariantPathogenicityProposition ;
+:cg/variant ?variant1 .
+}")
+        overlapping-genes-query (rdf/create-query "
+select ?gene where {
+?a a :cg/EvidenceStrengthAssertion ;
+:cg/subject ?prop1 .
+?prop1 a :cg/VariantPathogenicityProposition ;
+:cg/variant ?variant1 .
+?variant1 :ga4gh/copyChange ?copychange ;
+:cg/CompleteOverlap ?gene .
+?gene a :so/GeneWithProteinProduct .
+}")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           (map
+            (fn [a]
+              (let [v (rdf/ld1-> a [:cg/subject :cg/variant])]
+                {:assertion (str a)
+                 :direction (rdf/->kw (rdf/ld1-> a [:cg/direction]))
+                 :copy-change (rdf/->kw (rdf/ld1-> v [:ga4gh/copyChange]))
+                 :genes (set (map str (overlapping-genes-query tdb {:a a})))})))
+           (filterv #(< 0 (count (:genes %))))))))
+
+(def copy-changes #{:efo/copy-number-gain :efo/copy-number-loss})
+
+(def non-path #{:cg/Inconclusive :cg/Refutes})
+
+(def path #{:cg/Supports})
+
+(defn assertion-subset [target-copy-change target-direction assertions]
+  (filterv
+   (fn [{:keys [direction copy-change]}]
+     (and (target-direction direction) (= target-copy-change copy-change)))
+   assertions))
+
+(defn has-conflict? [path-assertion non-path-assertion error-factor]
+  (let [non-overlapping-genes (set/difference (:genes path-assertion)
+                                              (:genes non-path-assertion))]
+    (< (/ (count non-overlapping-genes)
+          (count (:genes path-assertion)))
+       error-factor)))
+
+(defn identify-conflicting-assertions [error-factor path-set non-path-set]
+  (reduce
+   (fn [conflicts path-assertion]
+     (reduce
+      (fn [all-conflicts new-conflict]
+        (conj all-conflicts
+              [(:assertion path-assertion)
+               (:assertion new-conflict)]))
+      conflicts
+      (filter #(has-conflict? path-assertion % error-factor) non-path-set)))
+   []
+   path-set))
+
+(defn construct-conflict-triples [conflict-list]
+  (->> conflict-list
+       (mapcat
+        (fn [[path-iri non-path-iri]]
+          [[(rdf/resource path-iri) :cg/conflictingInterpretation non-path-iri]
+           [non-path-iri :cg/conflictingInterpretation (rdf/resource path-iri)]]))
+       (into [])))
+
+(comment
+  (def assertions
+    (let [tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])
+          object-db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])
+          hybrid-db {:tdb tdb :object-db object-db}]
+      (->> (candidate-assertions hybrid-db))))
+
+  (def path-loss (assertion-subset :efo/copy-number-loss path assertions))
+  (def non-path-loss (assertion-subset :efo/copy-number-loss non-path assertions))
+  (count candidate-assertions)
+  (count path-loss)
+  (count non-path-loss)
+  (def loss-conflicts
+    (identify-conflicting-assertions 0.1 path-loss non-path-loss))
+
+  (count loss-conflicts)
+  )
+
 
 (comment
   (let [tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])]
@@ -291,4 +383,28 @@ select ?a where {
         ]
     (rdf/tx tdb
       (count (q tdb))))
+
+
+    (let [tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])
+          object-db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])
+          hybrid-db {:tdb tdb :object-db object-db}
+          q (rdf/create-query "
+select ?a where {
+?a a :cg/EvidenceStrengthAssertion ;
+:cg/direction ?direction  ;
+:cg/subject ?prop1 .
+?prop1 a :cg/VariantPathogenicityProposition ;
+:cg/variant ?variant1 .
+} limit 10")]
+      (tap>
+       (rdf/tx tdb
+         (mapv
+          (fn [a]
+            (let [v (rdf/ld1-> a [:cg/subject :cg/variant])]
+              {:assertion (str a)
+               :direction (rdf/->kw (rdf/ld1-> a [:cg/direction]))
+               :copy-change (rdf/->kw (rdf/ld1-> v [:ga4gh/copyChange]))
+               :genes (set (concat (rdf/ld-> v [:cg/CompleteOverlap])
+                                   (rdf/ld-> v [:cg/PartialOverlap])))}))
+          (q tdb)))))
   )

@@ -61,9 +61,13 @@
    find-query/query-result
    find-query/filter-ops
    find-query/filters-enum
+   find-query/display-enum
    find-query/filter-call
    find-query/assertions-query
-   find-query/sequence-features-query])
+   find-query/sequence-features-query
+   find-query/filter-description
+   find-query/filter-option
+   find-query/filters-query])
 
 
 (defn schema

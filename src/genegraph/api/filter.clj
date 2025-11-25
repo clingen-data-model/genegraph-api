@@ -166,52 +166,95 @@
 ;; so using snake-case to support javascript usage
 (def filters
   {:submitter {:pattern-fn submitter
+               :label "Submitter"
                :description "Selects assertions that have been contributed to by a specific agent."
                :comain :cg/EvidenceStrengthAssertion}
    :is_obsolete {:pattern-fn is-obsolete
+                 :label "Obsolete"
                  :description "Selects only assertions that have been invalidated by other assertions. Generally included for negation purposes, in order to select only current curations."
                  :domain :cg/EvidenceStrengthAssertion}
    :proposition_type {:pattern-fn proposition-type-pattern-fn
+                      :advertise true
+                      :display :list
+                      :label "Type"
                       :description "Type of proposition referred to by the evidence level assertion. Types include CG:VariantPathogenicityProposition, CG:GeneValidityProposition, and CG:ConditionMechanismProposition"
+                      :options [{:id "CG:VariantPathogenicityProposition"
+                                 :label "Variant Pathogenicity"
+                                 :description "CNV Variant Pathogenicity Records from ClinVar"}
+                                {:id "CG:GeneValidityProposition"
+                                 :label "Gene Validity"
+                                 :description "Gene Validity assertions from ClinGen and GenCC"}
+                                {:id "CG:ConditionMechanismProposition"
+                                 :label "Genetic Condition Mechanism"
+                                 :description "Mechanism of disease assertions from ClinGen Dosage Curation"}]
                       :domain :cg/EvidenceStrengthAssertion}
    :copy_change {:pattern-fn copy-change-pattern-fn
+                 :advertise true
+                 :label "Copy Change"
                  :description "Copy change of the referred-to variant"
-                 :domain :cg/EvidenceStrengthAssertion}
+                 :domain :cg/EvidenceStrengthAssertion
+                 :display :list
+                 :options [{:id "EFO:0030067"
+                            :label "Copy Number Loss"
+                            :description "Assessment of genomic copy number loss."}
+                           {:id "EFO:0030070"
+                            :label "Copy Number Gain"
+                            :description "Assessment of genomic copy number gain."}] }
    :assertion_direction {:pattern-fn assertion-direction-pattern-fn
+                         :advertise true
+                         :label "Direction"
                          :description "Direction of the assertion. Requires assertion to be the subject type"
-                         :domain :cg/EvidenceStrengthAssertion}
+                         :domain :cg/EvidenceStrengthAssertion
+                         :display :list
+                         :options [{:id "CG:Supports"
+                                    :label "Supports"
+                                    :description "Assertion supports variant pathogenicity, gene validity, or the relationship between a disease and a genetic mechanism."}
+                                   {:id "CG:Inconclusive"
+                                    :label "Inconclusive"
+                                    :description "Assertion is inconclusive with regard to variant pathogenicity, gene validity, or the relationship between a disease and a genetic mechanism."}
+                                   {:id "CG:Refutes"
+                                    :label "Refutes"
+                                    :description "Assertion contradicts the pathogenicity of a variant, the validity of a gene-disease relationship, or the relationship between a disease and genetic mechanism."}]}
    :complete_overlap_with_feature_set
    {:pattern-fn (fn [feature-set]
                   (feature-set-overlap-pattern :cg/CompleteOverlap feature-set))
+    :label "Complete Overlap with Feature"
     :description "Assertion that has complete overlap with the given feature set. Valid arguments include CG:HaploinsufficiencyFeatures and CG:TriplosensitivityFeatures"
     :domain :cg/EvidenceStrengthAssertion}
    :partial_overlap_with_feature_set
    {:pattern-fn (fn [feature-set]
                   (feature-set-overlap-pattern :cg/PartialOverlap feature-set))
+    :label "Partial Overlap with Feature"
     :description "Assertion that has partial overlap with the given feature set. Valid arguments include CG:HaploinsufficiencyFeatures and CG:TriplosensitivityFeatures"
     :domain :cg/EvidenceStrengthAssertion}
    :gene_count_min
    {:pattern-fn gene-count-min-pattern-fn
+    :label "Gene Overlap Count"
     :description "Threshold for minimum number of gene features. Valid arguments are CG:Genes25, CG:Genes35, and CG:Genes50"
     :domain :cg/EvidenceStrengthAssertion}
    :date_evaluated_min
    {:pattern-fn min-last-evaluted-date-pattern-fn
     :description "Filter for classifications evaluated after the given date (in ISO format"
+    :label "Evaluated After Date"
     :domain :cg/EvidenceStrengthAssertion}
    :has_annotation
    {:pattern-fn has-annotation
+    :label "Annotated Assertions"
     :description "Filter for assertions that have had some annotation made on them."
     :domain :cg/EvidenceStrengthAssertion}
    :has_assertion
    {:pattern-fn has-assertion
+    :label "Annotated Feature"
     :description "Filter for sequence features that are the subject of an assertion."
     :domain :cg/SequenceFeature}
    :is_about_gene
    {:pattern-fn is-about-gene
+    :label "Gene"
     :description "Filter for assertions that are about a specific gene. Expect a gene IRI or CURIE as an argument."
     :domain :cg/EvidenceStrengthAssertion}
    :is_about_gene_symbol
    {:pattern-fn is-about-gene-symbol
+    :label "Gene"
     :description "Filter for assertions that are about a specific gene. Expect a gene symbol as an argument."
     :domain :cg/EvidenceStrengthAssertion}})
 

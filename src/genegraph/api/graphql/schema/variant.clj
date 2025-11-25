@@ -16,6 +16,28 @@ select ?x where {
     (->> (q value {:v value})
          (mapv #(hr/hybrid-resource % context)))))
 
+(defn overlapping-features-fn [context args value]
+  (let [q (rdf/create-query "
+select ?x where {
+?variant :cg/CompleteOverlap ?x .
+?x a ?type .
+filter (?type in ( :so/GeneWithProteinProduct , :cg/DosageRegion ))}")]
+    (->> (q (:tdb context) {:variant value})
+         (mapv #(hr/hybrid-resource % context)))))
+
+(comment
+  (count
+   (let [context {:tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])
+                  :object-db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])}]
+     (rdf/tx (:tdb context)
+       (overlapping-features-fn
+        context
+        nil
+        (rdf/ld1-> (rdf/resource "CVSCV:SCV005044868" (:tdb context))
+                   [:cg/subject :cg/variant])))))
+  )
+
+
 (def canonical-variant
   {:name :CanonicalVariant
    :graphql-type :object
@@ -25,7 +47,8 @@ select ?x where {
             :copyChange {:type :Resource
                          :path [:ga4gh/copyChange]}
             :overlappingFeatures {:type '(list :SequenceFeature)
-                                  :path [:cg/CompleteOverlap]}
+                                  #_#_:path [:cg/CompleteOverlap]
+                                  :resolve (fn [c a v] (overlapping-features-fn c a v))}
             :assertions {:type '(list :EvidenceStrengthAssertion)
                          :resolve
                          (fn [c a v]
