@@ -23,7 +23,7 @@
   {:name :DisplayOption
    :graphql-type :enum
    :description "Suggested display for filter selection."
-   :values [:list]})
+   :values [:list :select]})
 
 (def filter-ops
   {:name :FilterOps
@@ -51,7 +51,7 @@
            [:bgp ['x :rdf/type :cg/EvidenceStrengthAssertion]]
            (:filters args))]
     (mapv #(hr/hybrid-resource % context)
-          (q (:tdb context) {::rdf/params {:limit 500}}))))
+          (q (:tdb context) {::rdf/params {:limit 50}}))))
 
 (def assertions-query
   {:name :assertions

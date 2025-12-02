@@ -167,6 +167,8 @@
 (def filters
   {:submitter {:pattern-fn submitter
                :label "Submitter"
+               :advertise true
+               :display :select
                :description "Selects assertions that have been contributed to by a specific agent."
                :comain :cg/EvidenceStrengthAssertion}
    :is_obsolete {:pattern-fn is-obsolete

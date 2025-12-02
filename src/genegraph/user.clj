@@ -214,10 +214,11 @@
        io/resource
        slurp
        edn/read-string
-       (filterv #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+       (filterv #(= #_"https://www.ncbi.nlm.nih.gov/clinvar/"
                     #_"https://genegraph.app/resources"
                     #_"https://thegencc.org/"
                     #_"http://www.ebi.ac.uk/efo/efo-base.owl"
+                    "https://affils.clinicalgenome.org/"
                     (:name %)))
        (mapv #(assoc % :source {:type :file
                                 :base "/Users/tristan/data/genegraph-base/"
@@ -4313,5 +4314,23 @@ select ?x where
                     (rdf/ld1-> a [:cg/subject :cg/variant :rdfs/label])])))))
 
 
+
+
   
+  )
+
+
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        q (rdf/create-query "select ?x where { ?x a :cg/Affiliation }")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           #_(map #(hr/hybrid-resource % hybrid-db))
+           count
+           #_(mapv (fn [a]
+                     [(str a)
+                      (rdf/ld1-> a [:rdfs/label])
+                      (rdf/ld1-> a [:cg/subject :cg/variant :rdfs/label])])))))
   )

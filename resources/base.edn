@@ -45,6 +45,7 @@
  {:name "https://affils.clinicalgenome.org/",
   :target "affils.json",
   :format :genegraph.api.base/affils-json,
+  :action :genegraph.api.base/load-affils
   :headers {"X-Api-Key" :affils-service-key}}
  {:name "https://www.ncbi.nlm.nih.gov/clinvar/submitters",
   :target "clinvar-submitters.txt",

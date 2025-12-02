@@ -12,7 +12,7 @@
            [org.apache.lucene.index IndexReader
             IndexWriter IndexWriterConfig IndexWriterConfig$OpenMode
             IndexableField IndexableFieldType DirectoryReader]
-           [org.apache.lucene.search IndexSearcher TopDocs ScoreDoc SearcherManager]
+           [org.apache.lucene.search IndexSearcher TopDocs ScoreDoc SearcherManager BooleanQuery BooleanClause$Occur TermQuery]
            [org.apache.lucene.index StoredFields Term]
            [org.apache.lucene.queryparser.classic QueryParser]
            [org.apache.lucene.queryparser.simple SimpleQueryParser]
@@ -33,7 +33,7 @@
            [com.google.genai.types EmbedContentConfig EmbedContentConfig$Builder]))
 
 (defn document-iri [doc]
-    (-> doc (.getField "iri") .stringValue))
+  (-> doc (.getField "iri") .stringValue))
 
 ;; Consider validation with spec
 ;; right now assuming happy path--should hopefully throw
@@ -172,6 +172,9 @@
 
 
 (comment
+  (TermQuery. (Term. "label" "autism"))
+
+  (comment ())
 
   (def lc
     (p/init
@@ -238,7 +241,7 @@
     (.release sm s)
     (.totalHits result))
 
-
+(.parse (SimpleQueryParser. anal "label") "spending* limit finder")
 
   
   ;; writing

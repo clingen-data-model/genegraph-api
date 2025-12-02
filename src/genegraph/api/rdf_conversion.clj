@@ -7,7 +7,8 @@
     :cg/date
     :schema/email
     :schema/givenName
-    :schema/familyName})
+    :schema/familyName
+    :rdfs/label})
 
 (defn value->rdf-object [v]
   (if (map? v)
@@ -42,6 +43,11 @@
 
 (defn map->model [m]
   (rdf/statements->model (map->statements m)))
+
+(defn map->text-index [m source]
+  {:iri (:iri m)
+   :labels [(:rdfs/label m)]
+   :source source})
 
 (comment
   (->
