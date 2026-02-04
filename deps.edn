@@ -12,25 +12,21 @@
                                                 :git/sha "2fdfd66"}
                  org.clojure/data.json {:mvn/version "2.5.1"}}
           :ns-default build}
-  :dev {:extra-deps {djblue/portal {:mvn/version "0.57.3"}
-                     io.github.nextjournal/clerk {:mvn/version "0.17.1102"}
+  :dev {:extra-deps {djblue/portal {:mvn/version "0.62.1"}
+                     io.github.nextjournal/clerk {:mvn/version "0.18.1158"}
                      io.github.clojure/tools.build {:git/tag "v0.10.8"
                                                 :git/sha "2fdfd66"}}
         
         :jvm-opts [                  #_"-agentpath:/Users/tristan/.yjp/2025.3.151/mac/7193F395/libyjpagent.dylib=delay=10000"
                    "-XX:+UseZGC"
-                   "-XX:+ZGenerational"
                    "-XX:MaxRAMPercentage=50"
                    "-Djdk.attach.allowAttachSelf"
-                   "-Djava.security.manager=allow"
                    "--add-modules=jdk.incubator.vector"
                    "--enable-native-access=ALL-UNNAMED"]}} ;; needed for lucene vector api
  ;; https://nrepl.org/nrepl/installation.html#jvmti
 
  :jvm-opts ["-XX:+UseZGC"
-            "-XX:+ZGenerational"
             "-XX:MaxRAMPercentage=75"
-            "-Djava.security.manager=allow"
             "--add-modules=jdk.incubator.vector"
             "--enable-native-access=ALL-UNNAMED"]
 
@@ -42,9 +38,11 @@
  
  :deps
  {ch.qos.logback/logback-classic                    {:mvn/version "1.5.0"}
-  org.clojure/clojure                               {:mvn/version "1.12.0"}
+  org.clojure/clojure                               {:mvn/version "1.12.4"}
   io.github.clingen-data-model/genegraph-framework
-  {:git/sha "2d993dead593c0f97968deb645679ad32d39b23e"}
+  #_{:git/sha "2d993dead593c0f97968deb645679ad32d39b23e"} ;; old version
+  {:git/sha "80f49887646a208069a624bbf9f06ea37815d8db"}
+  cheshire/cheshire {:mvn/version "6.1.0"} ;; required for lacinia-pedestal
   com.walmartlabs/lacinia-pedestal {:mvn/version "1.3"}
   hato/hato                                         {:mvn/version "1.0.0"}
   org.clojure/data.csv                              {:mvn/version "1.0.1"}
@@ -64,6 +62,11 @@
 
   com.google.genai/google-genai {:mvn/version "1.6.0"}
 
+  ;; WorkOS authentication
+  
+  com.workos/workos {:mvn/version "4.18.1"}
+  buddy/buddy-sign {:mvn/version "3.6.1-359"}
+  buddy/buddy-core {:mvn/version "1.12.0-430"}
 
   
   }

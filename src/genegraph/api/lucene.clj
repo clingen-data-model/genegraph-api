@@ -1,6 +1,7 @@
 (ns genegraph.api.lucene
   "Extension to support Apache Lucene using Genegraph framework storage mechanisms."
   (:require [genegraph.framework.storage :as storage]
+            [genegraph.framework.storage.rdf :as rdf]
             [genegraph.framework.protocol :as p]
             [clojure.java.io :as io])
   (:import [java.util.concurrent ArrayBlockingQueue TimeUnit]
@@ -12,11 +13,12 @@
            [org.apache.lucene.index IndexReader
             IndexWriter IndexWriterConfig IndexWriterConfig$OpenMode
             IndexableField IndexableFieldType DirectoryReader]
-           [org.apache.lucene.search IndexSearcher TopDocs ScoreDoc SearcherManager BooleanQuery BooleanClause$Occur TermQuery]
+           [org.apache.lucene.search IndexSearcher TopDocs ScoreDoc SearcherManager BooleanQuery BooleanQuery$Builder BooleanClause$Occur TermQuery]
            [org.apache.lucene.index StoredFields Term]
            [org.apache.lucene.queryparser.classic QueryParser]
            [org.apache.lucene.queryparser.simple SimpleQueryParser]
            [org.apache.commons.io FileUtils]
+           [org.apache.lucene.index VectorSimilarityFunction]
            [org.apache.lucene.document
             Document
             Field
@@ -30,10 +32,42 @@
             StoredValue$Type]
            [org.apache.lucene.util IOUtils]
            [com.google.genai Models Client]
-           [com.google.genai.types EmbedContentConfig EmbedContentConfig$Builder]))
+           [com.google.genai.types
+            EmbedContentConfig
+            EmbedContentConfig$Builder
+            EmbedContentResponse]))
+
+;; gemini-embedding-001 has too many dimensions
+;; lucene only supports 1024
+(def embedding-model
+  #_"gemini-embedding-001" 
+  "text-embedding-005")
 
 (defn document-iri [doc]
   (-> doc (.getField "iri") .stringValue))
+
+(defn retrieve-or-create-embedding [object-db ai-client text]
+  ;; The actual embeddings vector is buried deeply in
+  ;; Optionals and Arrays. Follow the happy path to get the
+  ;; array of floats.
+  (into-array
+   Float/TYPE
+   (-> ai-client                         ; Client
+       .models                           ; Models
+       (.embedContent embedding-model
+                      text
+                      (.build (EmbedContentConfig/builder))) ; EmbedContentResponse
+       .embeddings                                           ; Optional
+       .get                                                  ; List 
+       first                             ; ContentEmbedding
+       .values                           ; Optional 
+       .get)))
+
+(defn add-text-embedding-vectors [object-db ai-client doc]
+  (assoc doc
+         :embedding-vectors
+         (mapv #(retrieve-or-create-embedding object-db ai-client %)
+               (:embeddings doc))))
 
 ;; Consider validation with spec
 ;; right now assuming happy path--should hopefully throw
@@ -48,30 +82,72 @@
     (doseq [kw (:types m)] (.add doc (KeywordField. "type" kw Field$Store/YES)))
     (doseq [l (:labels m)] (.add doc (TextField. "label" l Field$Store/YES)))
     (doseq [d (:descriptions m)] (.add doc (TextField. "description" d Field$Store/YES)))
+    (doseq [v (:embedding-vectors m)] (.add doc
+                                            (KnnFloatVectorField.
+                                             "embeddings"
+                                             v
+                                             VectorSimilarityFunction/DOT_PRODUCT)))
     doc))
 
 
+#_(type (-> @genegraph.user/p first first))
+
 (defprotocol Searchable
   (search [this params]))
-
 
 (defn score-doc->m [score-doc stored-fields]
   {:iri (document-iri (.document stored-fields (.doc score-doc) #{"iri"}))
    :score (.score score-doc)})
 
-(defn lucene-search [{:keys [searcher-manager
-                             symbol-parser
-                             label-parser
-                             description-parser]}
-                     {:keys [field query max-results]}]
+(defn parsed-query
+  [{:keys [symbol-parser label-parser description-parser]
+    :as lucene-instance}
+   {:keys [field query] :as search-params}]
+  (println "parsed-query " field)
   (let [parser (case field
                  :symbol symbol-parser
                  :label label-parser
-                 :description description-parser)
-        searcher (.acquire searcher-manager)]
-    (->> (.search searcher
-                  (.parse parser query)
-                  (or max-results 100))
+                 :description description-parser)]
+    (.parse parser query)))
+
+(defn type-filtered-query
+  [lucene-instance search-params]
+  (println (-> search-params :type rdf/resource str))
+  (-> (BooleanQuery$Builder.)
+      (.add (parsed-query lucene-instance search-params)
+            BooleanClause$Occur/MUST)
+      (.add (TermQuery.
+             (Term. "type"
+                    (-> search-params :type rdf/resource str)
+                    #_"http://purl.obolibrary.org/obo/SO_0001217"
+                    #_"https://genegraph.clinicalgenome.org/terms/Affiliation"))
+            BooleanClause$Occur/MUST)
+      .build))
+
+;; TODO think about the architecture of this
+;; in the context of adding embeddings queries
+(defn embeddings-query
+  [lucene-instance search-params]
+  (KnnFloatVectorField/newVectorQuery
+   "embeddings"
+   (retrieve-or-create-embedding nil (:google-ai-client lucene-instance) (:query search-params))
+   5))
+
+(defn ->query
+  [lucene-instance search-params]
+  (if (= :embeddings (:field search-params))
+    (embeddings-query lucene-instance search-params)
+    (if (:type search-params)
+      (type-filtered-query lucene-instance search-params)
+      (parsed-query lucene-instance search-params))))
+
+(defn execute-search
+  [{:keys [searcher-manager] :as lucene-instance} search-params]
+  (let [searcher (.acquire searcher-manager)
+        query (->query lucene-instance search-params)]
+    (->> (.search (.acquire searcher-manager)
+                  query
+                  (:limit search-params 100))
          .scoreDocs
          (mapv #(score-doc->m % (.storedFields searcher))))))
 
@@ -81,30 +157,39 @@
                            label-parser
                            description-parser
                            needs-commit-q
-                           state]
+                           state
+                           google-ai-client]
   
   storage/IndexedWrite
   (storage/write [this k v]
     (.updateDocument writer
                      (Term. "iri" k)
-                     (->lucene-document v))
+                     (->lucene-document
+                      (add-text-embedding-vectors nil
+                                                  google-ai-client
+                                                  v)))
     (.offer needs-commit-q k))
   (storage/write [this k v commit-promise]
     (storage/write this k v)
     (deliver commit-promise true))
 
   Searchable
-  (search [this {:keys [field query max-results]}]
-    (let [parser (case field
-                   :symbol symbol-parser
-                   :label label-parser
-                   :description description-parser)
-          searcher (.acquire searcher-manager)]
-      (->> (.search (.acquire searcher-manager)
-                    (.parse parser query)
-                    (or max-results 100))
-           .scoreDocs
-           (mapv #(score-doc->m % (.storedFields searcher)))))))
+  (search [this search-params]
+    (execute-search this search-params)))
+
+(defn create-google-ai-client [{:keys [project location]}]
+  (if (and project location)
+    (-> (Client/builder)
+        (.project project)
+        (.location location)
+        (.vertexAI true)
+        (.build))
+    nil))
+
+#_(def c
+  (create-google-ai-client
+   {:project "clingen-dx"
+    :location "us-east1"}))
 
 (defrecord LuceneContainer [name
                             type
@@ -142,7 +227,8 @@
                 :description-parser (SimpleQueryParser. (StandardAnalyzer.)
                                                         "description")
                 :needs-commit-q (ArrayBlockingQueue. 2)
-                :state state}))
+                :state state
+                :google-ai-client (create-google-ai-client this)}))
       (Thread/startVirtualThread
        (fn []
          (let [{:keys [writer searcher-manager needs-commit-q]} @instance]
@@ -330,7 +416,7 @@
         (.location "us-east1")
         (.vertexAI true)
         (.build)))
-
+  (.close client)
   
   (time
    (-> client

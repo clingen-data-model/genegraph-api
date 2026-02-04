@@ -41,7 +41,8 @@
             [genegraph.api.shared-data :as shared-data]
             [genegraph.api.sequence-index :as idx]
             [genegraph.api.gpm :as gpm]
-            [genegraph.api.base.gene :as hgnc-gene])
+            [genegraph.api.base.gene :as hgnc-gene]
+            [charred.api :as charred])
   (:import [ch.qos.logback.classic Logger Level]
            [org.slf4j LoggerFactory]
            [java.time Instant LocalDate LocalDateTime ZoneOffset]
@@ -60,8 +61,10 @@
   )
 
 (comment
-  (clerk/serve! {:watch-paths ["notebooks" "src"]})
+  (clerk/serve! {:watch-paths ["notebooks"]})
   (clerk/build! {:paths ["notebooks/cnv.clj"]
+                 :package :single-file})
+  (clerk/build! {:paths ["notebooks/cvc.md"]
                  :package :single-file})
   (clerk/build! {:paths ["notebooks/data_exchange.md"]
                  :package :single-file})
@@ -135,7 +138,10 @@
                              :reset-opts {})
              :response-cache-db (assoc api/response-cache-db
                                        :reset-opts {})
-             :text-index (assoc api/text-index :reset-opts {})
+             :text-index (assoc api/text-index
+                                :reset-opts {}
+                                :project "clingen-dx"
+                                :location "us-east1")
              #_#_:sequence-feature-db api/sequence-feature-db
              :object-db (assoc api/object-db
                                :load-snapshot false
@@ -158,6 +164,8 @@
   (def api-test-app (p/init api-test-app-def))
   (p/start api-test-app)
   (p/stop api-test-app)
+
+  (tap> api-test-app)
 
   (p/reset api-test-app)
 
@@ -214,11 +222,11 @@
        io/resource
        slurp
        edn/read-string
-       (filterv #(= #_"https://www.ncbi.nlm.nih.gov/clinvar/"
+       (filterv #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
                     #_"https://genegraph.app/resources"
                     #_"https://thegencc.org/"
                     #_"http://www.ebi.ac.uk/efo/efo-base.owl"
-                    "https://affils.clinicalgenome.org/"
+                    #_"https://affils.clinicalgenome.org/"
                     (:name %)))
        (mapv #(assoc % :source {:type :file
                                 :base "/Users/tristan/data/genegraph-base/"
@@ -424,7 +432,7 @@ select ?x where {
   (time (get-events-from-topic api/gene-validity-sepio-topic))
   (get-events-from-topic api/actionability-topic)
   (time (get-events-from-topic api/gene-validity-complete-topic))
-  (get-events-from-topic api/gene-validity-raw-topic)
+  (time (get-events-from-topic api/gene-validity-raw-topic))
   (time (get-events-from-topic api/gene-validity-legacy-complete-topic))
   (time (get-events-from-topic api/dosage-topic))
 
@@ -4333,4 +4341,217 @@ select ?x where
                      [(str a)
                       (rdf/ld1-> a [:rdfs/label])
                       (rdf/ld1-> a [:cg/subject :cg/variant :rdfs/label])])))))
+
+  "https://genegraph.clinicalgenome.org/terms/Affiliation"
+  (str (rdf/resource :so/GeneWithProteinProduct))
+  ;; => "http://purl.obolibrary.org/obo/SO_0001217"
+  )
+
+(comment
+  (def egln1
+    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene_validity_complete-2025-12-04.edn.gz"]
+      (->> (event-store/event-seq r)
+           (filterv #(re-find #"9b055196-e452-4f0a-aa35-ce38b1733c43" (::event/value %))))))
+
+  (def egln1
+    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene_validity_raw-2025-12-04.edn.gz"]
+      (->> (event-store/event-seq r)
+           (filterv #(re-find #"9b055196-e452-4f0a-aa35-ce38b1733c43" (::event/value %))))))
+
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene_validity_raw-2025-12-04.edn.gz"]
+      (->> (event-store/event-seq r)
+           (take-last 10)
+           (mapv #(-> % ::event/timestamp Instant/ofEpochMilli str))))
+
+  ["2025-11-18T18:23:23.612Z" "2025-11-18T18:27:15.184Z" "2025-11-18T18:28:06.534Z" "2025-11-18T18:30:02.623Z" "2025-11-18T18:30:59.504Z" "2025-11-18T19:02:08.573Z" "2025-11-19T04:06:20.006Z" "2025-11-19T10:47:10.073Z" "2025-11-19T17:42:02.299Z" "2025-11-19T18:58:49.198Z"]
+
+  ["2025-11-26T11:02:43.939Z" "2025-11-26T13:13:56.564Z" "2025-11-26T16:30:38.596Z" "2025-11-26T16:45:36.716Z" "2025-11-26T20:01:56.589Z" "2025-11-27T02:57:51.825Z" "2025-11-27T11:48:39.162Z" "2025-11-27T12:19:07.737Z" "2025-11-28T16:15:43.449Z" "2025-11-30T03:51:30.946Z"]
+
+  (count egln1)
+  "9b055196-e452-4f0a-aa35-ce38b1733c43"
+  )
+
+
+;;matts examples
+(comment
+  "http://localhost:8080/#/r/GG%3Aa0a9ec11-ef90-4095-9c9e-696eabd0395bv2.1"
+
+  (with-open [r (io/reader "/Users/tristan/data/gene-validity-data/gg_a0a9ec11-ef90-4095-9c9e-696eabd0395bv2.1.json")]
+    (-> (json/read r :key-fn keyword)
+        tap>))
+  )
+
+
+;; gpm test
+(comment
+  
+  (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gpm-general-events-2025-12-15.edn.gz"]
+    (->> (event-store/event-seq r)
+         (map event/deserialize)
+         (filter #(= "group_description_updated"
+                     (get-in % [::event/data :event_type])))
+         (take 5)
+         (into [])
+         tap>))
+
+{"vcep_pilot_approval" 1, "member_role_assigned" 5119, "member_permission_revoked" 43, "gene_removed" 23, "group_description_updated" 345, "coi_completed" 1745, "ep_info_updated" 226, "group_created" 8, "member_role_removed" 439, "member_removed" 362, "caption_icon_updated" 24, "member_added" 4325, "gene_added" 178, "vcep_pilot_approved" 43, "member_unretired" 113, "ep_definition_approved" 153, "step_date_approved_updated" 1, "scope_description_updated" 26, "member_permission_granted" 146, "vcep_draft_specifications_approved" 62, "group_status_updated" 10, "member_retired" 1536, "group_name_updated" 5, "sustained_curation_review_completed" 10, "genes_added" 25, "membership_description_updated" 1, "ep_final_approval" 41, "parent_updated" 11, "member_updated" 236}
+
+
+
+
+  )
+
+
+;; Testing indexing of gene validity curation text
+(comment
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        text-index @(get-in api-test-app [:storage :text-index :instance])
+        ai-client (:google-ai-client text-index)
+        q (rdf/create-query "
+select ?x where {
+?x a :cg/EvidenceStrengthAssertion ;
+ :dc/description ?description ;
+ :cg/subject ?prop .
+ ?prop a :cg/GeneValidityProposition . 
+ filter not exists { ?x :prov/wasInvalidatedBy ?newx } 
+} limit 20")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           (mapv cgv/curation->text-index)
+           tap>
+           #_(mapv #(lucene/add-text-embedding-vectors object-db ai-client %))
+           #_(mapv lucene/->lucene-document)
+           #_(run! #(storage/write text-index (:iri %) %)))))
+
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        hybrid-db {:tdb tdb :object-db object-db}
+        text-index @(get-in api-test-app [:storage :text-index :instance])
+        ai-client (:google-ai-client text-index)
+        q (rdf/create-query "
+select ?x where {
+?x a :cg/EvidenceStrengthAssertion ;
+ :dc/description ?description ;
+ :cg/subject ?prop .
+ ?prop a :cg/GeneValidityProposition . 
+ filter not exists { ?x :prov/wasInvalidatedBy ?newx } 
+} limit 20")]
+      (rdf/tx tdb
+        (->> (lucene/search text-index
+                            {:field :embeddings
+                             :query "nephrotic"})
+             (mapv #(rdf/resource (:iri %) tdb))
+             (take 1)
+             (mapv #(rdf/ld1-> % [[:dc/isVersionOf :<] :dc/description])))))
+
+    
+
+    (-> emb1
+        first
+        .embeddings
+        .get
+        first
+        .values
+        .get
+        first
+        type)
+  
+  )
+
+;; Generating reports for CVC Trial
+
+(comment
+
+  ;; load annotation 
+  (event-store/with-event-reader [r (str root-data-dir
+                                         "ggapi-clinvar-curation-stage-1-2025-10-27.edn.gz")]
+    (->> (event-store/event-seq r)
+         (run! #(p/publish (get-in api-test-app [:topics :clinvar-curation]) %))))
+
+  ;; clear annotation
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])]
+    (rdf/tx tdb
+      (event-store/with-event-reader [r (str root-data-dir
+                                             "ggapi-clinvar-curation-stage-1-2025-10-27.edn.gz")]
+        (->> (event-store/event-seq r)
+             (mapv event/deserialize)
+             (run! #(storage/delete tdb (get-in % [::event/data :iri])))))))
+
+  (event-store/with-event-reader [r (str root-data-dir
+                                         "ggapi-clinvar-curation-stage-1-2025-10-27.edn.gz")]
+    (->> (event-store/event-seq r)
+         (take 10)
+         (mapv event/deserialize)
+         tap>))
+  
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?ann where {
+?ann a :cg/AssertionAnnotation .
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           #_(run! #(storage/delete tdb (str %)))
+           count)))
+
+
+  
+  (with-open [w (io/writer "/Users/tristan/Desktop/cvc-trial.csv")]
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+          object-db @(get-in api-test-app [:storage :object-db :instance])
+          q (rdf/create-query "
+select ?ann where {
+?ann a :cg/AssertionAnnotation ;
+ :cg/classification :cg/DosageMapConflict ;
+ :cg/evidence ?evidence ;
+ :cg/subject ?sub .
+ ?sub :cg/direction ?dir .
+ filter ( ?dir != :cg/Supports ) .
+}
+")
+          dosage-gene-label
+          (fn [r]
+            (let [prop-iri (re-find #"https://genegraph\.clinicalgenome\.org/r/ISCA-\d+x\d"
+                                    (str r))
+                  prop (rdf/resource prop-iri tdb)
+                  feature (rdf/ld1-> prop [:cg/feature])]
+              (rdf/ld1->* feature [:skos/prefLabel :rdfs/label])))]
+      (rdf/tx tdb
+        (->> (q tdb)
+             #_(run! #(storage/delete tdb (str %)))
+             #_(take 5)
+             (mapv (fn [r]
+                     (let [v (hr/hybrid-resource (rdf/ld1-> r [:cg/subject :cg/subject :cg/variant])
+                                                 {:tdb tdb :object-db object-db})]
+                       {:assertion r
+                        :submitter (rdf/ld1-> r [:cg/subject :cg/submitter :rdfs/label])
+                        :variant-link (:iri v)
+                        :variant (:rdfs/label v)
+                        :description (rdf/ld1-> r [:dc/description])
+                        :dosage-evidence (rdf/ld-> r [:cg/evidence])
+                        :dosage-genes (string/join
+                                       ", "
+                                       (map dosage-gene-label
+                                            (rdf/ld-> r [:cg/evidence])))})))
+             (mapv (fn [{:keys [submitter variant-link variant description dosage-genes]}]
+                     [variant variant-link submitter dosage-genes description]))
+             count
+             #_(charred/write-csv w))))) 
+  
+
+  
+  )
+
+;; check gci-express
+(comment
+
+  (with-open [r (io/reader "/Users/tristan/code/data-exchange-shared-json/json-from-gene-express/gci-express-with-entrez-ids.json")]
+    (->> (charred/read-json r :key-fn keyword)
+         count))
+  
   )

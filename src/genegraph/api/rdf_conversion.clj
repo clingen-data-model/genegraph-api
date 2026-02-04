@@ -46,7 +46,10 @@
 
 (defn map->text-index [m source]
   {:iri (:iri m)
-   :labels [(:rdfs/label m)]
+   :labels (if (:rdfs/label m)
+             [(:rdfs/label m)]
+             [])
+   :types [(-> m :type rdf/resource str)]
    :source source})
 
 (comment

@@ -44,7 +44,6 @@
     (reset! genes-atom true))
   e)
 
-
 (def prop-query
   (rdf/create-query "select ?prop where { ?prop a :cg/GeneValidityProposition } "))
 
@@ -188,6 +187,17 @@ filter not exists { ?x :prov/wasInvalidatedBy ?newerx }
                   m
                   {:newAssertion (assertion-resource event)}))
     event))
+
+(defn text-index-field [r field]
+  (mapv str (rdf/ld-> r [field])))
+
+(defn curation->text-index [r]
+  {:iri (str (rdf/ld1-> r [:dc/isVersionOf]))
+   :source "https://genegraph.clinicalgenome.org/gene-validity"
+   #_#_:labels (mapv str (rdf/ld-> r [:rdfs/label])) ; not used yet
+   :types (text-index-field r :rdf/type)
+   :descriptions (text-index-field r :dc/description)
+   :embeddings (text-index-field r :dc/description)})
 
 (def add-minimized-prior-version
   (interceptor/interceptor

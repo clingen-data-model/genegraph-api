@@ -5,7 +5,8 @@
             [genegraph.framework.storage :as storage]
             [genegraph.framework.storage.rocksdb :as rocksdb]
             [genegraph.api :as gv]
-            [clojure.data.json :as json]
+            #_[clojure.data.json :as json]
+            [charred.api :as json]
             [io.pedestal.interceptor :as interceptor]
             [io.pedestal.log :as log]
             [portal.api :as portal]
@@ -53,7 +54,7 @@
 
 (defn print-query [res]
   (-> (:query res)
-      (json/read-str :key-fn keyword)
+      (json/read-json :key-fn keyword)
       :query
       println))
 

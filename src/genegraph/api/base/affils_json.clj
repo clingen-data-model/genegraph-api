@@ -8,6 +8,8 @@
             [genegraph.framework.storage :as storage]
             [genegraph.framework.event :as event]))
 
+(def affils-root "https://genegraph.clinicalgenome.org/agent/")
+
 (defn affil->doc [{:keys [affiliation_fullname affiliation_id]}]
   {:iri (str affils-root affiliation_id)
    :rdfs/label affiliation_fullname
@@ -20,7 +22,6 @@
 (defn add-model [event]
   (assoc event ::model (rdf/statements->model (mapcat rdf-conversion/map->statements (::docs event)))))
 
-(def affils-root "https://genegraph.clinicalgenome.org/agent/")
 
 #_(defmethod rdf/as-model :genegraph.api.base/affils-json
   [{:keys [source]}]
@@ -41,7 +42,7 @@
     (reduce
      (fn [e a]
        (event/store e :text-index (:iri a) (rdf-conversion/map->text-index a (:name data))))
-     (event/store event :api-tdb (:name data) (::model event))
+     (event/store event-with-model :api-tdb (:name data) (::model event-with-model))
      (::docs event-with-model))))
 
 

@@ -16,6 +16,7 @@
             [genegraph.api.assertion-annotation :as ac]
             [genegraph.api.common :as common]
             [genegraph.api.auth :as auth]
+            [genegraph.api.workos :as workos]
             [genegraph.api.gpm :as gpm]
             [com.walmartlabs.lacinia.pedestal2 :as lacinia-pedestal]
             [com.walmartlabs.lacinia.pedestal.internal :as internal]
@@ -171,6 +172,14 @@
    :kafka-cluster :data-exchange
    :serialization :json
    :kafka-topic "gene_validity_complete"
+   :kafka-topic-config {}})
+
+
+(def gene-validity-raw-topic 
+  {:name :gene-validity-complete
+   :kafka-cluster :data-exchange
+   :serialization :json
+   :kafka-topic "gene_validity_raw"
    :kafka-topic-config {}})
 
 (def gene-validity-legacy-topic 
@@ -621,7 +630,19 @@
       :route-name ::readiness]
      ["/live"
       :get (fn [_] {:status 200 :body "server is live"})
-      :route-name ::liveness])
+      :route-name ::liveness]
+     ["/auth/login"
+      :get workos/login-handler
+      :route-name ::workos/login]
+     ["/auth/callback"
+      :get workos/callback-handler
+      :route-name ::workos/callback]
+     ["/auth/logout" :post workos/logout-handler
+      :route-name ::logout]
+     ["/auth/me"
+      :get [workos/require-auth
+            workos/me-handler]
+      :route-name ::workos/me])
     ::http/type :jetty
     ::http/port 8888
     ::http/join? false

@@ -2,7 +2,7 @@
   (:require [genegraph.framework.storage.rdf :as rdf]
             [genegraph.api.graphql.common.curation :as curation]
             [clojure.string :as s]
-            [cheshire.core :as json]
+            [charred.api :as json]
             [io.pedestal.log :as log]))
 
 ;; CGGV:assertion_43fb4e99-e97a-4d9c-af11-79c2b09ecd2e-2019-07-24T160000.000Z
@@ -109,7 +109,7 @@ select ?contrib where
     ;; match vintage style curie with date time stamp at the end
     (if (re-find #"\.\d{3}Z$" curie)
       (-> (legacy-json nil nil value)
-          (json/parse-string true)
+          (json/read-json :key-fn keyword)
           :report_id)
       ;; match GCI Express is always nil
       (if (re-find #"^CGGCIEX:assertion_\d+$" curie)
