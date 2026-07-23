@@ -95,6 +95,8 @@
   (if-let [sa (xml-zip/xml1-> z :ClassifiedRecord :SimpleAllele)]
     (update-int-vals
      {:allele-id (xml-zip/attr sa :AlleleID)
+      :vcv-id (xml-zip/attr z :Accession)
+      :vcv-version (xml-zip/attr z :Version)
       :variation-id (xml-zip/attr sa :VariationID)
       :variant-type (xml-zip/xml1-> sa :VariantType xml-zip/text)
       :spdi (xml-zip/xml1-> sa :CanonicalSPDI xml-zip/text)
@@ -136,6 +138,7 @@
      (assoc (xml-attrs->map
              (xml-zip/xml1-> n1 :ClinVarAccession)
              [:Accession
+              :Version
               :DateUpdated
               :DateCreated
               :Type
@@ -169,7 +172,13 @@
                          xml-zip/text)
             :SubmissionComment (xml-zip/xml-> n1
                                               :Comment
-                                              xml-zip/text)))
+                                              xml-zip/text)
+            :Origin (xml-zip/xml1-> n1
+                                    :ObservedInList
+                                    :ObservedIn
+                                    :Sample
+                                    :Origin
+                                    xml-zip/text)))
    (xml-zip/xml-> n
                   :ClassifiedRecord
                   :ClinicalAssertionList
@@ -319,6 +328,15 @@
    "reviewed by expert panel" 126, 
    "flagged submission" 203}
 
+(def clinvar-inheritance->inheritance
+  {"maternal" :cg/MaternalInheritance
+   "paternal" :cg/PaternalInheritance
+   "inherited" :cg/Inherited
+   "biparental" :cg/Biparental
+   "uniparental" :cg/Uniparental
+   "de novo" :cg/DeNovoVariant
+   "somatic" :cg/SomaticVariation})
+
 (def clinvar-status->cg-status
   {"no assertion criteria provided" :cg/NoCriteria
    "criteria provided, single submitter" :cg/CriteriaProvided
@@ -374,7 +392,8 @@
                     ReviewStatus
                     Version
                     SimpleAllele
-                    DateLastEvaluated]
+                    DateLastEvaluated
+                    Origin]
              :as scv}]
   (let [classification (get clinvar-class->acmg-class
                             Classification
@@ -383,6 +402,7 @@
      :iri (str "https://identifiers.org/clinvar.submission:"
                Accession)
      :cg/dateLastEvaluated DateLastEvaluated
+     :cg/inheritance (get clinvar-inheritance->inheritance Origin :cg/UnknownInheritance)
      :cg/submitter (scv-agent-iri scv)
      :cg/subject prop-iri
      :cg/classification classification
@@ -443,6 +463,7 @@
                  :cg/classification
                  :cg/reviewStatus
                  :cg/dateLastEvaluated
+                 :cg/inheritance
                  :cg/submitter])))
 
 (defn clinvar-variant->statements [clinvar-variant]
@@ -752,6 +773,13 @@
 
 ;; A bit of sample data for working with 
 (comment
+
+  ;; germline
+  ;; inherited
+  ;; maternal
+  ;; not applicable
+  ;;
+  
   (defonce http-client
     (hc/build-http-client {:connect-timeout 10000
                            :redirect-policy :always}))
@@ -767,6 +795,17 @@
   ;; According to gene viewer, is partial overlap with RORB gene
   (def partial-overlap (get-clinvar-variants ["563652"] http-client))
 
+  (def mat-inheritance (get-clinvar-variants ["148829"] http-client))
+
+  (->> (xml/parse-str mat-inheritance)
+       :content
+       (mapv #(-> %
+                  clinvar-xml->intermediate-model
+                  #_variant->statements-and-objects))
+       tap>)
+
+  (println mat-inheritance)
+
   (println internal-conflict)
 
   (println flagged-submission-xml)
@@ -776,7 +815,7 @@
         tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])
         add-gene-overlaps-with-db
         #(add-gene-overlaps-for-variant object-db  %)]
-    (->> (xml/parse-str partial-overlap)
+    (->> (xml/parse-str mat-inheritance)
          :content
          (mapv #(-> %
                     clinvar-xml->intermediate-model
@@ -812,6 +851,32 @@
 
   )
 
+;; Split ClinVar for parallel fun
+(comment
+  (with-open [is (->{:type :file
+                     :base "/users/tristan/data/genegraph-base/"
+                     :path "clinvar.xml.gz"}
+                    storage/as-handle
+                    io/input-stream
+                    GZIPInputStream.)
+              r (java.io.InputStreamReader. is)]
+    (let [buf (char-array 1400)
+          n (.read r buf)]
+      (println (String. buf 0 n)))
+    #_(->> (:content (xml/parse is))
+           (take 10)
+           (map clinvar-xml->intermediate-model)
+           #_(filter #(and (cnv-types (:variant-type %))
+                           (or (:copy-count %)
+                               (< 1000 (variation-length %)))))
+           #_(take 1)
+           #_(mapcat :classifications)
+           #_(map :ReviewStatus)
+           #_frequencies
+           (into [])
+           tap>))
+  )
+
 ;; note, may want to refactor out sequence feature overlap code
 ;; but using here for nowrap
 
@@ -827,4 +892,45 @@
 
 
 
+;; Storing the intermediate form of ClinVar for reprocessing
+(comment
+  (time
+   (let [db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]
+     (with-open [is (->{:type :file
+                        :base "/Users/tristan/data/genegraph-base"
+                        :path "clinvar.xml.gz"}
+                       storage/as-handle
+                       io/input-stream
+                       GZIPInputStream.)]
+       (->> (:content (xml/parse is))
+            #_(take 10000)
+            (map clinvar-xml->intermediate-model)
+            (run! #(when-let [id (:variation-id %)]
+                     (storage/write db [:clinvar-if id] %)))))))
 
+  (let [db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]
+    (tap> (storage/read db [:clinvar-if "455"])))
+
+  (defn created-dates [vcv]
+    (->> (:classifications vcv) (mapv :DateCreated)))
+
+  (let [db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]
+    (-> (storage/read db [:clinvar-if "455"])
+        created-dates
+        tap>))
+  
+  (time
+   (def date-counts
+     (let [db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]
+       (->> (rocksdb/range-get db {:prefix [:clinvar-if] :return :ref})
+            #_(take 10000)
+            (map deref)
+            (mapcat created-dates)
+            frequencies))))
+
+  (count date-counts)
+  (tap> date-counts)
+
+  (/ 2387464.002792 1000 60)
+
+  )

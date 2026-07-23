@@ -54,16 +54,23 @@
         loc2-start (max-coord (:ga4gh/start loc2))
         loc1-end (min-coord (:ga4gh/end loc1))
         loc2-end (min-coord (:ga4gh/end loc2))
-        all-coords [loc1-start loc2-start loc1-end loc2-end]]
-    (cond
-      (some nil? all-coords) :cg/NoOverlap
-      (and (< loc1-start loc2-start)
-           (< loc2-end loc1-end)) :cg/CompleteOverlap
-      (or (and (< loc1-start loc2-start)
-               (< loc2-start loc1-end))
-          (and (< loc2-end loc1-end)
-               (< loc2-start loc2-end))) :cg/PartialOverlap
-      :default (outer-overlap? loc1 loc2))))
+        all-coords [loc1-start loc2-start loc1-end loc2-end]
+        result (cond
+                 (some nil? all-coords) :cg/NoOverlap
+                 (and (< loc1-start loc2-start)
+                      (< loc2-end loc1-end)) :cg/CompleteOverlap
+                 (or (and (< loc1-start loc2-start)
+                          (< loc2-start loc1-end))
+                     (and (< loc2-end loc1-end)
+                          (< loc2-start loc2-end))) :cg/PartialOverlap
+                 :default (outer-overlap? loc1 loc2))]
+    #_(when-not (= :cg/NoOverlap result)
+      (tap> {:loc1-start loc1-start
+             :loc1-end loc1-end
+             :loc2-start loc2-start
+             :loc2-end loc2-end
+             :result result}))
+    result))
 
 
 (defn gene-overlaps-for-location [db location]

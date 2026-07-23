@@ -45,12 +45,12 @@
   e)
 
 (def prop-query
-  (rdf/create-query "select ?prop where { ?prop a :cg/GeneValidityProposition } "))
+  (rdf/create-query "select ?prop where { ?prop a :cg/GeneDiseaseValidityProposition } "))
 
 (def main-record-id-query
   (rdf/create-query "
 select ?mainRecord where {
- ?assertion a :cg/EvidenceStrengthAssertion ;
+ ?assertion a :cg/Statement ;
  :dc/isVersionOf ?mainRecord . } "))
 
 (def same-as-query
@@ -61,12 +61,12 @@ select ?mainRecord where {
   (rdf/tx (get-in event [::storage/storage :api-tdb])
       (let [m (::event/data event)]
         (when-let [prop (first (prop-query m))]
-          (let [hgnc-gene (rdf/ld1-> prop [:cg/gene])
+          (let [hgnc-gene (rdf/ld1-> prop [:cg/subjectGene])
                 ncbi-gene (first (same-as-query
                                   (get-in event [::storage/storage :api-tdb])
                                   {:y hgnc-gene}))]
-            (.remove m (rdf/construct-statement [prop :cg/gene hgnc-gene]))
-            (.add m (rdf/construct-statement [prop :cg/gene ncbi-gene]))))))
+            (.remove m (rdf/construct-statement [prop :cg/subjectGene hgnc-gene]))
+            (.add m (rdf/construct-statement [prop :cg/subjectGene ncbi-gene]))))))
   event)
 
 (def replace-hgnc-with-ncbi-gene
@@ -75,7 +75,7 @@ select ?mainRecord where {
     :enter (fn [e] (replace-hgnc-with-ncbi-gene-fn e))}))
 
 (defn has-publish-action [m]
-  (< 0 (count ((rdf/create-query "select ?x where { ?x :cg/role :cg/Publisher } ") m))))
+  (< 0 (count ((rdf/create-query "select ?x where { ?x :cg/activityType :cg/Submitted } ") m))))
 
 (defn prop-iri [event]
   (-> event ::event/data prop-query first str))
@@ -86,7 +86,7 @@ select ?mainRecord where {
 (def assertion-query
   (rdf/create-query "
 select ?assertion where {
-?assertion a :cg/EvidenceStrengthAssertion .
+?assertion a :cg/Statement .
 }"))
 
 (defn assertion-resource [event]
@@ -116,10 +116,10 @@ construct {
 }
 where {
  ?assertion ?p ?o ;
- a :cg/EvidenceStrengthAssertion .
+ a :cg/Statement .
  
  ?proposition ?p1 ?o1 ;
- a :cg/GeneValidityProposition .
+ a :cg/GeneDiseaseValidityProposition .
 
  OPTIONAL {
   ?assertion :cg/contributions ?pubcontrib .
@@ -128,7 +128,7 @@ where {
  }
  OPTIONAL {
   ?assertion :cg/contributions ?approvalcontrib .
-  ?approvalcontrib :cg/role :cg/Approver ;
+  ?approvalcontrib :cg/activityType :cg/Evaluated ;
   :cg/date ?approvalDate .
  }
  filter not exists { ?assertion :cg/contributions ?o }
@@ -146,30 +146,6 @@ filter not exists { ?x :prov/wasInvalidatedBy ?newerx }
 
 (defn get-tdb [event]
   (get-in event [::storage/storage :api-tdb]))
-
-#_(defn prior-version-model [event]
-  (first
-   (prior-version-query
-    (get-tdb event)
-    {:priorVersion (-> event
-                       ::event/data
-                       main-record-id-query
-                       first)})))
-
-#_(defn add-minimized-prior-version-fn [event]
-  (let [tdb (get-tdb event)]
-    (rdf/tx tdb
-      (if-let [m (prior-version-model event)]
-        (let [min-model (construct-minimized-assertion-query
-                         (storage/read tdb (main-record-iri event)))]
-          #_(println "prior version found")
-          (event/store event
-                       :api-tdb
-                       (-> min-model assertion-query first str)
-                       min-model))
-        (do
-          #_(println "prior version not found")
-          event)))))
 
 (defn prior-version-model [event]
   (let [m (storage/read (get-in event [::storage/storage :object-db])

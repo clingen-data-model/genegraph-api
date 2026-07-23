@@ -8,7 +8,13 @@
     :schema/email
     :schema/givenName
     :schema/familyName
-    :rdfs/label})
+    :rdfs/label
+    :cg/observedLOF
+    :cg/expectedLOF
+    :cg/priorMean
+    :cg/mean
+    :cg/lower95CI
+    :cg/upper95CI})
 
 (defn value->rdf-object [v]
   (if (map? v)

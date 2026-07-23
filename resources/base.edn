@@ -56,6 +56,9 @@
  {:name "https://thegencc.org/",
   :target "gencc.csv",
   :format :genegraph.api.base/gencc}
+ {:name "https://genegraph.clinicalgenome.org/genebayes",
+  :target "genebayes.csv",
+  :format :genegraph.api.base/genebayes}
  {:name "https://www.ncbi.nlm.nih.gov/clinvar/",
   :target "clinvar.xml.gz",
   :format :genegraph.api.base/clinvar,

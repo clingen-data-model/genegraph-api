@@ -20,6 +20,7 @@
             [genegraph.api.base.gencc]
             [genegraph.api.base.clinvar-submitters]
             [genegraph.api.base.affils-json]
+            [genegraph.api.base.genebayes]
             [io.pedestal.interceptor :as interceptor]
             [io.pedestal.log :as log])
   (:import [java.io File InputStream OutputStream]

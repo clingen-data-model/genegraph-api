@@ -1,72 +1,62 @@
 (ns genegraph.api.auth
-  (:require [genegraph.framework.storage.rdf :as rdf]
-            [genegraph.framework.storage :as storage]
-            [io.pedestal.interceptor :as interceptor])
-  (:import [com.google.firebase FirebaseApp FirebaseOptions FirebaseOptions$Builder]
-           [com.google.firebase.auth FirebaseAuth FirebaseToken]
-           [com.google.auth.oauth2 GoogleCredentials]))
+  (:require [io.pedestal.interceptor :as interceptor]
+            [charred.api :as charred]
+            [buddy.sign.jwt :as jwt]
+            [buddy.core.keys :as keys]
+            [clojure.string :as str]))
 
-;; note
-;; first request comes through as unauthenticated
-;; may need to deal with that case on frontend, especially
-;; when user is definitely authenticated
+;; public keys for jwt validation
+(def dev-key
+  (keys/str->public-key
+   "-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2uI4AnLWZzP0OL+Cv09B
+ppvxUAXH82KtDsrUAUvEVlO7terqVmLH8bt9YHcBdlyJ5/lpl0U+HP4Zl/sLjGft
+gOLSCC6/hqobuw0T4psgmZ01Q+TQ+YmJSiBcdj7DTQoyQYzwUN/+iqZ5UdzFV6QR
+Xtu7+Y8ZHFgPLC9AfhekS1g8WkzgG7D/iMif9GMeDowCWglY7f5SKN/ylohcxMXg
+d7PEMaTWpzTg4GBOJ0KDq1nVHZ/FdUFMZLqxWKb/xMxT8D09itOW3okxqISvNO1D
+FyZCBN9rOhUI0o2r6P1RJoKTzUTcuzjcYYkoXqF9ZtxzbX0M4k/simxxSv2FZ1RL
+8wIDAQAB
+-----END PUBLIC KEY-----
+"))
 
-;; also will probably want to consider caching some of this stuff
-;; but performance seems acceptable for now
+(def prod-key
+  (keys/str->public-key
+   "-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyuCiiKQ7rqtAgmnJw2Wy
+vHTaa8O+jxpf/Ocddr7r8mX1uXR30DUZi0Gt7TVPLTAaCowpYhYjto2Sg+I7pWnW
+a2QuSHrN28PoJk+D+psumQi6wm0HKV1p3sPgXF84JSnUf+aDLj3FnPd1cVSRtVuN
+1UWST8oYYapP6cltXNSs5KNzuepz0usY3vZuldgtEDn2pee0ZBrdpHEl6YuSDNZ/
+6kctMdRG1HFugIFa3P2s6hbCF4OcLqiD53a9SEzbS9UyNy1oqvtd89pF/FXR0zUp
+7JL7EoW6bJzuRYDNh94FEVr2D3Wy7B5Y3l5+7YdC79JQz4E83X1vzPnZPvMw/2tO
+0QIDAQAB
+-----END PUBLIC KEY-----
+"))
 
-(defonce firebase-app
-  (-> (FirebaseOptions/builder)
-      (.setCredentials (GoogleCredentials/getApplicationDefault))
-      (.setProjectId "som-clingen-projects")
-      .build
-      FirebaseApp/initializeApp))
+(defn e->cookie [ctx]
+  (get-in ctx [:request :headers "cookie"]))
 
-(defn authenticated? [e]
-  (not (get #{:unauthenticated-request :failed-verification nil}
-            (::user e))))
+(defn cookie->map [cookie]
+  (->> (str/split cookie #";")
+       (map #(str/split % #"="))
+       (into {})))
 
-(defn add-user [e]
-  (assoc
-   e
-   ::user
-   (if-let [t (get-in e [:request :headers "authorization"])]
-     (try
-       (.verifyIdToken (FirebaseAuth/getInstance) t)
-       (catch Exception e :failed-verification))
-     :unauthenticated-request)))
+(defn session->jwt [m]
+  (-> (update-keys m str/trim)
+      (get "__session")
+      (jwt/unsign dev-key {:alg :rs256})))
 
-(defn add-email [e]
-  (if (authenticated? e)
-    (assoc e ::email (.getEmail (::user e))
-             ::uid (.getUid (::user e)))
-    e))
-
-(defn add-groups [e]
-  (if (authenticated? e)
-    (let [tdb (get-in e [::storage/storage :api-tdb])
-          in-clingen-query (rdf/create-query "
-select ?x where
-{ ?x :schema/email ?email ;
-     :dc/source :cg/GPM . }")]
-      (rdf/tx tdb
-        (if (seq (in-clingen-query tdb {:email (::email e)}))
-          (assoc e ::groups #{:cg/ClinGen})
-          e)))
-    e))
+(defn authenticate [e]
+  (try
+    (-> e e->cookie cookie->map session->jwt)
+    (catch Exception e nil)))
 
 (defn auth-interceptor-fn [e]
-  (-> e
-      add-user
-      add-email
-      add-groups))
+  (tap> (authenticate e))
+  e)
 
 (def auth-interceptor
   (interceptor/interceptor
    {:name ::auth-interceptor
     :enter (fn [e] (auth-interceptor-fn e))}))
 
-;; returns exception when token expires
-#_(-> (.verifyIdToken (FirebaseAuth/getInstance)
-                    "eyJhbGciOiJSUzI1NiIsImtpZCI6ImE1YTAwNWU5N2NiMWU0MjczMDBlNTJjZGQ1MGYwYjM2Y2Q4MDYyOWIiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiVHJpc3RhbiBOZWxzb24iLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jTFIzU2QybVp3LWwtS1J0Z3N6WVdjYzdCS1JGeHYzTXhhMzh1QW0xUmp1MmVUNzhBPXM5Ni1jIiwiaXNzIjoiaHR0cHM6Ly9zZWN1cmV0b2tlbi5nb29nbGUuY29tL3NvbS1jbGluZ2VuLXByb2plY3RzIiwiYXVkIjoic29tLWNsaW5nZW4tcHJvamVjdHMiLCJhdXRoX3RpbWUiOjE3NTc2NzgwNDUsInVzZXJfaWQiOiIzd1dzZkFVRVNBWndmcDBZaEMxYUR6d095UHgxIiwic3ViIjoiM3dXc2ZBVUVTQVp3ZnAwWWhDMWFEendPeVB4MSIsImlhdCI6MTc1OTkyNzYzOCwiZXhwIjoxNzU5OTMxMjM4LCJlbWFpbCI6InRobmVsc29uQGdlaXNpbmdlci5lZHUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJnb29nbGUuY29tIjpbIjEwNDUyMTI5NzgxMTI0MTIwMDQ3MCJdLCJlbWFpbCI6WyJ0aG5lbHNvbkBnZWlzaW5nZXIuZWR1Il19LCJzaWduX2luX3Byb3ZpZGVyIjoiZ29vZ2xlLmNvbSJ9fQ.QNxIpiCu6sevPDPlaeF1NckXnEvGaEZPH3BBtnsXasAm5Tbguyzhnz2pgZ_w876za48TVMD29MUFQknA_ASt6aTGVeSPeW78AiMKurSf_UOeoi7f0wkI5mX3llsecTdexLXPf0ig_c4GvwpXwaedc8u3n1F9eaqCmw282yG_UxA-EusIdvUqMRdP5arcLZ_MiMMJ0XOxo7ubwfWj7COQg9RvvRwE6cHPF5KJtunMoUMdCeN-Qz-Y08vj8oOBeXTuxn5BpuE1OurlxhrLzJXTBlGjB6HoS3TbaIZl0iDVttrEjLB0yKpYY7bxexpTIHVh5SS-7K2H56bumcZkIgYTeQ")
 
-    .getUid)

@@ -17,7 +17,6 @@
 (def assertion-bgp
   [:bgp ['x :rdf/type :cg/EvidenceStrengthAssertion]])
 
-
 (def haplo-conflicts
   (let [filters [{:filter :proposition_type
                   :argument :cg/VariantPathogenicityProposition}
@@ -30,9 +29,9 @@
                   :operation :not_exists}]
         q (f/compile-filter-query assertion-bgp filters)]
     (rdf/tx tdb
-      (->> (q tdb #_{::rdf/params {:limit 3}})
-           (map str)
-           set))))
+            (->> (q tdb #_{::rdf/params {:limit 3}})
+                 (map str)
+                 set))))
 
 (def possible-haplo-conflicts
   (let [filters [{:filter :proposition_type
@@ -217,13 +216,79 @@
                  (some #(set/subset? s %) trip-vus-b-genes)))
        count))
 
+(def all-cnvs
+  (let [filters [{:filter :proposition_type
+                  :argument :cg/VariantPathogenicityProposition}]
+        q (f/compile-filter-query assertion-bgp filters)]
+    (rdf/tx tdb
+            (into [] (q tdb)))))
+
+(defn creation-date [statement]
+  (some-> (filter #(= :cg/Creator (:cg/role %)) (:cg/contributions statement))
+          first
+          :cg/date))
+
+(def submission-dates
+  (into []
+        (comp
+         (map #(hr/hybrid-resource % hybrid-db))
+         (map creation-date))
+        all-cnvs))
+
+^{:nextjournal.clerk/visibility {:result :show}}
+(take 10 submission-dates)
+
+^{:nextjournal.clerk/visibility {:result :show}}
+(let [date-counts (->> submission-dates
+                       (remove nil?)
+                       frequencies
+                       (sort-by key))
+      dates (map key date-counts)
+      cumulative (reductions + (map val date-counts))]
+  (clerk/plotly {:data [{:x dates
+                         :y cumulative
+                         :type "scatter"
+                         :mode "lines"}]
+                 :layout {:title "Cumulative ClinVar CNV submissions by date"
+                          :xaxis {:title "Date"}
+                          :yaxis {:title "Cumulative submissions"}}}))
+
+^{:nextjournal.clerk/visibility {:result :show}}
+(let [date-counts-all (->> (dissoc genegraph.api.base.clinvar/date-counts nil)
+                       (sort-by key))
+      dates-all (map key date-counts-all)
+      cumulative-all (reductions + (map val date-counts-all))
+      date-counts (->> submission-dates
+                       (remove nil?)
+                       frequencies
+                       (sort-by key))
+      dates (map key date-counts)
+      cumulative (reductions + (map val date-counts))]
+  (clerk/plotly {:data [{:x dates-all
+                         :y cumulative-all
+                         :type "scatter"
+                         :mode "lines"
+                         :name "all submissions"}
+                        {:x dates
+                         :y cumulative
+                         :type "scatter"
+                         :mode "lines"
+                         :name "CNV submissions"}]
+                 :layout {#_#_:title "Cumulative ClinVar submissions by date"
+                          :xaxis {:title "Date"}
+                          :yaxis {:title "Submissions (log scale)" :type "log"}}}))
+
 ^{:nextjournal.clerk/visibility {:result :show}}
 (def total-cnvs
   (let [filters [{:filter :proposition_type
                   :argument :cg/VariantPathogenicityProposition}]
         q (f/compile-filter-query assertion-bgp filters)]
     (rdf/tx tdb
-      (count (q tdb)))))
+            (count (q tdb)))))
+
+^{:nextjournal.clerk/visibility {:result :show}}
+total-cnvs
+
 
 ^{:nextjournal.clerk/visibility {:result :show}}
 (let [non-dosage-conflict-count (+ trip-conflict-p-count
@@ -246,3 +311,6 @@
                                   "possible conflicts with dosage map"
                                   "others"]
                          :type "pie"}]}))
+ 
+ 
+ 

@@ -62,6 +62,10 @@
 
 (comment
   (clerk/serve! {:watch-paths ["notebooks"]})
+  (clerk/build! {:paths ["notebooks/plan.md"]
+                 :package :single-file})
+  (clerk/build! {:paths ["notebooks/cnv_lof_score.clj"]
+                 :package :single-file})
   (clerk/build! {:paths ["notebooks/cnv.clj"]
                  :package :single-file})
   (clerk/build! {:paths ["notebooks/cvc.md"]
@@ -165,6 +169,7 @@
   (p/start api-test-app)
   (p/stop api-test-app)
 
+  
   (tap> api-test-app)
 
   (p/reset api-test-app)
@@ -186,6 +191,13 @@
                                          "ggapi-clinvar-curation-stage-1-2025-10-27.edn.gz")]
     (->> (event-store/event-seq r)
          (run! #(p/publish (get-in api-test-app [:topics :clinvar-curation]) %))))
+
+    (event-store/with-event-reader [r (str root-data-dir
+                                           "ggapi-clinvar-curation-stage-1-2025-10-27.edn.gz")]
+      (->> (event-store/event-seq r)
+           (take 5)
+           (mapv event/deserialize)
+           tap>))
   )
 
 ;; Reload base data
@@ -208,11 +220,12 @@
    "https://www.ncbi.nlm.nih.gov/clinvar/submitters"
    "http://dataexchange.clinicalgenome.org/gci-express"
    "https://thegencc.org/"
+   "https://genegraph.clinicalgenome.org/genebayes"
    "https://www.ncbi.nlm.nih.gov/clinvar/"])
 #_"https://omim.org/genemap"
 
 
-
+;; TODO Clean this up
 (comment
 
   ;; to update
@@ -222,12 +235,18 @@
        io/resource
        slurp
        edn/read-string
-       (filterv #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+       (filterv #(= #_"https://www.ncbi.nlm.nih.gov/clinvar/"
+                    #_"https://genegraph.clinicalgenome.org/genebayes"
                     #_"https://genegraph.app/resources"
                     #_"https://thegencc.org/"
                     #_"http://www.ebi.ac.uk/efo/efo-base.owl"
                     #_"https://affils.clinicalgenome.org/"
+                    #_"https://genegraph.clinicalgenome.org/genebayes"
+                    "https://ncbi.nlm.nih.gov/genomes/GCF_000001405.40_GRCh38.p14_genomic.gff"
+                    "https://ncbi.nlm.nih.gov/genomes/GCF_000001405.25_GRCh37.p13_genomic.gff"
                     (:name %)))
+       #_(remove #(= "https://www.ncbi.nlm.nih.gov/clinvar/"
+                   (:name %)))
        (mapv #(assoc % :source {:type :file
                                 :base "/Users/tristan/data/genegraph-base/"
                                 :path (:target %)}))
@@ -322,7 +341,21 @@ select ?x where
   (get base-event-map "https://www.ncbi.nlm.nih.gov/clinvar/")
   )
 
+;; Remove curations
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "
+select ?x where
+{ ?x a ?type . }
+ limit 5")]
+    (rdf/tx tdb
+      (->> (q tdb {:type :cg/Statement})
+           count
+           #_(mapv #(rdf/ld1-> % [:rdf/type])))))
+  )
+
 ;; this bit is obsolete, delete after review
+;; TODO actually review and delete this
 (comment
   (with-open [r (-> "base.edn" io/resource io/reader PushbackReader.)]
     (->> (edn/read r)
@@ -383,6 +416,38 @@ select ?x where {
 
 ;; reload clingen gene validity
 (comment
+  ;; validity from new source
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "
+select ?x where 
+{?x a ?type}")]
+    (rdf/tx tdb
+      (->> (q tdb {:type :cg/GeneDiseaseValidityProposition})
+           count)))
+  
+  ;; Clear validity for reloading
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        q (rdf/create-query "
+select ?x where 
+{?x a ?type}")
+        q2 (rdf/create-query "
+select ?mainRecord where {
+ ?assertion a :cg/Statement ;
+ :dc/isVersionOf ?mainRecord . } ")]
+    (rdf/tx tdb
+      (->> (q tdb {:type :cg/GeneDiseaseValidityProposition})
+           count)))
+  
+  (time
+   (event-store/with-event-reader [r "/Users/tristan/data/sepio-events/events.edn.gz"]
+     (->> (event-store/event-seq r)
+          #_(mapv ::event/key)
+          #_(take 1)
+          (run! #(p/publish (get-in api-test-app [:topics :gene-validity-sepio])
+                            (assoc % ::event/completion-promise (promise)))))))
+
+  
+  
   (time
    (event-store/with-event-reader [r "/Users/tristan/data/genegraph-neo/gene-validity-sepio-2025-10-09.edn.gz"]
      (->> (event-store/event-seq r)
@@ -396,14 +461,14 @@ select ?x where {
 (comment
   (time
    (event-store/with-event-reader [r (str root-data-dir
-                                          "gene_dosage_raw-2025-10-21.edn.gz")]
+                                          "gene_dosage_raw-2026-05-17.edn.gz")]
      (->> (event-store/event-seq r)
           #_(mapv ::event/key)
           #_(take 1)
           (run! #(p/publish (get-in api-test-app [:topics :dosage])
                             (assoc % ::event/completion-promise (promise)))))))
-
   (+ 1 1)
+
   )
 
 ;; Downloading events
@@ -429,6 +494,7 @@ select ?x where {
 ;; Event Writers
 
 (comment
+  (time (get-events-from-topic api/all-curation-events-topic))
   (time (get-events-from-topic api/gene-validity-sepio-topic))
   (get-events-from-topic api/actionability-topic)
   (time (get-events-from-topic api/gene-validity-complete-topic))
@@ -3622,24 +3688,24 @@ select ?x where {
                (< loc2-start loc2-end))) :cg/PartialOverlap
       :default (outer-overlap? loc1 loc2))))
   
-  (defn gene-overlaps-for-location [db location]
-    (->> (mapcat
-          #(rocksdb/range-get
-            db
-            (idx/location->search-params location %))
-          [:so/Gene])
-         (map :iri)
-         set))
+(defn gene-overlaps-for-location [db location]
+  (->> (mapcat
+        #(rocksdb/range-get
+          db
+          (idx/location->search-params location %))
+        [:so/Gene])
+       (map :iri)
+       set))
 
 
-  (defn protein-coding-gene? [gene tdb]
-    (let [q (rdf/create-query "select ?g where { ?g a :so/GeneWithProteinProduct } ")]
-      (seq (q tdb {:g (rdf/resource gene)}))))r
+(defn protein-coding-gene? [gene tdb]
+  (let [q (rdf/create-query "select ?g where { ?g a :so/GeneWithProteinProduct } ")]
+    (seq (q tdb {:g (rdf/resource gene)}))))
 
-  (let [object-db @(get-in api-test-app [:storage :object-db :instance])
-        tdb @(get-in api-test-app [:storage :api-tdb :instance])]
-    (mapv #(gene-overlaps-for-location object-db %)
-          (get-in region1 [::dosage/region :ga4gh/location])))
+(let [object-db @(get-in api-test-app [:storage :object-db :instance])
+      tdb @(get-in api-test-app [:storage :api-tdb :instance])]
+  (mapv #(gene-overlaps-for-location object-db %)
+        (get-in region1 [::dosage/region :ga4gh/location])))
 
   
   (def last-regions
@@ -4320,6 +4386,7 @@ select ?x where
                    [(str a)
                     (rdf/ld1-> a [:rdfs/label])
                     (rdf/ld1-> a [:cg/subject :cg/variant :rdfs/label])])))))
+  
 
 
 
@@ -4554,4 +4621,322 @@ select ?ann where {
     (->> (charred/read-json r :key-fn keyword)
          count))
   
+  )
+
+
+;; Erin's query
+
+;; AD Definitive/Anything w Dosage info
+
+;; what is the dosage haplo score?
+
+;; variants in the gene curation are predicted/proven null
+
+;; ratio of null/other
+
+; filter (?gvstrength in ( :cg/Moderate , :cg/Strong , :cg/Definitive ))
+(comment
+  (with-open [w (io/writer "/Users/tristan/Desktop/gene-report.csv")]
+    (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+          object-db @(get-in api-test-app [:storage :object-db :instance])
+          q (rdf/create-query "
+select ?gvstmt ?disease ?gene ?linkiri ?gvcriteria ?gvstrength ?dosageStrength where {
+?gene a :so/GeneWithProteinProduct .
+?prop :cg/gene ?gene ;
+:cg/disease ?disease ;
+:cg/modeOfInheritance ?moi ;
+a :cg/GeneValidityProposition .
+?gvstmt :cg/subject ?prop ;
+:dc/isVersionOf ?linkiri ;
+:cg/specifiedBy ?gvcriteria ;
+:cg/evidenceStrength ?gvstrength .
+?dosageProp :cg/feature ?gene ;
+:cg/mechanism :cg/Haploinsufficiency ;
+a :cg/GeneticConditionMechanismProposition .
+?dosagestmt :cg/subject ?dosageProp ;
+:cg/evidenceStrength ?dosageStrength .
+filter not exists { ?gvstmt :prov/wasInvalidatedBy ?newstmt }
+filter (?moi in ( :hp/AutosomalDominantInheritance , :hp/XLinkedInheritance ))
+filter not exists { ?gvstmt :dc/source ?stmtsource }
+}
+")
+          varsq (rdf/create-query "
+select ?el where 
+{ ?stmt :cg/evidence + ?el .
+  ?el :cg/specifiedBy ?criteria .
+  filter (?criteria in 
+  ( :cg/GeneValidityNullVariantCriteria ,
+    :cg/GeneValidityNonNullVariantCriteria , 
+    :cg/GeneValidityProbandADNullCriteria , 
+    :cg/GeneValidityProbandADDeNovoCriteria ,
+    :cg/GeneValidityProbandADNonNullCriteria ) ) }")]
+      (rdf/tx tdb
+        (->> (q tdb {::rdf/params {:type :table}})
+
+             (mapv #(-> %
+                        (assoc
+                         :variant-frequencies
+                         (->> (varsq tdb {:stmt (:gvstmt %)})
+                              (mapv (fn [el] (rdf/->kw (rdf/ld1-> el [:cg/specifiedBy]))))
+                              frequencies))
+                        (assoc :gene-label (rdf/ld1-> (:gene %) [:skos/prefLabel]))
+                        (assoc :gci-link (string/replace
+                                          (str (:linkiri %))
+                                          "https://genegraph.clinicalgenome.org/r/"
+                                          "https://curation.clinicalgenome.org/curation-central/"))))
+             (mapv (fn [{:keys [gene-label
+                                disease
+                                gci-link
+                                gvcriteria
+                                gvstrength
+                                dosageStrength
+                                variant-frequencies]}]
+                     [gene-label
+                      (rdf/ld1-> disease [:rdfs/label])
+                      (name (rdf/->kw gvcriteria))
+                      (name (rdf/->kw gvstrength))
+                      (name (rdf/->kw dosageStrength))
+                      (:cg/GeneValidityNullVariantCriteria variant-frequencies)
+                      (:cg/GeneValidityNonNullVariantCriteria variant-frequencies)
+                      (:cg/GeneValidityProbandADDeNovoCriteria variant-frequencies)
+                      (:cg/GeneValidityProbandADNullCriteria variant-frequencies)
+                      (:cg/GeneValidityProbandADNonNullCriteria variant-frequencies)
+                      gci-link]))
+             (cons ["gene"
+                    "disease"
+                    "gene validity criteria"
+                    "gene validity classification"
+                    "dosage classification"
+                    "null variant count"
+                    "other variant count"
+                    "pre sop7 de novo variant count"
+                    "pre sop7 null variant count"
+                    "pre sop7 non null variant count"
+                    "GCI link"])
+             (charred/write-csv w)
+             #_count))))
+
+  (def http-client (hc/build-http-client {}))
+
+  ;https://ldh.genome.network/ldh/Variant/id?ids=CA023687,CA015944,CA013436&detail=high
+  (-> (hc/get
+       "https://ldh.genome.network/ldh/Variant/id"
+       {:query-params {:ids ["CA023687" "CA015944"]
+                       :types ["AlleleMolecularConsequenceStatement"]
+                       :detail "high"}
+        :http-client http-client
+        :as :json})
+      tap>)
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?cr where {
+?v a :ga4gh/VariationDescriptor ;
+:ga4gh/CanonicalReference ?cr .
+}
+")
+        stmt "https://genegraph.clinicalgenome.org/r/367af253-b424-4f21-b6f8-f2b3d3300792v1.1"]
+    (rdf/tx tdb
+      (-> (rdf/resource stmt tdb)
+          (rdf/ld-> [:cg/evidence]))))
+  
+
+  )
+
+(comment
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?prob where {
+?prob a ?type .
+}
+")]
+    (rdf/tx tdb
+      (->> (q tdb {:type :cg/VariantPathogenicityProposition})
+           count)))
+
+  )
+
+["Site" "Internal Reference" "Variant Class" "Assembly" "ISCN" "Chromosome" "Genomic Start" "Genomic End" "Zygosity" "Inheritance" "Pathogenicity" "Pathogenicity Comment (Optional)" "Year Last Evaluated" "Other notes (optional)"]
+
+;; MAVEDB!
+
+
+(comment
+  (def path
+    "/users/tristan/Downloads/urn_mavedb_00000050-a-1_annotated_variants_pathogenicity-evidence-line.ndjson")
+  (with-open [r (io/reader path)]
+    (->> (line-seq r)
+         (take 1)
+         (mapv #(charred/read-json % :key-fn keyword))
+         tap>))
+
+  (with-open [r (io/reader path)]
+    (->> (line-seq r)
+         count))
+
+  )
+
+
+(comment
+  (event-store/with-event-reader [r (str root-data-dir
+                                         "all-curation-events-2026-05-14.edn.gz")]
+    (->> (event-store/event-seq r)
+         (take 1)
+         (mapv event/deserialize)
+         tap>))
+
+  (event-store/with-event-reader [r (str root-data-dir
+                                         "all-curation-events-2026-05-14.edn.gz")]
+    (->> (event-store/event-seq r)
+         count))
+
+  (event-store/with-event-reader [r (str root-data-dir
+                                         "all-curation-events-2026-05-15.edn.gz")]
+    (->> (event-store/event-seq r)
+         count))
+  )
+
+
+(comment
+;; Are one of you able to easily pull for me a list of genes with at least one Moderate+ GDV and no previous dosage curation?  If I remember correctly this is a bit difficult to do in the current download file given how it is currently organized, but if there is a straightforward way for me to do this myself, please point me toward it.  I’d like to use this to prioritize genes for Dosage to review moving forward.
+ 
+;; For output I’d really like one gene/one row, so just gene symbol, HIGHEST GDV classification, MOI associated with that curation, Disease associated with that curation, and date of that curation.  If there are multiple definitives on a gene, I just need one (doesn’t matter which).  If possible though, I would like some flag that there are multiple GDVs, just a simple Y/N is sufficient; this would serve as our cue to look at this gene closely before assigning.
+ 
+;; Would it be possible to have something like this within a week?  We are having some issues with our dosage assignments and schedules and I am trying to start the organization from scratch to help with this.  If that is not possible, feel free to suggest an alternative timeline.
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?feature where {
+?gdvprop a :cg/GeneDiseaseValidityProposition ;
+ :cg/gene ?feature .
+?gdvstatement :cg/proposition ?gdvprop ;
+:cg/contributions ?contrib ;
+:cg/classification ?gdvclass .
+?contrib :cg/activityType :cg/Evaluated .
+values ?gdvclass { :cg/Moderate :cg/Strong :cg/Definitive }
+filter not exists 
+{ ?dosageprop :cg/feature ?feature ;
+  a :cg/GeneticConditionMechanismProposition . }
+}
+")
+        eval-query (rdf/create-query "select ?contrib where {
+ ?statement :cg/contributions ?contrib .
+ ?contrib :cg/activityType :cg/Evaluated . }")
+        class-rank {:cg/Definitive 3 :cg/Strong 2 :cg/Moderate 1}]
+    (rdf/tx tdb
+      (with-open [w (io/writer "/users/tristan/Desktop/dosage-curation-candidates.csv")]
+        (->> (q tdb)
+             #_(take 20)
+             (mapv (fn [r]
+                     (let [stmts (->> (rdf/ld-> r [[:cg/gene :<]
+                                                   [:cg/proposition :<]])
+                                      (remove #(rdf/ld1-> % [:prov/wasInvalidatedBy]))
+                                      (mapv (fn [s]
+                                              (let [classif (rdf/ld1-> s [:cg/classification])]
+                                                {:statement s
+                                                 :class classif
+                                                 :rank (get class-rank
+                                                            (rdf/->kw classif)
+                                                            0)})))
+                                      (sort-by :rank)
+                                      reverse)
+                           highest-stmt (first stmts)]
+                       (if highest-stmt
+                         [(rdf/ld1-> r [:skos/prefLabel])
+                          (if (< 1 (count stmts)) "yes" "no")
+                          (rdf/ld1-> (:class highest-stmt) [:rdfs/label])
+                          (rdf/ld1-> (:statement highest-stmt)
+                                     [:cg/proposition
+                                      :cg/objectCondition
+                                      :rdfs/label])
+                          (rdf/ld1-> (:statement highest-stmt)
+                                     [:cg/proposition
+                                      :cg/modeOfInheritanceQualifier
+                                      :rdfs/label])
+                          (rdf/ld1-> (first (eval-query
+                                             tdb
+                                             {:statement (:statement highest-stmt)}))
+                                     [:cg/date])]
+                         nil))))
+             (remove nil?)
+             #_(q tdb {:type :cg/GeneticConditionMechanismProposition})
+             #_count
+             (cons ["gene" "multiple classifications?" "highest classification" "disease" "inheritance" "date"])
+             (charred/write-csv w)))))
+
+  
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?dosageprop where { ?dosageprop :cg/feature ?feature ;
+  a :cg/GeneticConditionMechanismProposition . }
+")]
+    (rdf/tx tdb
+      (->> (q tdb)
+           (take 5)
+           (mapv #(rdf/ld1-> % [:cg/feature]))
+           #_(q tdb {:type :cg/GeneticConditionMechanismProposition})
+           #_count)))
+
+  (let [tdb @(get-in api-test-app [:storage :api-tdb :instance])
+        object-db @(get-in api-test-app [:storage :object-db :instance])
+        q (rdf/create-query "
+select ?dosageprop where { ?dosageprop :cg/feature ?feature ;
+  a :cg/GeneticConditionMechanismProposition . }
+")
+         q2 (rdf/create-query "
+select ?gdvstatement where {
+?gdvprop a :cg/GeneDiseaseValidityProposition ;
+ :cg/gene ?feature .
+?gdvstatement :cg/proposition ?gdvprop ;
+:cg/contributions ?contrib ;
+:cg/classification ?gdvclass .
+values ?gdvclass { :cg/Moderate :cg/Strong :cg/Definitive }
+filter not exists { ?gdvstatement :prov/wasInvalidatedBy ?x } }
+")]
+    (rdf/tx tdb
+      (->> (q2 tdb)
+           count)))
+  
+  )
+
+(comment
+  (def cv1 "/Users/tristan/Downloads/clinvar-annotation-submission-133-20260527.json")
+  (def cv2 "/Users/tristan/Downloads/clinvar-annotation-submission-127-20251218.json")
+  (def clinvar-submission
+    (with-open [r (io/reader cv1)]
+      (charred/read-json r)))
+
+  (with-open [r (io/reader "/Users/tristan/Downloads/clinvar-annotation-submission-127-20251218.json")]
+    (-> (charred/read-json r)
+        type))
+
+
+  (tap> clinvar-submission)
+  clinvar-submission
+  {"Date Created" "2026-05-27", "Is Annotation Outdated" nil, "ClinVar Release Date" "2026-05-23", "VCV" "VCV000555168", "SCV Deleted Release Date" nil, "Timestamp" "2026-05-26T15:16:13Z", "Submitter ID" "320494", "Reason" "Older claim that does not account for recent evidence", "Is Annotated SCV Deleted" false, "Action" "flagging candidate", "Notes" nil, "SCV ID" "SCV000795855.2", "Variation ID" "555168"}
+  
+  )
+
+;; Creating ClinVar submission
+(comment
+  (let [db @(get-in api-test-app [:storage :object-db :instance])]
+    (-> (storage/read db [:clinvar-if "455"])
+        tap>))
+
+  (time
+   (let [db @(get-in api-test-app [:storage :object-db :instance])]
+     (-> (rocksdb/range-get db {:prefix [:clinvar-if] :return :ref})
+         count)))
+
+  (time
+   (let [db @(get-in api-test-app [:storage :object-db :instance])
+         add-gene-overlaps-with-db #(clinvar/add-gene-overlaps-for-variant db  %)]
+     (-> (storage/read db [:clinvar-if "4852088"])
+         clinvar/variant->statements-and-objects
+         add-gene-overlaps-with-db
+         tap>)))
   )

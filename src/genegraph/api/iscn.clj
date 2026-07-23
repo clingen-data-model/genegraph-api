@@ -20,6 +20,10 @@
     (re-seq iscn-re iscn-expr))
   #_(iscn->fields "arr[hg19] 5p15.2(11,397,258-11,419,020 )x1 mat")
   (tap> (map iscn->fields (concat mayo trillium)))
+  (->> (concat mayo trillium)
+       (map iscn->all-fields )
+       (map count)
+       frequencies)
   )
 ;; mayo sample
 (def mayo

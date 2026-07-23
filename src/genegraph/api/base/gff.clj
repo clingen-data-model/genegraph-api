@@ -1,5 +1,6 @@
 (ns genegraph.api.base.gff
   (:require [clojure.data.csv :as csv]
+            [charred.api :as charred]
             [clojure.java.io :as io]
             [clojure.string :as str]
             [genegraph.framework.id :as id]
@@ -70,7 +71,9 @@
 (def entrez-gene-root "https://identifiers.org/ncbigene:")
 
 (def gff-type->so-term
-  {"gene" :so/Gene})
+  {"gene" :so/Gene
+   "exon" :so/Exon
+   "CDS" :so/CDS})
 
 (def useable-types
   (set (keys gff-type->so-term)))
@@ -85,7 +88,8 @@
 
 (defn gff-feature-id [gff-map]
   (case (:gff/type gff-map)
-    "gene" (str entrez-gene-root (:ncbi/gene-id gff-map))))
+    "gene" (str entrez-gene-root (:ncbi/gene-id gff-map))
+    ))
 
 (defn gff-map->sequence-feature [gff-map]
   (let [location (gff-map->location gff-map)]
@@ -172,12 +176,12 @@
             tap>))))
 
   (time
-   (let [gff-path "/Users/tristan/data/clinvar-cnv-annotation/GRCh38.gff.gz"]
+   (let [gff-path "/Users/tristan/data/genegraph-base/GRCh38.gff.gz"]
      (with-open [r (-> gff-path
                        io/input-stream
                        GZIPInputStream.
                        io/reader)]
-       (->> (csv/read-csv r :separator \tab)
+       (->> (charred/read-csv r :separator \tab)
             (filter #(< 3 (count %)))   ; remove comments
             (map gff-attributes->map)
             (filter #(= "exon" (:gff/type %)))
@@ -185,6 +189,107 @@
             (into #{})
             count))))
 
+  (let [gff-path "/Users/tristan/data/genegraph-base/GRCh38.gff.gz"]
+    (with-open [r (-> gff-path
+                      io/input-stream
+                      GZIPInputStream.
+                      io/reader)]
+      (->> (charred/read-csv r :separator \tab)
+           (filter #(< 3 (count %)))   ; remove comments
+           (map gff-attributes->map)
+           (filter #(= "gene" (:gff/type %)))
+           (take 5)
+           (into [])
+           tap>
+           #_(map #(-> % gff-map->location :iri))
+           #_(into #{})
+           #_count)))
+
+  (let [gff-path "/Users/tristan/data/genegraph-base/GRCh38.gff.gz"]
+    (with-open [r (-> gff-path
+                      io/input-stream
+                      GZIPInputStream.
+                      io/reader)]
+      (->> (charred/read-csv r :separator \tab)
+           (filter #(< 3 (count %)))   ; remove comments
+           (map gff-attributes->map)
+           (filter #(= "mRNA" (:gff/type %)))
+           (take 5)
+           (into [])
+           #_(mapv gff-map->object-and-indexes)
+           tap>
+           #_(map #(-> % gff-map->location :iri))
+           #_(into #{})
+           #_count)))
+  (time
+   (let [gff-path "/Users/tristan/data/genegraph-base/GRCh38.gff.gz"
+         db @(get-in genegraph.user/api-test-app
+                     [:storage :object-db :instance])]
+     (with-open [r (-> gff-path
+                       io/input-stream
+                       GZIPInputStream.
+                       io/reader)]
+       (->> (charred/read-csv r :separator \tab)
+            (filter #(< 3 (count %)))    ; remove comments
+            (map gff-attributes->map)
+            #_(take 10000)
+            (map :gff/type)
+            frequencies
+            #_tap>
+            #_(map #(-> % gff-map->location :iri))
+            #_(into #{})
+            #_count))))
+
+  
+  (["exon" 2324920] ;; needs ID mechanism
+   ["CDS" 1850767]  ;; needs ID mechanism
+   ["match" 161208]
+   ["mRNA" 145477]
+   ["biological_region" 137093]
+   ["enhancer" 115208]
+   ["gene" 48173]
+   ["silencer" 35932]
+   ["lnc_RNA" 33203]
+   ["cDNA_match" 27301]
+   ["pseudogene" 19339]
+   ["transcript" 15171])
+
+  (["exon" 1066163]
+   ["CDS" 813173]
+   ["match" 157514]
+   ["biological_region" 134090]
+   ["enhancer" 112455]
+   ["mRNA" 74145]
+   ["silencer" 35474]
+   ["cDNA_match" 34038]
+   ["gene" 32948]
+   ["pseudogene" 17368]
+   ["lnc_RNA" 12357]
+   ["transcript" 10142])
+  
+  {"lnc_RNA" 83,
+   "primary_transcript" 10,
+   "mRNA" 334,
+   "biological_region" 288,
+   "nucleotide_motif" 4,
+   "snRNA" 1,
+   "pseudogene" 34,
+   "snoRNA" 1,
+   "tandem_repeat" 1,
+   "gene" 110,
+   "repeat_instability_region" 1,
+   "region" 1,
+   "enhancer" 194,
+   "meiotic_recombination_region" 2,
+   "transcript" 21,
+   "CDS" 3859,
+   "transcriptional_cis_regulatory_region" 1,
+   "silencer" 131,
+   "exon" 4907,
+   "miRNA" 17}
+
+  429455
+  
   (time
    (def mRNA-names
      (let [gff-path "/Users/tristan/data/clinvar-cnv-annotation/GRCh38.gff.gz"]
@@ -395,5 +500,3 @@
 ;; https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/9606/GCF_000001405.40-RS_2023_03/GCF_000001405.40_GRCh38.p14_genomic.gff.gz
 
 ;; https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz
-
-

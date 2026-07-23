@@ -1,26 +1,16 @@
 # Projects
 
-## Erin Query
-
-AD Definitive/Anything w Dosage info
-
-what is the dosage haplo score?
-
-variants in the gene curation are predicted/proven null
-
-ratio of null/other
-
 ## Gene Validity Versioning -> Website
 
 This is dependent on populating the the "All Curation Events" topic with data in the format agreed to with Phil.
 
 #### Current Activity
 
-Had a productive meeting with Phil on **Dec 11**; at this point we appear to have a complete specification for sharing data to "All Curation Events"
+At this point we appear to have a complete specification for sharing data to "All Curation Events", based on our last meetings.
 
 #### Next Step
 
-Produce transform based on discussion for curation changes from last meeting. Estimated **Jan 8** Will present data on our next Genegraph/Website call at this time.
+Produce transform based on discussion for curation changes from last meeting.
 
 #### Completion
 
@@ -50,6 +40,10 @@ A publicly announced data release will be a significant milestone. I expect to i
 The CNV guidelines committee is looking at the value of computational predictors in assessing CNV pathogenicity. Historically, scores had been used from DECIPHER, however these scores are outdated and deprecated. We are looking at replacing previous approaches with a new algorithm, GeneBayes. We are looking to assess this algorithm by comparing the score distribution from controls vs cases. We are evaluating the use of gnomAD SV as a control set. For the case set, we intend to combine CNVs pulled from ClinVar with inheritance information and combine it with cases offered from our group of participating clinical labs.
 
 ### Next Step
+
+#### Integrate example data from participating labs
+
+Currently have tabular data from Mayo and Trillium. Initial assessment is that it will be feasible to sue this example data; will need to write adapters to integrate data with remaining data sets.
 
 #### Evaluate accessibility of data from sources
 
@@ -116,8 +110,14 @@ The Gene Validity curation team has asked for various queries over the Gene Vali
 
 ## Common Infrastructure
 
-### Authentication
+### Genegraph / Kafka disconnect errors
 
+Occasionally, the processing between Genegraph and the website stops working. Users notice when their curations don't appear on the website when expected.
+
+Have made significant updates to some of the Kafka interaction code to automatically restart Kafka clients when these disconnects occur.
+
+### Authentication
+ 
 Needed for ClinVar Curation, helpful for allowing curators access to Gene Validity queries; data prior to 
 
 ### Text Indexes
@@ -131,3 +131,14 @@ Vector-based text indexes are expected to provide a more complete, semantic sear
 Classifier for papers for recuration
 
 Text to query generation for searching
+
+## Gene Validity Queries
+
+AD Definitive/Anything w Dosage info
+
+what is the dosage haplo score?
+
+variants in the gene curation are predicted/proven null
+
+ratio of null/other
+ 

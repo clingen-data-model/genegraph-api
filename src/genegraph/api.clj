@@ -16,13 +16,15 @@
             [genegraph.api.assertion-annotation :as ac]
             [genegraph.api.common :as common]
             [genegraph.api.auth :as auth]
-            [genegraph.api.workos :as workos]
+            #_[genegraph.api.workos :as workos]
             [genegraph.api.gpm :as gpm]
             [com.walmartlabs.lacinia.pedestal2 :as lacinia-pedestal]
             [com.walmartlabs.lacinia.pedestal.internal :as internal]
-            [io.pedestal.http :as http]
             [io.pedestal.interceptor :as interceptor]
             [io.pedestal.log :as log]
+            [io.pedestal.http.cors :as http-cors]
+            [io.pedestal.http :as http]
+            [io.pedestal.http.ring-middlewares :as http-middleware]
             [clojure.java.io :as io]
             [clojure.set :as set])
   (:import [org.apache.jena.sparql.core Transactional]
@@ -189,6 +191,14 @@
    :kafka-topic "gene_validity"
    :kafka-topic-config {}})
 
+
+(def all-curation-events-topic
+  {:name :all-curation-events
+   :kafka-cluster :data-exchange
+   :serialization :json
+   :kafka-topic "all-curation-events"
+   :kafka-topic-config {}})
+
 (def api-log-topic
   {:name :api-log
    :kafka-cluster :data-exchange
@@ -211,7 +221,7 @@
 ;; gv
 
 (def prop-query
-  (rdf/create-query "select ?prop where { ?prop a :cg/GeneValidityProposition } "))
+  (rdf/create-query "select ?prop where { ?prop a :cg/GeneDiseaseValidityProposition } "))
 
 (def same-as-query
   (rdf/create-query "select ?x where { ?x :owl/sameAs ?y }"))
@@ -221,7 +231,7 @@
   (rdf/tx (get-in event [::storage/storage :api-tdb])
       (let [m (::event/data event)
             prop (first (prop-query m))
-            hgnc-gene (rdf/ld1-> prop [:cg/gene])
+            hgnc-gene (rdf/ld1-> prop [:cg/subjectGene])
             ncbi-gene (first (same-as-query (get-in event [::storage/storage :api-tdb])
                                             {:y hgnc-gene}))]
         (.remove m (rdf/construct-statement [prop :cg/gene hgnc-gene]))
@@ -234,15 +244,20 @@
     :enter (fn [e] (replace-hgnc-with-ncbi-gene-fn e))}))
 
 (defn has-publish-action [m]
-  (< 0 (count ((rdf/create-query "select ?x where { ?x :cg/role :cg/Publisher } ") m))))
+  (< 0 (count ((rdf/create-query "select ?x where { ?x :cg/activityType :cg/Submitted } ") m))))
 
-(defn prop-iri [event]
-  (-> event ::event/data prop-query first str))
+(defn root-iri [event]
+  (let [q (rdf/create-query "
+select ?id where {
+ ?s a :cg/Statement ;
+  :dc/isVersionOf ?id
+} ")]
+    (-> event ::event/data q first str)))
 
 (defn store-curation-fn [event]
   (if (has-publish-action (::event/data event))
-    (event/store event :api-tdb (prop-iri event) (::event/data event))
-    (event/delete event :api-tdb (prop-iri event))))
+    (event/store event :api-tdb (root-iri event) (::event/data event))
+    (event/delete event :api-tdb (root-iri event))))
 
 (def store-curation
   (interceptor/interceptor
@@ -541,6 +556,8 @@
   {:name :graphql-api
    :type :processor
    :interceptors [#_lacinia-pedestal/initialize-tracing-interceptor
+                  #_http-cors/dev-allow-origin
+                  #_(http-cors/allow-origin (fn [& _] true))
                   publish-result-interceptor
                   auth/auth-interceptor
                   query-timer-interceptor
@@ -557,7 +574,7 @@
                   lacinia-pedestal/disallow-subscriptions-interceptor
                   lacinia-pedestal/prepare-query-interceptor
                   #_lacinia-pedestal/enable-tracing-interceptor
-                  #_inspect-event-interceptor
+                  inspect-event-interceptor
                   graphql-mutation-effects-interceptor
                   lacinia-pedestal/query-executor-handler]
    :init-fn init-graphql-processor})
@@ -617,10 +634,8 @@
                 {:path "/ready"
                  :processor :graphql-ready
                  :method :get}]
-    ::http/host "0.0.0.0"
-    ::http/allowed-origins {:allowed-origins (constantly true)
-                            :creds true}
-    ::http/routes
+    ::http/allowed-origins ["http://localhost:8080"]
+    :routes
     (conj
      (lacinia-pedestal/graphiql-asset-routes "/assets/graphiql")
      ["/ide" :get (lacinia-pedestal/graphiql-ide-handler {})
@@ -630,42 +645,19 @@
       :route-name ::readiness]
      ["/live"
       :get (fn [_] {:status 200 :body "server is live"})
-      :route-name ::liveness]
-     ["/auth/login"
-      :get workos/login-handler
-      :route-name ::workos/login]
-     ["/auth/callback"
-      :get workos/callback-handler
-      :route-name ::workos/callback]
-     ["/auth/logout" :post workos/logout-handler
-      :route-name ::logout]
-     ["/auth/me"
-      :get [workos/require-auth
-            workos/me-handler]
-      :route-name ::workos/me])
-    ::http/type :jetty
-    ::http/port 8888
-    ::http/join? false
-    ::http/secure-headers nil}})
+      :route-name ::liveness])}})
 
 (def ready-server
   {:gene-validity-server
    {:type :http-server
     :name :ready-server
-    ::http/host "0.0.0.0"
-    ::http/allowed-origins {:allowed-origins (constantly true)
-                            :creds true}
-    ::http/routes
+    :routes
     [["/ready"
       :get (fn [_] {:status 200 :body "server is ready"})
       :route-name ::readiness]
      ["/live"
       :get (fn [_] {:status 200 :body "server is live"})
-      :route-name ::liveness]]
-    ::http/type :jetty
-    ::http/port 8888
-    ::http/join? false
-    ::http/secure-headers nil}})
+      :route-name ::liveness]]}})
 
 (def base-app-def
   {:type :genegraph-app

@@ -1,3 +1,5 @@
+;; EVAL I don't know why this exists separately from Cohort
+
 (ns genegraph.api.graphql.schema.control-cohort)
 
 (def control-cohort

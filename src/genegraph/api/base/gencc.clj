@@ -7,7 +7,8 @@
             [genegraph.framework.storage.rdf :as rdf]
             [genegraph.framework.storage :as storage]
             [genegraph.framework.id :as id]
-            [io.pedestal.log :as log])
+            [io.pedestal.log :as log]
+            [charred.api :as charred])
   (:import [java.io PushbackReader]))
 
 "uuid" ;; ugly as sin, use Genegraph hash
@@ -105,7 +106,8 @@
              :iri "https://genegraph.clingen.app/wNV35ZPSUBo"}]}))
 
 (defn row->record
-  [[gencc-uuid
+  [[sgc-id
+    version-number
     gene
     symbol
     disease
@@ -135,7 +137,7 @@
     submitted-as-assertion-criteria-url
     submitted-as-submission-id
     submitted-run-date]]
-  {:gencc-uuid gencc-uuid
+  {:sgc-id sgc-id
    :gene gene
    :symbol symbol
    :disease disease
@@ -351,5 +353,56 @@
              :cg/contributionTo "https://genegraph.clingen.app/d0vW1xSkkLY",
              :iri "https://genegraph.clingen.app/wNV35ZPSUBo"}]}))
 
-  
+  (with-open [r (io/reader (storage/->input-stream {:type :file
+                                                    :base "/Users/tristan/data/genegraph-base/"
+                                                    :path "gencc.csv"}))]
+    (->> (charred/read-csv r)
+         first
+         #_rest
+         #_(mapv row->record)))
+
+  ["sgc_id"
+   "version_number"
+   "gene_curie"
+   "gene_symbol"
+   "disease_curie"
+   "disease_title"
+   "disease_original_curie"
+   "disease_original_title"
+   "classification_curie"
+   "classification_title"
+   "moi_curie"
+   "moi_title"
+   "submitter_curie"
+   "submitter_title"
+   "submitted_as_hgnc_id"
+   "submitted_as_hgnc_symbol"
+   "submitted_as_disease_id"
+   "submitted_as_disease_name"
+   "submitted_as_moi_id"
+   "submitted_as_moi_name"
+   "submitted_as_submitter_id"
+   "submitted_as_submitter_name"
+   "submitted_as_classification_id"
+   "submitted_as_classification_name"
+   "submitted_as_date"
+   "submitted_as_public_report_url"
+   "submitted_as_notes"
+   "submitted_as_pmids"
+   "submitted_as_assertion_criteria_url"
+   "submitted_as_submission_id"
+   "submitted_run_date"]
+
+  (with-open [r (io/reader (storage/->input-stream {:type :file
+                                                    :base "/Users/tristan/data/genegraph-base/"
+                                                    :path "gencc.csv"}))]
+    (->> (charred/read-csv r)
+         rest
+         #_(take 1)
+         (map row->record)
+         (map #(select-keys % [:gene :disease :moi]))
+         
+         count))
+  15423
+  29876
   )

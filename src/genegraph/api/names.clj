@@ -35,7 +35,8 @@
  "efo" "http://www.ebi.ac.uk/efo/EFO_"
  "gencc" "https://genegraph.clinicalgenome.org/r/gencc/"
  "orphanet" "http://www.orpha.net/ORDO/Orphanet_"
- "schema" "https://schema.org/"})
+ "schema" "https://schema.org/"
+ "ensembl" "http://identifiers.org/ensembl:"})
 
 (add-keyword-mappings
  {:mondo/HereditaryDisease "http://purl.obolibrary.org/obo/MONDO_0003847"
@@ -173,6 +174,8 @@
   :so/Gene "http://purl.obolibrary.org/obo/SO_0000704"
   :so/GeneWithProteinProduct "http://purl.obolibrary.org/obo/SO_0001217"
   :so/SequenceFeature "http://purl.obolibrary.org/obo/SO_0000110"
+  :so/Exon "http://purl.obolibrary.org/obo/SO_0000147"
+  :so/CDS "http://purl.obolibrary.org/obo/SO_0000834"  
   :stato/Cohort "http://purl.obolibrary.org/obo/STATO_0000203"
   :stato/lower-confidence-limit "http://purl.obolibrary.org/obo/STATO_0000315"
   :stato/upper-confidence-limit "http://purl.obolibrary.org/obo/STATO_0000314"
