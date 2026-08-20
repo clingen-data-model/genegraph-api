@@ -3397,8 +3397,6 @@ select ?el where
     str
     (map fragment-str (query->dependencies query)))))
 
-(println (compile-query base-resource-query))
-
 (defn add-direct-dependencies [typename detail-level]
   (->> (re-seq #"([A-Za-z]+)(\d)" (get-in fragments [typename detail-level]))
        (map (fn [[_ t l]] [t (Integer/parseInt l)]))

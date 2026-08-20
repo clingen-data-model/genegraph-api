@@ -14,7 +14,7 @@
             [genegraph.api.sequence-index :as idx]
             [io.pedestal.log :as log]
             [hato.client :as hc]
-            [genegraph.api.spec.ga4gh])
+            [genegraph.api.ga4gh])
   (:import [org.apache.jena.rdf.model Model ModelFactory]
            [java.util.zip GZIPInputStream]))
 

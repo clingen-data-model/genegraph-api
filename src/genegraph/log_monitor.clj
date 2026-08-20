@@ -97,28 +97,7 @@
        (take 20)
        (mapv :duration))
 
-  (->> (rocksdb/range-get @(get-in log-monitor [:storage :log-store :instance])
-                          [:log-record])
-       (remove :handled-by)
-       #_(filter #(re-find #"genes\(limit" (:query %)))
-       (map #(assoc % :duration (- (:end-time %) (:start-time %))))
-       (sort-by :duration)
-       reverse
-       (take 1)
-       #_(mapv :duration)
-       (map #(assoc % :parsed-query (json/read-str (:query %) :key-fn keyword)))
-       (run! #(println (:parsed-query %))))
 
-  
-
-  
-  
-  (spit "/Users/tristan/Desktop/problem-query.graphql"
-        (-> (storage/read @(get-in log-monitor [:storage :log-store :instance])
-                          [:log-record "1720618886905"])
-            :query
-            (json/read-str :key-fn keyword)
-            :query))
   
   )
 (def c (hc/build-http-client {:connect-timeout 100
@@ -141,7 +120,7 @@
                             "CGTERMS:AdultActionabilityWorkingGroup"
                             :else y)))
        x))
-   (-> response :body (json/read-str :key-fn keyword))))
+   (-> response :body (json/read-json :key-fn keyword))))
 
 (defn request [query host]
   (try
@@ -271,10 +250,8 @@
         first
         :gene_validity_assertions
         first
-        p        :legacy_json))
-  
-pp  (tap> (data/diff (-> diffs first :diff second legacy-json json/read-str)
-                   (-> diffs first :diff first legacy-json json/read-str)))
+        :legacy_json))
+
 
 
   

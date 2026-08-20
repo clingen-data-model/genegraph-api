@@ -17,7 +17,7 @@
             [genegraph.api.sequence-index :as idx]
             [io.pedestal.log :as log]
             [hato.client :as hc]
-            [genegraph.api.spec.ga4gh]))
+            [genegraph.api.ga4gh]))
 
 (defn max-coord [coord-or-range]
   (if (vector? coord-or-range)
