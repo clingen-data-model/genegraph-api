@@ -1,6 +1,7 @@
 (ns genegraph.api.ga4gh-test
   (:require [clojure.test :refer [deftest testing is are]]
             [clojure.spec.alpha :as spec]
+            [clojure.spec.test.alpha :as stest]
             [genegraph.framework.id :as id]
             [genegraph.api.shared-data :as shared-data]
             [genegraph.api.ga4gh :as ga4gh]))
@@ -456,3 +457,80 @@
       (is (= variant (spec/conform :ga4gh/CopyNumberChange variant)))
       (is (= a-variant-description
              (spec/conform ::ga4gh/variant-description a-variant-description))))))
+
+;;;; Validation on the constructors
+
+(deftest validate!-test
+  (testing "a conforming value is returned unchanged"
+    (is (= a-variant-description
+           (ga4gh/validate! ::ga4gh/variant-description
+                            a-variant-description
+                            "should not throw"))))
+  (testing "conforming values are not replaced by their conformed form"
+    (let [loc (ga4gh/->ga4gh-loc a-variant-description)]
+      (is (= loc (ga4gh/validate! :ga4gh/SequenceLocation loc "unused")))))
+  (testing "a non-conforming value throws with the supplied message"
+    (let [ex (try (ga4gh/validate! ::ga4gh/build 42 "boom")
+                  (catch clojure.lang.ExceptionInfo e e))]
+      (is (= "boom" (ex-message ex)))
+      (is (= ::ga4gh/build (:spec (ex-data ex))))
+      (is (= 42 (:value (ex-data ex))))))
+  (testing "ex-data carries both a human readable and a machine readable explanation"
+    (let [ex (try (ga4gh/->ga4gh-variant (assoc a-variant-description :svtype "INV"))
+                  (catch clojure.lang.ExceptionInfo e e))
+          {:keys [explanation] :as data} (ex-data ex)
+          problems (::spec/problems data)]
+      (is (string? explanation))
+      (is (seq problems))
+      (is (= [:svtype] (:in (first problems))))
+      (is (= "INV" (:val (first problems)))))))
+
+(deftest validation-is-transparent-for-valid-input-test
+  (testing "validation does not alter what the constructors return"
+    (are [description] (and (spec/valid? ::ga4gh/variant-description description)
+                            (spec/valid? :ga4gh/CopyNumberChange
+                                         (ga4gh/->ga4gh-variant description))
+                            (spec/valid? :ga4gh/SequenceLocation
+                                         (ga4gh/->ga4gh-loc description)))
+      a-variant-description
+      {:build "GRCh38" :chrom "chrX" :start 1 :end 2 :svtype "DUP"}
+      {:build "hg19" :chrom "chr22" :start "100" :end "200" :svtype "Deletion"}
+      {:build "38" :chrom "Y" :start 10 :end-min "20" :end-max "30"
+       :svtype "copy number gain"}))
+  (testing "extra keys in the description are tolerated"
+    (is (spec/valid? :ga4gh/CopyNumberChange
+                     (ga4gh/->ga4gh-variant
+                      (assoc a-variant-description :source "ISCA" :id 17))))))
+
+(deftest fdef-instrumentation-test
+  (testing "the fdefs agree with the checks the fns already make"
+    (let [instrumented (stest/instrument [`ga4gh/->ga4gh-loc
+                                          `ga4gh/->ga4gh-variant
+                                          `ga4gh/location-size
+                                          `ga4gh/seq-id
+                                          `ga4gh/build-str->build])]
+      (try
+        (is (= 5 (count instrumented)))
+        (testing "valid calls pass instrumented argument checks"
+          (is (spec/valid? :ga4gh/CopyNumberChange
+                           (ga4gh/->ga4gh-variant a-variant-description)))
+          (is (= 15 (ga4gh/location-size {:type :ga4gh/SequenceLocation
+                                          :ga4gh/sequenceReference
+                                          (ga4gh/seq-id "1" "38")
+                                          :ga4gh/start 10
+                                          :ga4gh/end 25
+                                          :iri "https://example.org/x"}))))
+        (testing "instrumented arg specs reject bad arguments"
+          (are [form] (thrown? clojure.lang.ExceptionInfo form)
+            (ga4gh/seq-id 1 "38")
+            (ga4gh/build-str->build :hg38)
+            (ga4gh/location-size {:ga4gh/start 10 :ga4gh/end 25})
+            (ga4gh/->ga4gh-variant (assoc a-variant-description :svtype "INV"))))
+        (finally
+          (stest/unstrument [`ga4gh/->ga4gh-loc
+                             `ga4gh/->ga4gh-variant
+                             `ga4gh/location-size
+                             `ga4gh/seq-id
+                             `ga4gh/build-str->build])))))
+  (testing "unstrumenting restores the plain fns"
+    (is (nil? (ga4gh/seq-id "chrZZ" "38")))))
