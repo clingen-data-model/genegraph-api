@@ -18,6 +18,20 @@
                    :defining-attributes
                    [:cg/variant :cg/condition]})
 
+(defn validate!
+  "Return value when it conforms to spec, otherwise throw. Specs are resolved
+  from the registry at call time, so the specs relied on here may be (and are)
+  registered further down the file."
+  [spec value message]
+  (if (spec/valid? spec value)
+    value
+    (throw (ex-info message
+                    {:spec spec
+                     :value value
+                     :explanation (spec/explain-str spec value)
+                     ::spec/problems (::spec/problems
+                                      (spec/explain-data spec value))}))))
+
 (defn location-size
   "Calculate the size of a sequence location"
   [{:ga4gh/keys [start end]}]
@@ -56,7 +70,15 @@
     (Long/parseLong s)
     s))
 
-(defn ->ga4gh-loc [{:keys [build chrom end-min end-max end start start-min start-max]}]
+(defn ->ga4gh-loc
+  "Convert a location described in the intermediate format into a GA4GH
+  SequenceLocation. Throws if the description, or the location built from
+  it, does not conform to spec."
+  [{:keys [build chrom end-min end-max end start start-min start-max]
+    :as location-description}]
+  (validate! ::location-description
+             location-description
+             "Not a valid location description")
   (let [start-min (->long start-min)
         start-max (->long start-max)
         end-min (->long end-min)
@@ -71,7 +93,9 @@
                           [end-min end-max]
                           (or end end-min))
              :type :ga4gh/SequenceLocation}]
-    (assoc loc :iri (id/iri loc))))
+    (validate! :ga4gh/SequenceLocation
+               (assoc loc :iri (id/iri loc))
+               "Did not construct a valid GA4GH SequenceLocation")))
 
 (def ->efo-term
   {"DEL" :efo/copy-number-loss
@@ -83,12 +107,18 @@
 
 (defn ->ga4gh-variant
   "Convert a variant based on an intermediate description format into GA4GH VRS format.
-  Currently only supports copy number variants."
-  [{:keys [svtype] :as v}]
+  Currently only supports copy number variants. Throws if the description, or the
+  variant built from it, does not conform to spec."
+  [{:keys [svtype] :as variant-description}]
+  (validate! ::variant-description
+             variant-description
+             "Not a valid variant description")
   (let [variant {:type :ga4gh/CopyNumberChange
                  :ga4gh/copyChange (->efo-term svtype)
-                 :ga4gh/location (->ga4gh-loc v)}]
-    (assoc variant :iri (id/iri variant))))
+                 :ga4gh/location (->ga4gh-loc variant-description)}]
+    (validate! :ga4gh/CopyNumberChange
+               (assoc variant :iri (id/iri variant))
+               "Did not construct a valid GA4GH CopyNumberChange")))
 
 ;;;; Specs
 ;;;;
