@@ -1,29 +1,157 @@
 (ns genegraph.api.iscn
   "Namespace for converting loosely structured files with an ISCN defined variant
-  at the core")
-(do
-  ;; Captures, in order:
-  ;;   1 build        e.g. hg19, GRCh37, GRCH37
-  ;;   2 cytoband     e.g. 2q33.1q33.2, 5p15.2, Xp22.13
-  ;;   3 start        e.g. 11,397,258 or 34466631
-  ;;   4 end          e.g. 11,419,020 or 36307189
-  ;;   5 copy-number  the digit after x (1-4)
-  ;;   6 inheritance  mat, pat, or dn
-  ;; the arr[build] prefix is optional so trailing comma-separated
-  ;; variants on one line are also captured (with build = nil)
-  (def iscn-re
-    #"(?:arr\[([^\]]+)\]\s*)?([XY\d]+)([pq][\dpq.]+)\s*\(\s*([\d,]+)[-_]([\d,]+)\s*\)\s*x(\d+)(?:\[[\d.]+\])?\s*(mat|pat|dn)")
-  (defn iscn->fields [iscn-expr]
-    (re-find iscn-re iscn-expr))
-  ;; a single expression may hold multiple comma-separated variants
-  (defn iscn->all-fields [iscn-expr]
-    (re-seq iscn-re iscn-expr))
-  #_(iscn->fields "arr[hg19] 5p15.2(11,397,258-11,419,020 )x1 mat")
+  at the core"
+  (:require [clojure.string :as str]
+            [genegraph.api.ga4gh :as ga4gh]))
+;; Captures, in order:
+;;   1 build        e.g. hg19, GRCh37, GRCH37
+;;   2 cytoband     e.g. 2q33.1q33.2, 5p15.2, Xp22.13
+;;   3 start        e.g. 11,397,258 or 34466631
+;;   4 end          e.g. 11,419,020 or 36307189
+;;   5 copy-number  the digit after x (1-4)
+;;   6 inheritance  mat, pat, or dn
+;; the arr[build] prefix is optional so trailing comma-separated
+;; variants on one line are also captured (with build = nil)
+(def iscn-re
+  #"(?:arr\[([^\]]+)\]\s*)?([XY\d]+)([pq][\dpq.]+)\s*\(\s*([\d,]+)[-_]([\d,]+)\s*\)\s*x(\d+)(?:\[[\d.]+\])?\s*(mat|pat|dn)")
+
+(defn iscn->fields [iscn-expr]
+  (re-find iscn-re iscn-expr))
+
+;; a single expression may hold multiple comma-separated variants
+(defn iscn->all-fields [iscn-expr]
+  (re-seq iscn-re iscn-expr))
+
+;;;; Converting parsed ISCN into GA4GH variants
+;;;;
+;;;; iscn->fields yields regex groups; genegraph.api.ga4gh takes an
+;;;; intermediate description map and returns VRS entities. These fns bridge
+;;;; the two, and do it over collections, since one expression may name several
+;;;; variants and a file names many expressions.
+
+(def copy-number->svtype
+  "ISCN reports the copy number observed; GA4GH describes the direction of the
+  change. Two copies is the diploid reference state and so describes no change
+  at all -- it deliberately has no term here, and variants reporting it are
+  reported as unconvertible rather than silently assigned a direction."
+  {"0" "copy number loss"
+   "1" "copy number loss"
+   "3" "copy number gain"
+   "4" "copy number gain"})
+
+(def inheritance->allele-origin
+  {"mat" :maternal
+   "pat" :paternal
+   "dn" :de-novo})
+
+(defn- ->coordinate
+  "ISCN coordinates are often written with thousands separators."
+  [s]
+  (str/replace s "," ""))
+
+(defn fields->variant-description
+  "Convert one iscn->fields match into the intermediate description format
+  genegraph.api.ga4gh understands. The build is accepted separately because the
+  arr[build] prefix is written once per expression rather than once per variant.
+  Keys beyond the ones ga4gh requires ride along; its specs tolerate them."
+  ([fields] (fields->variant-description fields (second fields)))
+  ([[iscn _ chrom cytoband start end copy-number inheritance] build]
+   {:iscn iscn
+    :build build
+    :chrom chrom
+    :cytoband (str chrom cytoband)
+    :start (->coordinate start)
+    :end (->coordinate end)
+    :copy-number (parse-long copy-number)
+    :svtype (copy-number->svtype copy-number)
+    :inheritance (inheritance->allele-origin inheritance)}))
+
+(defn iscn->variant-descriptions
+  "Parse every variant in one ISCN expression into intermediate descriptions.
+  The arr[build] prefix appears at most once per expression, so variants written
+  after it inherit its build."
+  [iscn-expr]
+  (let [matches (iscn->all-fields iscn-expr)
+        build (some second matches)]
+    (mapv #(fields->variant-description % build) matches)))
+
+(defn description->observation
+  "Build the GA4GH CopyNumberChange for one description, returning the
+  description with the result assoced under :variant.
+
+  ga4gh/->ga4gh-variant throws on anything it cannot represent -- a build or
+  chromosome outside the reference, a copy number of two -- so the failure is
+  captured under :error instead. A single unusable line should not cost the rest
+  of the batch."
+  [description]
+  (try
+    (assoc description :variant (ga4gh/->ga4gh-variant description))
+    (catch clojure.lang.ExceptionInfo e
+      (assoc description
+             :error {:message (ex-message e)
+                     :explanation (:explanation (ex-data e))}))))
+
+(defn iscn->observations
+  "Every variant in one ISCN expression, converted to GA4GH where possible."
+  [iscn-expr]
+  (mapv description->observation (iscn->variant-descriptions iscn-expr)))
+
+(defn variant-set
+  "Convert a collection of ISCN expressions into the set of distinct GA4GH
+  variants they describe. Returns a map of
+
+    :variants      the distinct :ga4gh/CopyNumberChange entities. Deduplicated
+                   by value -- their :iri is content addressed, so the same
+                   interval reported for two probands is one variant.
+    :observations  one entry per parsed variant: the intermediate description,
+                   including cytoband and inheritance, plus the :variant it
+                   produced (or an :error explaining why it produced none).
+                   This is where the link between a variant and the report it
+                   came from survives; the variants themselves carry no
+                   provenance.
+    :unconvertible the observations that failed, split out for convenience.
+    :unparsed      expressions the ISCN regex did not match at all.
+
+  Nothing here throws; an expression that cannot be handled is reported."
+  [iscn-exprs]
+  (let [observations (into [] (mapcat iscn->observations) iscn-exprs)
+        {converted true unconvertible false} (group-by (comp some? :variant)
+                                                       observations)]
+    {:variants (into #{} (map :variant) converted)
+     :observations observations
+     :unconvertible (vec unconvertible)
+     :unparsed (vec (remove iscn->fields iscn-exprs))}))
+
+(defn locations
+  "The distinct GA4GH SequenceLocations in a variant set. Useful on its own for
+  overlap queries, which work over loci rather than variants."
+  [{:keys [variants]}]
+  (into #{} (map :ga4gh/location) variants))
+
+
+(comment
+  (iscn->fields "arr[hg19] 5p15.2(11,397,258-11,419,020 )x1 mat")
+  
   (tap> (map iscn->fields (concat mayo trillium)))
   (->> (concat mayo trillium)
        (map iscn->all-fields )
        (map count)
        frequencies)
+
+  (iscn->observations
+   "arr[hg19] 6p25.3p25.2(156,974-3,503,055)x1 mat,14q32.12q32.33(92,192,180-107,285,437)x3 mat")
+
+  ;; 90 expressions -> 87 convertible variants, 85 of them distinct
+  (let [{:keys [variants unconvertible unparsed]}
+        (variant-set (concat mayo trillium))]
+    {:variants (count variants)
+     :unconvertible (mapv :iscn unconvertible)
+     :unparsed unparsed})
+
+  (tap> (variant-set (concat mayo trillium)))
+
+  ;; the loci, ready for an overlap query
+  (locations (variant-set mayo))
   )
 ;; mayo sample
 (def mayo
