@@ -43,7 +43,7 @@
   {:git/sha "373bfc7f97abad877a693a542c3b35b4f6af33fd"} ;;
   cheshire/cheshire {:mvn/version "6.1.0"} ;; required for lacinia-pedestal
   io.pedestal/pedestal.servlet                      {:mvn/version "0.8.1"} ; satisfy legacy deps in lacinia-pedestal
-  com.walmartlabs/lacinia-pedestal                  {:mvn/version "1.3"}
+  com.walmartlabs/lacinia-pedestal                  {:mvn/version "1.3.1"}
   hato/hato                                         {:mvn/version "1.0.0"}
   org.clojure/data.csv                              {:mvn/version "1.0.1"}
   org.clojure/data.zip {:mvn/version "1.0.0"}
