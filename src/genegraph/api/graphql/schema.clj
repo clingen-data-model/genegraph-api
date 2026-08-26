@@ -70,6 +70,42 @@
    find-query/filters-query])
 
 
+
+(def default-rdf-to-graphql-type-mappings
+  {:type-mappings
+   #_[[:cg/EvidenceStrengthAssertion :EvidenceStrengthAssertion]
+    [:cg/EvidenceLine :EvidenceLine]
+    [:cg/AssertionAnnotation :AssertionAnnotation]
+    [:cg/VariantPathogenicityProposition :VariantPathogenicityProposition]
+    [:cg/GeneticConditionMechanismProposition :GeneticConditionMechanismProposition]
+    [:cg/GeneValidityProposition :GeneValidityProposition]
+    [:cg/CanonicalVariant :CanonicalVariant]
+    [:ga4gh/CopyNumberChange :CopyNumberChange]
+    [:ga4gh/SequenceLocation :SequenceLocation]
+    [:so/SequenceFeature :SequenceFeature]
+    [:cg/DosageRegion :SequenceFeature]]
+   []
+   :default-type-mapping :GenericResource})
+
+#_(defn model []
+  [default-rdf-to-graphql-type-mappings
+   #_agent/agent
+   text-search/text-search-query
+   model-resource/resource-interface
+   model-resource/generic-resource
+   model-resource/resource-query
+   ;; find-query/query-result
+   ;; find-query/filter-ops
+   ;; find-query/filters-enum
+   ;; find-query/display-enum
+   ;; find-query/filter-call
+   ;; find-query/assertions-query
+   ;; find-query/sequence-features-query
+   ;; find-query/filter-description
+   ;; find-query/filter-option
+   ;; find-query/filters-query
+   ])
+
 (defn schema
   ([]
    (schema-builder/schema (model)))
@@ -99,4 +135,5 @@
 (comment
   (merged-schema)
   (tap> (schema-description))
+  (schema-description)
   )

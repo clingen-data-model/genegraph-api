@@ -495,7 +495,9 @@ select ?mainRecord where {
 
 (comment
   (time (get-events-from-topic api/all-curation-events-topic))
-  (time (get-events-from-topic api/gene-validity-sepio-topic))
+  (.start
+   (Thread.
+    #(time (get-events-from-topic api/gene-validity-sepio-topic))))
   (get-events-from-topic api/actionability-topic)
   (time (get-events-from-topic api/gene-validity-complete-topic))
   (time (get-events-from-topic api/gene-validity-raw-topic))
