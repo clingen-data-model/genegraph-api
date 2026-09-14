@@ -69,11 +69,12 @@
 
 (def refseq-root "https://identifiers.org/refseq:")
 (def entrez-gene-root "https://identifiers.org/ncbigene:")
+(def genegraph-root "https://genegraph.clinicalgenome.org/r/")
 
 (def gff-type->so-term
   {"gene" :so/Gene
    "exon" :so/Exon
-   "CDS" :so/CDS})
+   #_#_"CDS" :so/CDS})
 
 (def useable-types
   (set (keys gff-type->so-term)))
@@ -86,16 +87,20 @@
          :ga4gh/sequenceReference (str refseq-root (:gff/seqid gff-map))}]
     (assoc location-attrs :iri (id/iri location-attrs))))
 
+(defn gene-iri [gff-map]
+  (str entrez-gene-root (:ncbi/gene-id gff-map)))
+
 (defn gff-feature-id [gff-map]
   (case (:gff/type gff-map)
-    "gene" (str entrez-gene-root (:ncbi/gene-id gff-map))
-    ))
+    "gene" (gene-iri gff-map)
+    "exon" (str genegraph-root "exon_" (::hash gff-map)))) ;; exon id
 
 (defn gff-map->sequence-feature [gff-map]
   (let [location (gff-map->location gff-map)]
     {:type (gff-type->so-term (:gff/type gff-map))
      :iri (gff-feature-id gff-map)
-     :location location}))
+     :location location
+     :parent (gene-iri gff-map)}))
 
 (defmethod idx/sequence-feature->sequence-index :so/Gene [feature]
   (let [loci (idx/location->index-entries (:location feature))]
@@ -130,6 +135,14 @@
                      [:objects (:iri object)]
                      (dissoc merged-object :location))))
   (run! #(storage/write db (:key %) (:value %)) indexes))
+
+
+;;   {"MANE Select" 202936, "RefSeq Select" 445, "MANE Plus Clinical" 1572}
+
+(defn write-feature? [gff-map]
+  (or (= "gene" (:gff/type f))
+      (and (= "exon" (:gff/type f))
+           (= "MANE Select" (:gff-attrs/tag f)))))
 
 (defmethod ap/process-base-event :genegraph.api.base/load-gff [event]
   (log/info :fn ::ap/process-base-event
@@ -475,7 +488,20 @@
        tap>)
 
   (time
-   (let [gff-path "/Users/tristan/data/clinvar-cnv-annotation/GRCh38.gff.gz"]
+   (let [gff-path "/Users/tristan/data/genegraph-base/GRCh38.gff.gz"]
+     (with-open [r (-> gff-path
+                       io/input-stream
+                       GZIPInputStream.
+                       io/reader)]
+       (->> (line-seq r)
+            #_(filter #(< 3 (count %))) ; remove comments
+            #_(map gff-attributes->map)
+            (take 20)
+            (into [])
+            tap>))))
+
+  (time
+   (let [gff-path "/Users/tristan/data/genegraph-base/GRCh38.gff.gz"]
      (with-open [r (-> gff-path
                        io/input-stream
                        GZIPInputStream.
@@ -493,6 +519,33 @@
     {"replication_regulatory_region" 11, "sequence_secondary_structure" 14, "V_gene_segment" 664, "regulatory_region" 2, "DNaseI_hypersensitive_site" 177, "vault_RNA" 4, "telomerase_RNA" 1, "lnc_RNA" 32088, "primary_transcript" 2139, "CAAT_signal" 6, "sequence_feature" 1964, "tRNA" 691, "conserved_region" 138, "promoter" 439, "direct_repeat" 20, "mRNA" 144447, "biological_region" 83821, "sequence_alteration_artifact" 10, "nucleotide_motif" 623, "snRNA" 172, "cDNA_match" 25870, "nucleotide_cleavage_site" 4, "pseudogene" 19251, "snoRNA" 1300, "C_gene_segment" 44, "tandem_repeat" 64, "TATA_box" 30, "imprinting_control_region" 2, "gene" 47876, "D_gene_segment" 61, "replication_start_site" 3, "protein_binding_site" 1416, "repeat_instability_region" 62, "centromere" 24, "Y_RNA" 4, "CAGE_cluster" 96, "microsatellite" 5, "non_allelic_homologous_recombination_region" 514, "minisatellite" 13, "region" 709, "sequence_comparison" 1, "enhancer" 81572, "meiotic_recombination_region" 368, "matrix_attachment_site" 18, "RNase_P_RNA" 2, "epigenetically_modified_region" 12, "transcript" 14995, "origin_of_replication" 87, "rRNA" 80, "scRNA" 4, "J_gene_segment" 128, "match" 107863, "response_element" 20, "GC_rich_promoter_region" 15, "enhancer_blocking_element" 59, "CDS" 1836136, "insulator" 12, "repeat_region" 10, "recombination_feature" 632, "ncRNA" 54, "transcriptional_cis_regulatory_region" 1935, "locus_control_region" 14, "antisense_RNA" 24, "sequence_alteration" 30, "dispersed_repeat" 5, "silencer" 4917, "mobile_genetic_element" 204, "D_loop" 1, "exon" 2301289, "mitotic_recombination_region" 54, "chromosome_breakpoint" 14, "miRNA" 3218, "RNase_MRP_RNA" 1}
     (sort-by val)
     reverse))
+
+  ;; figuring out how to use MANE select & other annotated exons
+  ;; MANE select only for partial; inactivating overlaps seems like the
+  ;; right approach. Am not sure how much more adding MANE Plus Clinical will get me.
+  ;; Would need to start keeping track of individual transcripts, rather than being able to
+  ;; (at least for now) assume just one transcript per protein-coding gene.
+  (time
+   (let [gff-path "/Users/tristan/data/genegraph-base/GRCh38.gff.gz"]
+     (with-open [r (-> gff-path
+                       io/input-stream
+                       GZIPInputStream.
+                       io/reader)]
+       (->> (csv/read-csv r :separator \tab)
+            (filter #(< 3 (count %)))   ; remove comments
+            #_(take 100000)
+            (map gff-attributes->map)
+            (filter (fn [f]
+                      (and (= "exon" (:gff/type f))
+                           #_(not= "true" (:gff-attrs/pseudo f))
+                           (:gff-attrs/tag f))))
+            (take 20)
+            (mapv gff-map->sequence-feature)
+            (into [])
+            tap>
+            #_(map :gff-attrs/tag)
+            #_frequencies))))
+  
 
   )
 

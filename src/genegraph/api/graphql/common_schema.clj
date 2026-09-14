@@ -37,10 +37,13 @@
      :Float 'Float
      :Int 'Int
      :Boolean 'Boolean
-     :ID 'ID})
+     :ID 'ID
+     :Number 'Float})
 
   (defn range->gql-type [range]
-    (kw->gql-type range))
+    (if-let [ptype (get primitive-types range)]
+      ptype
+      (kw->gql-type range)))
   
   (defn property->graphql-field [p arity]
     (let [field (get properties p)
@@ -48,7 +51,7 @@
       [p {:description (:description field)
           :type (if (= :oneOf arity)
                   base-type
-                  '(list base-type))}]))
+                  `(list ~base-type))}]))
   
   (defn fields-for [c]
     (into {}
@@ -69,7 +72,12 @@
                  {})))
   (tap> (compose-objects)))
 
-
-
-
+;; keeping track of classes yet to be implemented
+(def needed-classes
+  [:Class ; Need to link definition -> description
+   :Concept 
+   :SequenceFeature
+   :Agent
+   :CopyNumberVariant ; doubles up on CopyNumberChange and CopyNumberCount
+   ])
 

@@ -4940,3 +4940,48 @@ filter not exists { ?gdvstatement :prov/wasInvalidatedBy ?x } }
          add-gene-overlaps-with-db
          tap>)))
   )
+
+
+;; Reviewing flags on old ISCA calls
+;; completed task, can be removed
+(comment
+  (def isca-folder "/Users/tristan/Desktop/isca flags/")
+
+  (defn scv-ids [path]
+    (with-open [f (io/reader path)]
+      (->> (charred/read-csv f)
+           rest
+           (reduce (fn [m x] (assoc m (nth x 12) x)) {})
+           #_(mapv #(nth % 12))
+           #_set)))
+  
+  (defn header-row [path]
+    (with-open [f (io/reader path)]
+      (->> (charred/read-csv f)
+           first
+           #_(mapv #(nth % 12))
+           #_set)))
+  
+  (do
+    (defn flag-file-ids [path]
+      (with-open [f (io/reader (str isca-folder path))]
+        (->> (charred/read-csv f :separator \tab)
+             rest
+             (mapv (fn [[scv]] (re-find #"SCV\d+" scv)))
+             set)))
+    (tap> (flag-file-ids "ClinGen_curated_SCVs_for_OrgID_505237.txt")))
+  (with-open [w (io/writer (str isca-folder "repeat-flags.csv"))]
+    (let [gene-conflicts (str isca-folder "original-submission/gene-conflicts.csv")
+          region-conflicts (str isca-folder "original-submission/region-conflicts.csv")
+          conflicts-by-scv-id (merge (scv-ids gene-conflicts) (scv-ids region-conflicts))
+          header (header-row gene-conflicts)
+          new-flag-files ["ClinGen_curated_SCVs_for_OrgID_505237.txt"
+                          "ClinGen_curated_SCVs_for_OrgID_505240.txt"
+                          "ClinGen_curated_SCVs_for_OrgID_505241.txt"
+                          "ClinGen_curated_SCVs_for_OrgID_505285.txt"]
+          new-flags (apply set/union (map flag-file-ids new-flag-files))]
+      (->> (select-keys conflicts-by-scv-id new-flags)
+           vals
+           (cons header)
+           (charred/write-csv w))))
+  )

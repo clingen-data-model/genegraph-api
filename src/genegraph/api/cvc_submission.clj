@@ -61,6 +61,7 @@ select ?x ?g where {
              (mapv (fn [{:keys [x g]}] [(str x) g]))
              (into {})))))
 
+  (tap> old-prop-ids)
   (spit "/Users/tristan/data/genegraph-neo/old-dosage-prop-features.edn"
         (pr-str old-prop-ids))
 
@@ -125,12 +126,7 @@ select ?x ?g where {
            :state :error
            :error true})))
     
-    (let [tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])]
-      (rdf/tx tdb
-        (->> (clinvar-annotations tdb)
-             (take 1)
-             (mapv annotation->submission-record)
-             #_(mapv #(mapv assertion->prop-id (rdf/ld-> % [:cg/evidence]))))))
+
 
     
     (with-open [submission (io/writer "/Users/tristan/Desktop/candidate-cvc-cnv-submission.json")]
@@ -178,3 +174,56 @@ select ?x ?g where {
       (->> (q tdb)
            count
            #_(mapv #(rdf/ld1-> % [:cg/evidence :rdf/type #_:cg/subject #_#_:cg/feature :rdfs/label]))))))
+
+;; investigating freshness of ClinVar submissions
+(comment
+  (do
+    (defn annotation->debug-record [ann]
+      (try
+        (let [now (str (Instant/now))
+              scv (hr/hybrid-resource (rdf/ld1-> ann [:cg/subject]) hybrid-db)
+              variant (hr/hybrid-resource (rdf/ld1-> scv [:cg/subject :cg/variant])
+                                          hybrid-db)
+              variation-id (re-find #"\d+$" (:iri variant))
+              submitter-id (re-find #"\d+$" (:cg/submitter scv))
+              clinvar-variant (storage/read object-db [:clinvar-if variation-id])]
+          {"Date Created"  (subs now 0 10)
+           "Is Annotation Outdated" nil,
+           "ClinVar Release Date" "2026-06-04",
+           "VCV" (str (:vcv-id clinvar-variant) "." (:vcv-version clinvar-variant))
+           "SCV Deleted Release Date" nil,
+           "Timestamp" now
+           "Submitter ID" submitter-id
+           "Reason" "Conflict with ClinGen Gene Dosage Map",
+           "Is Annotated SCV Deleted" false,
+           "Action" "flagging candidate",
+           "Notes" (notes ann),
+           "SCV ID" (str (re-find #"SCV\d+$" (:iri scv)) "." (some-> clinvar-variant
+                                                                     :classifications
+                                                                     first
+                                                                     :Version))
+           "Variation ID" variation-id
+           "Original Classification" (some-> clinvar-variant :classifications first :Classification)
+           :clinvar-variant clinvar-variant})
+        (catch Exception e
+          (tap> (hr/hybrid-resource (rdf/ld1-> ann [:cg/subject]) hybrid-db))
+          (stacktrace/print-stack-trace e)
+          (tap> ann)
+          (tap> (rdf/ld-> ann [:cg/evidence]))
+          {:record (str ann)
+           :state :error
+           :error true})))
+    (with-open [w (io/writer "/Users/tristan/Desktop/changed-clinvar-submissions.csv")]
+      (let [tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])
+            plp #{"Pathogenic" "Likely pathogenic"}]
+        (rdf/tx tdb
+          (->> (clinvar-annotations tdb)
+               #_(take 1)
+               (mapv annotation->debug-record)
+               (filterv #(plp (get % "Original Classification")))
+               (mapv :clinvar-variant)
+               #_(charred/write-csv w)
+               #_(group-by #(get % "Submitter ID"))
+               tap>
+               #_(mapv #(mapv assertion->prop-id (rdf/ld-> % [:cg/evidence]))))))))
+  )
