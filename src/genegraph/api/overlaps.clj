@@ -194,7 +194,7 @@
     (some overlaps overlap-priority)))
 
 
-(defn  [db loci]
+(defn gene-overlaps-for-loci [db loci]
   (let [get-gene (fn [gene] (storage/read db [:objects gene]))]
     (->> (gene-ids-for-loci db loci)
          (mapv #(storage/read db [:objects %]))
