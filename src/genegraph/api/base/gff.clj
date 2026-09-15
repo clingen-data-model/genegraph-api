@@ -100,6 +100,7 @@
     {:type (gff-type->so-term (:gff/type gff-map))
      :iri (gff-feature-id gff-map)
      :location location
+     :strand (:gff/strand gff-map)
      :parent (gene-iri gff-map)}))
 
 (defmethod idx/sequence-feature->sequence-index :so/Gene [feature]
@@ -114,12 +115,22 @@
         :value (select-keys feature [:iri])})
      loci)))
 
-(defn gff-map->object-and-indexes [gff-map]
+(defn gff-gene->object-and-indexes [gff-map]
   (let [feature (gff-map->sequence-feature gff-map)]
-    {:object feature
+    {:type :so/Gene
+     :object feature
      :indexes (idx/sequence-feature->sequence-index feature)}))
 
-(defn write-object-and-indexes [db {:keys [object indexes]}]
+(defn gff-exon->object [gff-map]
+  {:type :so/Exon
+   :object (gff-map->sequence-feature gff-map)})
+
+(defn gff-map->object-and-indexes [gff-map]
+  (case (:gff/type gff-map)
+    "gene" (gff-gene->object-and-indexes gff-map)
+    "exon" (gff-exon->object gff-map)))
+
+(defn write-gene-object-and-indexes [db {:keys [object indexes]}]
   (when object
     (let [k [:objects (:iri object)]
           existing-record (storage/read db k)
@@ -136,13 +147,84 @@
                      (dissoc merged-object :location))))
   (run! #(storage/write db (:key %) (:value %)) indexes))
 
+(defn write-exon [db {:keys [object]}]
+  (when object
+    (storage/write db
+                   [:exons
+                    (:parent object)
+                    (get-in object [:location :ga4gh/sequenceReference])
+                    (:iri object)]
+                   object)))
+
+(defn write-object-and-indexes [db obj-and-indexes]
+  (case (:type obj-and-indexes)
+        :so/Gene (write-gene-object-and-indexes db obj-and-indexes)
+        :so/Exon (write-exon db obj-and-indexes)))
 
 ;;   {"MANE Select" 202936, "RefSeq Select" 445, "MANE Plus Clinical" 1572}
 
 (defn write-feature? [gff-map]
-  (or (= "gene" (:gff/type f))
-      (and (= "exon" (:gff/type f))
-           (= "MANE Select" (:gff-attrs/tag f)))))
+  (or (= "gene" (:gff/type gff-map))
+      (and (= "exon" (:gff/type gff-map))
+           (contains? #{"MANE Select" "RefSeq Select"}
+                      (:gff-attrs/tag gff-map)))))
+
+
+(comment
+  (time
+   (let [gff-path "/Users/tristan/data/genegraph-base/GRCh37.gff.gz"]
+     (with-open [r (-> gff-path
+                       io/input-stream
+                       GZIPInputStream.
+                       io/reader)]
+       (let [write-records #(write-object-and-indexes
+                             @(get-in genegraph.user/api-test-app
+                                     [:storage :object-db :instance])
+                             %)]
+         (->> (csv/read-csv r :separator \tab)
+              (filter #(< 3 (count %)))    ; remove comments
+              (map gff-attributes->map)
+              #_(take 100000)
+              (filter write-feature?)
+              #_(take 20)
+              (map gff-map->object-and-indexes)
+              (run! write-records))))))
+
+  (time
+   (->> (genegraph.framework.storage.rocksdb/range-get
+         @(get-in genegraph.user/api-test-app
+                  [:storage :object-db :instance])
+         {:prefix [:exons]
+          :return :ref})
+        count))
+
+  (->> (genegraph.framework.storage/range-delete 
+        @(get-in genegraph.user/api-test-app
+                 [:storage :object-db :instance])
+        [:exons]))
+  
+  (time
+
+
+   (let [gff-path "/Users/tristan/data/genegraph-base/GRCh38.gff.gz"]
+     (with-open [r (-> gff-path
+                       io/input-stream
+                       GZIPInputStream.
+                       io/reader)]
+       (let [write-records #(write-object-and-indexes
+                             @(get-in genegraph.user/api-test-app
+                                      [:storage :object-db :instance])
+                             %)]
+         (->> (csv/read-csv r :separator \tab)
+              (filter #(< 3 (count %))) ; remove comments
+              (map gff-attributes->map)
+              (take 100000)
+              (filter write-feature?)
+              (take 20)
+              (map gff-map->object-and-indexes)
+              (run! write-records))))))
+  
+  )
 
 (defmethod ap/process-base-event :genegraph.api.base/load-gff [event]
   (log/info :fn ::ap/process-base-event
@@ -159,7 +241,8 @@
       (->> (csv/read-csv r :separator \tab)
            (filter #(< 3 (count %)))    ; remove comments
            (map gff-attributes->map)
-           (filter #(useable-types (:gff/type %)))
+           #_(filter #(useable-types (:gff/type %)))
+           (filter write-feature?)
            (map gff-map->object-and-indexes)
            (run! write-records))))
   (log/info :fn ::ap/process-base-event
@@ -545,8 +628,30 @@
             tap>
             #_(map :gff-attrs/tag)
             #_frequencies))))
-  
 
+
+  (time
+   (let [gff-path "/Users/tristan/data/genegraph-base/GRCh37.gff.gz"]
+     (with-open [r (-> gff-path
+                       io/input-stream
+                       GZIPInputStream.
+                       io/reader)]
+       (->> (csv/read-csv r :separator \tab)
+            (filter #(< 3 (count %)))   ; remove comments
+            #_(take 100000)
+            (map gff-attributes->map)
+            (filter (fn [f]
+                      (and (= "exon" (:gff/type f))
+                           #_(not= "true" (:gff-attrs/pseudo f))
+                           (:gff-attrs/tag f))))
+            ;; (take 20)
+            ;; (mapv gff-map->sequence-feature)
+            ;; (into [])
+            ;; tap>
+            (map :gff-attrs/tag)
+            frequencies))))
+  
+  {"RefSeq Select" 190476, "RefSeq Plus Clinical" 1440}
   )
 
 
