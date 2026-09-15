@@ -31,23 +31,21 @@
 
 ;; question for group, how to handle outer overlaps
 (defn outer-overlap? [loc1 loc2]
-    (if (some vector? [(:ga4gh/start loc1)
-                       (:ga4gh/start loc2)
-                       (:ga4gh/end loc1)
-                       (:ga4gh/end loc2)])
-      (let [loc1-start (min-coord (:ga4gh/start loc1))
-            loc2-start (min-coord (:ga4gh/start loc2))
-            loc1-end (max-coord (:ga4gh/end loc1))
-            loc2-end (max-coord (:ga4gh/end loc2))
-            all-coords [loc1-start loc2-start loc1-end loc2-end]]
-        (if (or (some nil? all-coords)
-                (< loc1-end loc2-start)
-                (< loc2-end loc1-start))
-          :cg/NoOverlap
-          :cg/OuterOverlap))
-      :cg/NoOverlap))
-
-
+  (if (some vector? [(:ga4gh/start loc1)
+                     (:ga4gh/start loc2)
+                     (:ga4gh/end loc1)
+                     (:ga4gh/end loc2)])
+    (let [loc1-start (min-coord (:ga4gh/start loc1))
+          loc2-start (min-coord (:ga4gh/start loc2))
+          loc1-end (max-coord (:ga4gh/end loc1))
+          loc2-end (max-coord (:ga4gh/end loc2))
+          all-coords [loc1-start loc2-start loc1-end loc2-end]]
+      (if (or (some nil? all-coords)
+              (< loc1-end loc2-start)
+              (< loc2-end loc1-start))
+        :cg/NoOverlap
+        :cg/OuterOverlap))
+    :cg/NoOverlap))
 
 (defn overlap-type [loc1 loc2]
   (let [loc1-start (max-coord (:ga4gh/start loc1))
@@ -64,14 +62,36 @@
                      (and (< loc2-end loc1-end)
                           (< loc2-start loc2-end))) :cg/PartialOverlap
                  :default (outer-overlap? loc1 loc2))]
-    #_(when-not (= :cg/NoOverlap result)
-      (tap> {:loc1-start loc1-start
-             :loc1-end loc1-end
-             :loc2-start loc2-start
-             :loc2-end loc2-end
-             :result result}))
     result))
 
+(comment
+  (def loc1
+    {:ga4gh/sequenceReference "https://identifiers.org/refseq:NC_000001.11"
+     :ga4gh/start 925634
+     :ga4gh/end [930434 931187]
+     :type :ga4gh/SequenceLocation
+     :iri "https://genegraph.clinicalgenome.org/r/pYvB2LXA4IejcUU_6PaFxg"
+     :overlaps [{:gene {:type :so/Gene, :iri "https://identifiers.org/ncbigene:148398", :strand "+", :parent "https://identifiers.org/ncbigene:148398", :ga4gh/location #{{:type :ga4gh/SequenceLocation, :ga4gh/start 923923, :ga4gh/end 944574, :ga4gh/sequenceReference "https://identifiers.org/refseq:NC_000001.11", :iri "https://genegraph.clinicalgenome.org/r/v92DQZr_I23pEV2kbBY8EA"} {:type :ga4gh/SequenceLocation, :ga4gh/start 859303, :ga4gh/end 879954, :ga4gh/sequenceReference "https://identifiers.org/refseq:NC_000001.10", :iri "https://genegraph.clinicalgenome.org/r/kKQSo2P4iX8odVpVT1l3Bg"}}}, :overlap :cg/OuterOverlap}]})
+
+  (def rdb @(get-in genegraph.user/api-test-app [:storage :object-db :instance]))
+
+  (gene-overlaps-for-loci rdb [loc1])
+
+  (defn exons-for-gene
+    "Return the exons for a given gene, sorted by start location"
+    [db gene-iri sequence-iri]
+    (storage/scan db [:exons gene-iri sequence-iri]))
+  (tap>
+   (exons-for-gene rdb
+                   "https://identifiers.org/ncbigene:148398"
+                   "https://identifiers.org/refseq:NC_000001.11"))
+  (->> (exons-for-gene rdb
+                       "https://identifiers.org/ncbigene:148398"
+                       "https://identifiers.org/refseq:NC_000001.11")
+       (mapv (fn [exon] {:overlap (overlap-type loc1 (:location exon))
+                         :exon exon}))
+       tap>)
+  )
 
 (defn gene-overlaps-for-location [db location]
   (->> (mapcat
