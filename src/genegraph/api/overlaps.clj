@@ -15,6 +15,7 @@
             [genegraph.framework.id :as id]
             [genegraph.api.protocol :as ap]
             [genegraph.api.sequence-index :as idx]
+            [genegraph.api.shared-data :as shared-data]
             [io.pedestal.log :as log]
             [hato.client :as hc]
             [genegraph.api.ga4gh]))
@@ -73,6 +74,7 @@
   (mapv (fn [exon] {:overlap (overlap-type loc (:location exon))
                     :exon exon})
         exons))
+
 (defn most-coding-sequence-deleted? [exons-with-overlaps]
   (let [exons-with-coding-extents
         (mapv (fn [e]
@@ -126,19 +128,20 @@
 
 (def partial-overlap-set #{:cg/OuterOverlap :cg/PartialOverlap})
 
-(defn update-overlaps [overlaps db loc]
-  (mapv (fn [overlap]
-          (if (partial-overlap-set (:overlap overlap))
-            (assoc overlap
-                   :overlap
-                   (disruptions-from-partial-overlap db
-                                                     loc
-                                                     (get-in overlap [:gene :iri])))
-            overlap))
-        overlaps))
-
-(defn analyze-partial-overlaps [db loc]
-  (update loc :overlaps update-overlaps db loc))
+(defn update-partial-overlaps
+  "Update partial overlaps for predicted gene disruption based on exonic involvement"
+  [db loc overlaps]
+  (if loc
+    (mapv (fn [overlap]
+            (if (partial-overlap-set (:overlap overlap))
+              (assoc overlap
+                     :overlap
+                     (disruptions-from-partial-overlap db
+                                                       loc
+                                                       (get-in overlap [:gene :iri])))
+              overlap))
+          overlaps)
+    overlaps))
 
 (comment
 
@@ -193,15 +196,27 @@
                    (:ga4gh/location gene)))]
     (some overlaps overlap-priority)))
 
+(defn in-sequence-set? [loci seq-set]
+  (some (fn [loc]
+          (when (contains? seq-set (:ga4gh/sequenceReference loc))
+            loc))
+        loci))
+
+(defn priority-loc [loci]
+  (or (in-sequence-set? loci shared-data/build38seqs)
+      (in-sequence-set? loci shared-data/build37seqs)
+      (first loci)))
 
 (defn gene-overlaps-for-loci [db loci]
-  (let [get-gene (fn [gene] (storage/read db [:objects gene]))]
+  (let [get-gene (fn [gene] (storage/read db [:objects gene]))
+        best-loc (priority-loc loci)]
     (->> (gene-ids-for-loci db loci)
          (mapv #(storage/read db [:objects %]))
          (mapv (fn [g]
                  {:gene g
                   :overlap (gene-overlap loci g)}))
-         (remove #(= :cg/NoOverlap (:overlap %))))))
+         (remove #(= :cg/NoOverlap (:overlap %)))
+         (update-partial-overlaps db best-loc))))
 
 (defn protein-coding-gene? [gene tdb]
   (let [q (rdf/create-query "select ?g where { ?g a :so/GeneWithProteinProduct } ")]
