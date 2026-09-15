@@ -35,14 +35,14 @@
                      (:ga4gh/start loc2)
                      (:ga4gh/end loc1)
                      (:ga4gh/end loc2)])
-    (let [loc1-start (min-coord (:ga4gh/start loc1))
-          loc2-start (min-coord (:ga4gh/start loc2))
-          loc1-end (max-coord (:ga4gh/end loc1))
-          loc2-end (max-coord (:ga4gh/end loc2))
+    (let [loc1-start (max-coord (:ga4gh/start loc1))
+          loc2-start (max-coord (:ga4gh/start loc2))
+          loc1-end (min-coord (:ga4gh/end loc1))
+          loc2-end (min-coord (:ga4gh/end loc2))
           all-coords [loc1-start loc2-start loc1-end loc2-end]]
       (if (or (some nil? all-coords)
-              (< loc1-end loc2-start)
-              (< loc2-end loc1-start))
+              (<= loc1-end loc2-start)
+              (<= loc2-end loc1-start))
         :cg/NoOverlap
         :cg/OuterOverlap))
     :cg/NoOverlap))
@@ -55,16 +55,93 @@
         all-coords [loc1-start loc2-start loc1-end loc2-end]
         result (cond
                  (some nil? all-coords) :cg/NoOverlap
-                 (and (< loc1-start loc2-start)
-                      (< loc2-end loc1-end)) :cg/CompleteOverlap
-                 (or (and (< loc1-start loc2-start)
-                          (< loc2-start loc1-end))
-                     (and (< loc2-end loc1-end)
-                          (< loc2-start loc2-end))) :cg/PartialOverlap
+                 (and (<= loc1-start loc2-start)
+                      (<= loc2-end loc1-end)) :cg/CompleteOverlap
+                 (and (< loc1-start loc2-end)
+                      (< loc2-start loc1-end)) :cg/PartialOverlap
                  :default (outer-overlap? loc1 loc2))]
     result))
 
+;; Code for handling partial overlaps
+
+(defn exons-for-gene
+  "Return the exons for a given gene, sorted by start location"
+  [db gene-iri sequence-iri]
+  (storage/scan db [:exons gene-iri sequence-iri]))
+
+(defn exon-overlaps [loc exons]
+  (mapv (fn [exon] {:overlap (overlap-type loc (:location exon))
+                    :exon exon})
+        exons))
+(defn most-coding-sequence-deleted? [exons-with-overlaps]
+  (let [exons-with-coding-extents
+        (mapv (fn [e]
+                (let [{:ga4gh/keys [start end]} (get-in e [:exon :location])]
+                  (assoc e :cds-size (- end start))))
+              exons-with-overlaps)]
+    (< 0.5
+       (/
+        (->> exons-with-coding-extents
+             (filterv #(= :cg/CompleteOverlap (:overlap %)))
+             (mapv :cds-size)
+             (reduce +))
+        (reduce + (mapv :cds-size exons-with-coding-extents))))))
+
+(defn odd-number-of-splice-signals? [exons-with-overlaps]
+  (some-> (frequencies (map :overlap exons-with-overlaps))
+          :cg/PartialOverlap
+          odd?))
+
+(defn deletion-of-first-exon? [exons-with-overlaps]
+  (let [strand (-> exons-with-overlaps first :exon :strand)
+        first-exon (if (= "+" strand)
+                     (first exons-with-overlaps)
+                     (last exons-with-overlaps))]
+    (= :cg/CompleteOverlap (:overlap first-exon))))
+
+(defn probable-gene-disruption? [exons-with-overlaps]
+  (let [tests [most-coding-sequence-deleted?
+               odd-number-of-splice-signals?
+               deletion-of-first-exon?]]
+    (some (fn [t] (t exons-with-overlaps)) tests)))
+
+(defn possible-frameshift? [exons-with-overlaps]
+  (<= 1
+      (count
+       (set/intersection #{:cg/OuterOverlap :cg/PartialOverlap}
+                         (set (map :overlap exons-with-overlaps))))))
+
+(defn fully-intronic? [exons-with-overlaps]
+  (= #{:cg/NoOverlap}
+     (set (map :overlap exons-with-overlaps))))
+
+(defn disruptions-from-partial-overlap [db loc gene]
+  (let [exons (exons-for-gene db gene (:ga4gh/sequenceReference loc))
+        exons-with-overlaps (exon-overlaps loc exons)]
+    (cond
+      (probable-gene-disruption? exons-with-overlaps) :cg/ProbableGeneDisruption
+      (possible-frameshift? exons-with-overlaps) :cg/PossibleFrameshift
+      (fully-intronic? exons-with-overlaps) :cg/FullyIntronic
+      :default :cg/SmallExonDeletion)))
+
+(def partial-overlap-set #{:cg/OuterOverlap :cg/PartialOverlap})
+
+(defn update-overlaps [overlaps db loc]
+  (mapv (fn [overlap]
+          (if (partial-overlap-set (:overlap overlap))
+            (assoc overlap
+                   :overlap
+                   (disruptions-from-partial-overlap db
+                                                     loc
+                                                     (get-in overlap [:gene :iri])))
+            overlap))
+        overlaps))
+
+(defn analyze-partial-overlaps [db loc]
+  (update loc :overlaps update-overlaps db loc))
+
 (comment
+
   (def loc1
     {:ga4gh/sequenceReference "https://identifiers.org/refseq:NC_000001.11"
      :ga4gh/start 925634
@@ -75,22 +152,9 @@
 
   (def rdb @(get-in genegraph.user/api-test-app [:storage :object-db :instance]))
 
-  (gene-overlaps-for-loci rdb [loc1])
-
-  (defn exons-for-gene
-    "Return the exons for a given gene, sorted by start location"
-    [db gene-iri sequence-iri]
-    (storage/scan db [:exons gene-iri sequence-iri]))
-  (tap>
-   (exons-for-gene rdb
-                   "https://identifiers.org/ncbigene:148398"
-                   "https://identifiers.org/refseq:NC_000001.11"))
-  (->> (exons-for-gene rdb
-                       "https://identifiers.org/ncbigene:148398"
-                       "https://identifiers.org/refseq:NC_000001.11")
-       (mapv (fn [exon] {:overlap (overlap-type loc1 (:location exon))
-                         :exon exon}))
-       tap>)
+  (disruptions-from-partial-overlap rdb loc1 "https://identifiers.org/ncbigene:148398")
+  (tap> (analyze-partial-overlaps rdb loc1))
+ 
   )
 
 (defn gene-overlaps-for-location [db location]
@@ -130,7 +194,7 @@
     (some overlaps overlap-priority)))
 
 
-(defn gene-overlaps-for-loci [db loci]
+(defn  [db loci]
   (let [get-gene (fn [gene] (storage/read db [:objects gene]))]
     (->> (gene-ids-for-loci db loci)
          (mapv #(storage/read db [:objects %]))

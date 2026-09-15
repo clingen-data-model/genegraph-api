@@ -153,7 +153,7 @@
                    [:exons
                     (:parent object)
                     (get-in object [:location :ga4gh/sequenceReference])
-                    (:iri object)]
+                    (get-in object [:location :ga4gh/start])]
                    object)))
 
 (defn write-object-and-indexes [db obj-and-indexes]
@@ -172,7 +172,7 @@
 
 (comment
   (time
-   (let [gff-path "/Users/tristan/data/genegraph-base/GRCh37.gff.gz"]
+   (let [gff-path "/Users/tristan/data/genegraph-base/GRCh38.gff.gz"]
      (with-open [r (-> gff-path
                        io/input-stream
                        GZIPInputStream.

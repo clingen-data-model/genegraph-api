@@ -48,3 +48,16 @@
                           "22" "https://identifiers.org/refseq:NC_000022.11"
                           "X" "https://identifiers.org/refseq:NC_000023.11"
                           "Y" "https://identifiers.org/refseq:NC_000024.10"}})
+
+
+(def build38seqs
+  (->> chr-to-ref
+       :grch38
+       vals
+       set))
+
+(def build37seqs
+  (->> chr-to-ref
+       :grch37
+       vals
+       set))

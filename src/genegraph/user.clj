@@ -168,7 +168,7 @@
   (def api-test-app (p/init api-test-app-def))
   (p/start api-test-app)
   (p/stop api-test-app)
-
+  (type api-test-app)
   
   (tap> api-test-app)
 

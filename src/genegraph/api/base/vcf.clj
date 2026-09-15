@@ -102,22 +102,25 @@
     (assoc variant :iri (id/iri variant))))
 
 (comment
+  (def gnomad-cnv-path "/Users/tristan/data/genegraph-base/gnomad-cnv.vcf.gz")
+  (def gnomad-sv-path "/Users/tristan/data/genegraph-base/gnomad-sv-vcf.gz")
+  
   (let [tdb @(get-in genegraph.user/api-test-app [:storage :api-tdb :instance])
         object-db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]
     (rdf/tx
-     tdb
-     (with-open [r (-> "/Users/tristan/Downloads/gnomad-cnv.vcf.gz"
-                       io/input-stream
-                       GZIPInputStream.)]
-       (->> (charred/read-csv r :separator \tab)
-            (remove #(re-find #"^#" (first %)))
-            (take 1)
-            (mapv #(-> %
-                       vcf-row->map
-                       ->ga4gh-variant
-                       :ga4gh/location))
-            (mapv #(assoc % :overlaps (overlaps/gene-overlaps-for-loci object-db [%])))
-            tap>))))
+        tdb
+        (with-open [r (-> gnomad-cnv-path
+                          io/input-stream
+                          GZIPInputStream.)]
+          (->> (charred/read-csv r :separator \tab)
+               (remove #(re-find #"^#" (first %)))
+               (take 1)
+               (mapv #(-> %
+                          vcf-row->map
+                          ->ga4gh-variant
+                          :ga4gh/location))
+               (mapv #(assoc % :overlaps (overlaps/gene-overlaps-for-loci object-db [%])))
+               tap>))))
 
   (with-open [r (-> "/Users/tristan/Downloads/gnomad-cnv.vcf.gz"
                     io/input-stream
