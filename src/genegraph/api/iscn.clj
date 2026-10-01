@@ -2,7 +2,10 @@
   "Namespace for converting loosely structured files with an ISCN defined variant
   at the core"
   (:require [clojure.string :as str]
-            [genegraph.api.ga4gh :as ga4gh]))
+            [genegraph.api.ga4gh :as ga4gh]
+            [genegraph.api.variant-ingest :as variant]
+            [clojure.java.io :as io]
+            [charred.api :as charred]))
 ;; Captures, in order:
 ;;   1 build        e.g. hg19, GRCh37, GRCH37
 ;;   2 cytoband     e.g. 2q33.1q33.2, 5p15.2, Xp22.13
@@ -130,6 +133,15 @@
 
 
 (comment
+  (tap> (variant-set mayo))
+  (with-open [r (io/reader "/Users/tristan/data/mayo.csv")]
+    (->> (charred/read-csv r)
+         #_(take 5)
+         (mapv first)
+         variant-set
+         ))
+
+  
   (iscn->fields "arr[hg19] 5p15.2(11,397,258-11,419,020 )x1 mat")
   
   (tap> (map iscn->fields (concat mayo trillium)))

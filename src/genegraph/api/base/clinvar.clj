@@ -212,13 +212,10 @@
    (or (:copy-count variant)
        (< 1000 (variation-length variant)))))
 
-
-
 ;;placeholder for now
 (defmethod rdf/as-model :genegraph.api.base/clinvar [{:keys [source]}]
   (log/info :fn ::rdf/as-model :format :genegraph.api.base/clinvar)
   (ModelFactory/createDefaultModel))
-
 
 (defn get-clinvar-variants [variants http-client]
   (:body
@@ -246,9 +243,6 @@
                             (or stop display_stop))
              :type :ga4gh/SequenceLocation}]
     (assoc loc :iri (id/iri loc))))
-
-
-
 
 (defn clinvar-variant->ga4gh-alleles [{:keys [location
                                               variant-type
@@ -918,7 +912,17 @@
     (-> (storage/read db [:clinvar-if "455"])
         created-dates
         tap>))
-  
+  (time
+   (def clinvar-cnv-variation-ids
+     (let [db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]
+       (->> (rocksdb/range-get db {:prefix [:clinvar-if] :return :ref})
+            (map deref)
+            (filter is-cnv?)
+            (map :variation-id)
+            set))))
+  (+ 1 1)
+
+  (spit "/Users/tristan/data/clinvar-variation-ids.edn" clinvar-cnv-variation-ids)
   (time
    (def date-counts
      (let [db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]

@@ -77,17 +77,21 @@
 (seq-loc "chr13")
 
 (defn ->ga4gh-loc [{:keys [chrom endmin endmax end pos posmax posmin]}]
-  (let [start-min (Long/parseLong posmin)
-        start-max (Long/parseLong posmax)
-        end-min (Long/parseLong endmin)
-        end-max (Long/parseLong endmax)
+  (let [start (when pos (Long/parseLong pos))
+        end (when end (Long/parseLong pos))
+        start-min (when posmin (Long/parseLong posmin))
+        start-max (when posmax (Long/parseLong posmax))
+        end-min (when endmin (Long/parseLong endmin))
+        end-max (when endmax (Long/parseLong endmax))
         loc {:ga4gh/sequenceReference (seq-loc chrom)
-             :ga4gh/start (if (not= start-min start-max)
-                            [start-min start-max]
-                            start-min)
-             :ga4gh/end (if (not= end-min end-max)
-                          [end-min end-max]
-                          end-min)
+             :ga4gh/start (cond
+                            (not (or start-min start-max)) start
+                            (not= start-min start-max) [start-min start-max]
+                            :default start-min)
+             :ga4gh/end (cond
+                            (not (or end-min end-max)) end
+                            (not= end-min end-max) [end-min end-max]
+                            :default end-min)
              :type :ga4gh/SequenceLocation}]
     (assoc loc :iri (id/iri loc))))
 
@@ -121,24 +125,43 @@
                           :ga4gh/location))
                (mapv #(assoc % :overlaps (overlaps/gene-overlaps-for-loci object-db [%])))
                tap>))))
+  
+  (with-open [r (-> gnomad-sv-path
+                    io/input-stream
+                    GZIPInputStream.)]
+    (->> (charred/read-csv r :separator \tab)
+         (remove #(re-find #"^#" (first %)))
+         (take 5)
+         (mapv (fn [v] (-> v
+                           vcf-row->map
+                           ->ga4gh-variant)))
+         tap>))
 
-  (with-open [r (-> "/Users/tristan/Downloads/gnomad-cnv.vcf.gz"
+  (with-open [r (-> gnomad-cnv-path
                     io/input-stream
                     GZIPInputStream.)]
     (->> (charred/read-csv r :separator \tab)
          (remove #(re-find #"^#" (first %)))
          (take 1)
-         (mapv vcf-row->map)
+         (mapv #(-> % vcf-row->map ->ga4gh-variant))
          tap>))
 
-  (with-open [r (-> "/Users/tristan/Downloads/gnomad-cnv.vcf.gz"
+    (with-open [r (-> gnomad-sv-path
+                    io/input-stream
+                    GZIPInputStream.)]
+      (->> (charred/read-csv r :separator \tab)
+           (remove #(re-find #"^#" (first %)))
+           (take 1)
+           (mapv #(-> % vcf-row->map ->ga4gh-variant))
+           tap>))
+
+  (with-open [r (-> gnomad-cnv-path
                     io/input-stream
                     GZIPInputStream.)]
     (->> (charred/read-csv r :separator \tab)
-         (filter #(re-find #"^#" (first %)))
-         (take 100)
-         (into [])
-         tap>))
+         (remove #(re-find #"^#" (first %)))
+         (mapv #(-> % vcf-row->map :filter))
+         frequencies))
 
   (with-open [r (-> "/Users/tristan/data/gnomad/gnomad-sv.vcf"
                     io/input-stream
@@ -159,22 +182,23 @@
   (.start
    (Thread.
     (fn []
-      (with-open [r (-> "/Users/tristan/data/gnomad/gnomad-sv.vcf.gz"
-                        io/input-stream
-                        GZIPInputStream.)]
-        (->> (charred/read-csv r :separator \tab)
-             (remove #(re-find #"^#" (first %)))
-             (map vcf-row->map)
-             (filter (fn [{:keys [alt filter svlen predicted_lof]}]
-                       (and (= "<DEL>" alt)
-                            (= "PASS" filter)
-                            svlen
-                            (< 1000 (Long/parseLong svlen))
-                            predicted_lof)))
-             count
-             #_(take 5)
-             #_(into [])
-             tap>)))))
+      (time
+       (with-open [r (-> "/Users/tristan/data/gnomad/gnomad-sv.vcf.gz"
+                         io/input-stream
+                         GZIPInputStream.)]
+         (->> (charred/read-csv r :separator \tab)
+              (remove #(re-find #"^#" (first %)))
+              #_(take 100000)
+              (map vcf-row->map)
+              (filter (fn [{:keys [alt filter svlen predicted_lof]}]
+                        (and (= "<DEL>" alt)
+                             svlen
+                             (< 1000 (Long/parseLong svlen))
+                             predicted_lof)))
+              count
+              #_(take 5)
+              #_(into [])
+              tap>))))))
   (+ 1 1)
   ;; Dels < 1kb
   282080

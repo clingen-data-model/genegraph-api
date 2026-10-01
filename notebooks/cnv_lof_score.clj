@@ -6,10 +6,12 @@
             [genegraph.api.lof-score :as lof-score]
             [genegraph.api.overlaps :as overlaps]
             [genegraph.api.base.vcf :as vcf]
+            [genegraph.api.iscn :as iscn]
             [genegraph.user :as u]
             [nextjournal.clerk :as clerk]
             [charred.api :as charred]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [clojure.math :as math])
   (:import [java.util.zip GZIPInputStream]))
 
 ;; ### Control set
@@ -17,7 +19,9 @@
 ;; Rare (<1% site frequency) autosomal coding copy number variants from exome
 ;; sequencing from 464,297 individuals.
 
-
+^{::clerk/visibility {:result :hide}}
+(def gene-disruption-set
+  #{:cg/CompleteOverlap :cg/ProbableGeneDisruption})
 
 ^{::clerk/visibility {:result :hide}}
 (def tdb
@@ -94,7 +98,22 @@ a :cg/LOFProbabilityEstimation .
                       object-db
                       [(vcf/->ga4gh-loc %)])))))
 
+
+;; #### inspecting gnomAD dels
+
 (count gnomad-dels)
+
+;; Overall counts of gene disruptions in gnomAD CNV
+(->> gnomad-dels
+     (mapcat :overlaps)
+     (map :overlap)
+     frequencies
+     (mapv (fn [[k v]] [(name k) v]))
+     clerk/table)
+
+(take 20 gnomad-dels)
+
+
 
 ^{::clerk/visibility {:result :hide}}
 (defn lof-score [variant]
@@ -107,7 +126,7 @@ a :cg/LOFProbabilityEstimation .
     (->> gnomad-dels
          (map #(assoc %
                       :complete-overlaps
-                      (filterv (fn [g] (= :cg/CompleteOverlap (:overlap g)))
+                      (filterv (fn [g] (gene-disruption-set (:overlap g)))
                                (:overlaps %))))
          (filter #(seq (:complete-overlaps %)))
          (mapv #(assoc %
@@ -570,3 +589,384 @@ select ?feature where
      (filter #(and (< (:lof-score %) -7.0 )
                    (< 35 (:gene-count %))
                    (= :cg/Supports (:direction %)))))
+
+
+;; Comparison against Mayo set
+(def mayo-variants
+  (with-open [r (io/reader "/Users/tristan/data/mayo.csv")]
+    (->> (charred/read-csv r)
+         #_(take 5)
+         (mapv first)
+         iscn/variant-set)))
+
+(def mayo-variants-with-lof-score
+  (rdf/tx tdb
+    (->> mayo-variants
+         :observations
+         (filter (fn [{:keys [svtype variant]}]
+                   (and (= "copy number loss" svtype)
+                        variant)))
+         #_(take 5)
+         (mapv #(assoc %
+                       :overlaps
+                       (overlaps/gene-overlaps-for-loci
+                        object-db
+                        [(get-in % [:variant :ga4gh/location])])))
+         (mapv (fn [v] (assoc v
+                              :disruptive-overlaps
+                              (filterv #(gene-disruption-set (:overlap %))
+                                       (:overlaps v)))))
+         (filterv (fn [v] (seq (:disruptive-overlaps v))))
+         (mapv #(assoc %
+                       :gene-scores
+                       (remove
+                        nil?
+                        (mapv (fn [o] (rdf/ld1-> (rdf/resource (:gene o) tdb)
+                                                 [[:cg/feature :<] :cg/lower95CI]))
+                              (:disruptive-overlaps %)))))
+         (filterv (fn [v] (seq (:gene-scores v))))
+         (mapv (fn [v] (assoc v :lof-score (lof-score v)))))))
+
+(clerk/plotly
+ {:data
+  [#_{:x (mapv :lof-score variants-with-lof-score)
+    :type "histogram"
+    :name "clinvar"
+      :opacity 0.6}
+   {:x (mapv :lof-score mayo-variants-with-lof-score)
+    :type "histogram"
+    :name "mayo"
+    :opacity 0.6}
+   {:x (mapv :lof-score dels-with-lof-score)
+    :type "histogram"
+    :name "gnomAD"
+    :opacity 0.6}]
+  :layout {:barmode "overlay"
+           :shapes [{:type "line"
+                     :x0 sp95-gnomadcnv
+                     :x1 sp95-gnomadcnv
+                     :y0 0
+                     :y1 1
+                     :yref "paper"
+                     :line {:color "black"
+                            :width 2
+                            :dash "dash"}}
+                    {:type "line"
+                     :x0 sp99-gnomadcnv
+                     :x1 sp99-gnomadcnv
+                     :y0 0
+                     :y1 1
+                     :yref "paper"
+                     :line {:color "black"
+                            :width 2
+                            :dash "dash"}}
+                    {:type "line"
+                     :x0 sp999-gnomadcnv
+                     :x1 sp999-gnomadcnv
+                     :y0 0
+                     :y1 1
+                     :yref "paper"
+                     :line {:color "black"
+                            :width 2
+                            :dash "dash"}}]
+           :annotations [{:x sp95-gnomadcnv
+                          :y 1
+                          :yref "paper"
+                          :text "95%"
+                          :showarrow false
+                          :yanchor "bottom"}
+                         {:x sp99-gnomadcnv
+                          :y 1
+                          :yref "paper"
+                          :text "99%"
+                          :showarrow false
+                          :yanchor "bottom"}
+                         {:x sp999-gnomadcnv
+                          :y 1
+                          :yref "paper"
+                          :text "99.9%"
+                          :showarrow false
+                          :yanchor "bottom"}]}})
+
+
+(tap> mayo-variants-with-lof-score)
+
+(clerk/plotly
+   {:data
+    [#_{:x (mapv :lof-score variants-with-lof-score)
+        :type "histogram"
+        :name "clinvar"
+        :opacity 0.6}
+     {:x (mapv :lof-score (filter #(= :de-novo (:inheritance %))
+                                  mayo-variants-with-lof-score))
+      :type "histogram"
+      :name "mayo"
+      :opacity 0.6}
+     {:x (mapv :lof-score dels-with-lof-score)
+      :type "histogram"
+      :name "gnomAD"
+      :opacity 0.6}]
+    :layout {:barmode "overlay"
+             :shapes [{:type "line"
+                       :x0 sp95-gnomadcnv
+                       :x1 sp95-gnomadcnv
+                       :y0 0
+                       :y1 1
+                       :yref "paper"
+                       :line {:color "black"
+                              :width 2
+                              :dash "dash"}}
+                      {:type "line"
+                       :x0 sp99-gnomadcnv
+                       :x1 sp99-gnomadcnv
+                       :y0 0
+                       :y1 1
+                       :yref "paper"
+                       :line {:color "black"
+                              :width 2
+                              :dash "dash"}}
+                      {:type "line"
+                       :x0 sp999-gnomadcnv
+                       :x1 sp999-gnomadcnv
+                       :y0 0
+                       :y1 1
+                       :yref "paper"
+                       :line {:color "black"
+                              :width 2
+                              :dash "dash"}}]
+             :annotations [{:x sp95-gnomadcnv
+                            :y 1
+                            :yref "paper"
+                            :text "95%"
+                            :showarrow false
+                            :yanchor "bottom"}
+                           {:x sp99-gnomadcnv
+                            :y 1
+                            :yref "paper"
+                            :text "99%"
+                            :showarrow false
+                            :yanchor "bottom"}
+                           {:x sp999-gnomadcnv
+                            :y 1
+                            :yref "paper"
+                            :text "99.9%"
+                            :showarrow false
+                            :yanchor "bottom"}]}})
+
+
+^{::clerk/visibility {:result :hide}}
+(defn sampling-probability [percentile variant-set]
+  (-> (sort-by :lof-score  variant-set)
+      (nth (math/round (* percentile (count variant-set))))
+      :lof-score))
+
+^{::clerk/visibility {:result :hide}}
+(def sp95-gnomadcnv
+  (sampling-probability 0.95 dels-with-lof-score))
+
+^{::clerk/visibility {:result :hide}}
+(def sp99-gnomadcnv
+  (sampling-probability 0.99 dels-with-lof-score))
+
+^{::clerk/visibility {:result :hide}}
+(def sp999-gnomadcnv
+  (sampling-probability 0.999 dels-with-lof-score))
+
+;; #### Sampling probabilities
+
+(clerk/table [["probability" "gnomAD CNV" "mayo CNVs"]
+              ["25%"
+               (sampling-probability 0.25 dels-with-lof-score)
+               (sampling-probability 0.25 mayo-variants-with-lof-score)]
+              ["50%"
+               (sampling-probability 0.50 dels-with-lof-score)
+               (sampling-probability 0.50 mayo-variants-with-lof-score)]
+              ["75%"
+               (sampling-probability 0.75 dels-with-lof-score)
+               (sampling-probability 0.75 mayo-variants-with-lof-score)]
+              ["95%" sp95-gnomadcnv (sampling-probability 0.95 mayo-variants-with-lof-score)]
+              ["99%" sp99-gnomadcnv (sampling-probability 0.99 mayo-variants-with-lof-score)]
+              ["99.9%" sp999-gnomadcnv (sampling-probability 0.999 mayo-variants-with-lof-score)]])
+
+#_(rdf/tx tdb
+    (->> gnomad-dels
+         (map #(assoc %
+                      :complete-overlaps
+                      (filterv (fn [g] (gene-disruption-set (:overlap g)))
+                               (:overlaps %))))
+         (filter #(seq (:complete-overlaps %)))
+         (mapv #(assoc %
+                       :gene-scores
+                       (remove
+                        nil?
+                        (mapv (fn [o] (rdf/ld1-> (rdf/resource (:gene o) tdb)
+                                                 [[:cg/feature :<] :cg/lower95CI]))
+                              (:complete-overlaps %)))))
+         (filter #(seq (:gene-scores %)))
+         (mapv #(assoc % :lof-score (lof-score %)))))
+
+#_(def gnomad-dels
+    (->> gnomad-cnv
+         (filter #(= "DEL" (:svtype %)))
+         #_(take 10)
+         (mapv #(assoc %
+                       :overlaps
+                       (overlaps/gene-overlaps-for-loci
+                        object-db
+                        [(vcf/->ga4gh-loc %)])))))
+
+
+(def gnomad-sv
+  (with-open [r (-> "/Users/tristan/data/gnomad/gnomad-sv.vcf.gz"
+                         io/input-stream
+                         GZIPInputStream.)]
+         (->> (charred/read-csv r :separator \tab)
+              (remove #(re-find #"^#" (first %)))
+              #_(take 100000)
+              (map vcf/vcf-row->map)
+              (filterv (fn [{:keys [alt filter svlen predicted_lof]}]
+                        (and (= "<DEL>" alt)
+                             svlen
+                             (< 1000 (Long/parseLong svlen))
+                             predicted_lof))))))
+
+(def gnomad-sv-overlaps
+  (mapv #(assoc %
+                :overlaps
+                (overlaps/gene-overlaps-for-loci
+                 object-db
+                 [(vcf/->ga4gh-loc %)]))
+        gnomad-sv))
+
+(def gnomad-sv-with-lof-score
+  (rdf/tx tdb
+    (->> gnomad-sv-overlaps
+         (mapv (fn [v] (assoc v
+                              :disruptive-overlaps
+                              (filterv #(gene-disruption-set (:overlap %))
+                                       (:overlaps v)))))
+         (filterv (fn [v] (seq (:disruptive-overlaps v))))
+         (mapv #(assoc %
+                       :gene-scores
+                       (remove
+                        nil?
+                        (mapv (fn [o] (rdf/ld1-> (rdf/resource (:gene o) tdb)
+                                                 [[:cg/feature :<] :cg/lower95CI]))
+                              (:disruptive-overlaps %)))))
+         (filterv (fn [v] (seq (:gene-scores v))))
+         (mapv (fn [v] (assoc v :lof-score (lof-score v)))))))
+
+
+;; #### Sampling probabilities
+
+;; variants with LOF score
+(count gnomad-sv-with-lof-score)
+
+(clerk/table [["probability" "gnomAD CNV" "gnomad SV" "mayo CNVs"]
+              ["25%"
+               (sampling-probability 0.25 dels-with-lof-score)
+               (sampling-probability 0.25 gnomad-sv-with-lof-score)
+               (sampling-probability 0.25 mayo-variants-with-lof-score)]
+              ["50%"
+               (sampling-probability 0.50 dels-with-lof-score)
+               (sampling-probability 0.50 gnomad-sv-with-lof-score)
+               (sampling-probability 0.50 mayo-variants-with-lof-score)]
+              ["75%"
+               (sampling-probability 0.75 dels-with-lof-score)
+               (sampling-probability 0.75 gnomad-sv-with-lof-score)
+               (sampling-probability 0.75 mayo-variants-with-lof-score)]
+              ["95%"
+               sp95-gnomadcnv
+               (sampling-probability 0.95 gnomad-sv-with-lof-score)
+               (sampling-probability 0.95 mayo-variants-with-lof-score)]
+              ["99%"
+               sp99-gnomadcnv
+               (sampling-probability 0.99 gnomad-sv-with-lof-score)
+               (sampling-probability 0.99 mayo-variants-with-lof-score)]
+              ["99.9%"
+               sp999-gnomadcnv
+               (sampling-probability 0.999 gnomad-sv-with-lof-score)
+               (sampling-probability 0.999 mayo-variants-with-lof-score) ]])
+(def gnomad-sv-sp
+  {:p95 (sampling-probability 0.95 gnomad-sv-with-lof-score)
+   :p99 (sampling-probability 0.99 gnomad-sv-with-lof-score)
+   :p999 (sampling-probability 0.999 gnomad-sv-with-lof-score)})
+
+(clerk/plotly
+ {:data
+  [#_{:x (mapv :lof-score variants-with-lof-score)
+      :type "histogram"
+      :name "clinvar"
+      :opacity 0.6}
+   {:x (mapv :lof-score mayo-variants-with-lof-score)
+    :type "histogram"
+    :name "mayo"
+    :opacity 0.6}
+   {:x (mapv :lof-score gnomad-sv-with-lof-score)
+    :type "histogram"
+    :name "gnomAD SV"
+    :opacity 0.6}]
+  :layout {:barmode "overlay"
+           :shapes [{:type "line"
+                     :x0 (gnomad-sv-sp :p95)
+                     :x1 (gnomad-sv-sp :p95)
+                     :y0 0
+                     :y1 1
+                     :yref "paper"
+                     :line {:color "black"
+                            :width 2
+                            :dash "dash"}}
+                    {:type "line"
+                     :x0 (gnomad-sv-sp :p99)
+                     :x1 (gnomad-sv-sp :p99)
+                     :y0 0
+                     :y1 1
+                     :yref "paper"
+                     :line {:color "black"
+                            :width 2
+                            :dash "dash"}}
+                    {:type "line"
+                     :x0 (gnomad-sv-sp :p999)
+                     :x1 (gnomad-sv-sp :p999)
+                     :y0 0
+                     :y1 1
+                     :yref "paper"
+                     :line {:color "black"
+                            :width 2
+                            :dash "dash"}}]
+           :annotations [{:x (gnomad-sv-sp :p95)
+                          :y 1
+                          :yref "paper"
+                          :text "95%"
+                          :showarrow false
+                          :yanchor "bottom"}
+                         {:x (gnomad-sv-sp :p99)
+                          :y 1
+                          :yref "paper"
+                          :text "99%"
+                          :showarrow false
+                          :yanchor "bottom"}
+                         {:x (gnomad-sv-sp :p999)
+                          :y 1
+                          :yref "paper"
+                          :text "99.9%"
+                          :showarrow false
+                          :yanchor "bottom"}]}})
+
+
+(->> dels-with-lof-score
+     (mapcat :overlaps)
+     (map :overlap)
+     frequencies)
+#:cg{:ProbableGeneDisruption 20619, :SmallExonDeletion 1501, :CompleteOverlap 37139, :OverlapWithUnknownConsequence 3018, :FullyIntronic 698}
+
+(->> mayo-variants-with-lof-score
+     (filter (fn [v]
+                (let [pos-strand-overlaps (filterv #(= "+" (:strand %)) (:overlaps v))
+                      {:cg/keys [ProbableGeneDisruption SmallExonDeletion]}
+                      (frequencies (map :overlap pos-strand-overlaps))]
+                  (or (and (= 1 ProbableGeneDisruption) (= 1 SmallExonDeletion))
+                      (= 2 ProbableGeneDisruption)))))
+     (take 5)
+     (into [])
+     tap>)

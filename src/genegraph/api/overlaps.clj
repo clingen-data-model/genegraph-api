@@ -121,6 +121,7 @@
   (let [exons (exons-for-gene db gene (:ga4gh/sequenceReference loc))
         exons-with-overlaps (exon-overlaps loc exons)]
     (cond
+      (zero? (count exons))  :cg/OverlapWithUnknownConsequence
       (probable-gene-disruption? exons-with-overlaps) :cg/ProbableGeneDisruption
       (possible-frameshift? exons-with-overlaps) :cg/PossibleFrameshift
       (fully-intronic? exons-with-overlaps) :cg/FullyIntronic

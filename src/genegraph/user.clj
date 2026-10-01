@@ -21,6 +21,7 @@
             [clojure.data.csv :as csv]
             [io.pedestal.log :as log]
             [io.pedestal.interceptor :as interceptor]
+            [io.pedestal.service.resources :as pedestal-resource]
             [hato.client :as hc]
             [clojure.java.io :as io]
             [clojure.set :as set]
@@ -4984,4 +4985,16 @@ filter not exists { ?gdvstatement :prov/wasInvalidatedBy ?x } }
            vals
            (cons header)
            (charred/write-csv w))))
+
+  )
+;; (System/getenv "JAVA_CMD")
+;; (System/getProperty "java.home")
+
+;; (System/getProperty "java.home")
+;; (System/getProperty "java.version")
+
+
+(comment
+  (pedestal-resource/resource-routes {:resource-root "public"
+                                      :prefix "/"})
   )
