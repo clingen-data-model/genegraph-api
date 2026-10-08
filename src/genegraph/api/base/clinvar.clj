@@ -14,7 +14,8 @@
             [genegraph.api.sequence-index :as idx]
             [io.pedestal.log :as log]
             [hato.client :as hc]
-            [genegraph.api.ga4gh])
+            [genegraph.api.ga4gh]
+            [genegraph.api.variant-ingest :as vi])
   (:import [org.apache.jena.rdf.model Model ModelFactory]
            [java.util.zip GZIPInputStream]))
 
@@ -884,10 +885,32 @@
  
 ;; -Erin
 
+;; functions for processing ClinVar data from IF
 
+(defmethod vi/if->ga4gh-bundle :clinvar [variant-if]
+  (clinvar-variant->ga4gh variant-if))
+
+(defn clinvar-cnvs [db cnv-ids]
+  (map #(storage/read db [:clinvar-if %]) cnv-ids))
 
 ;; Storing the intermediate form of ClinVar for reprocessing
 (comment
+  
+  (defmethod vi/if->ga4gh-bundle :clinvar [variant-if]
+    (clinvar-variant->ga4gh variant-if))
+
+  (defn get-variant [variant-id]
+    (let [db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]
+      (storage/read db [:clinvar-if variant-id])))
+
+  (->> clinvar-cnv-variation-ids
+       (take 1)
+       (mapv #(-> %
+                  get-variant
+                  (assoc ::vi/type :clinvar)
+                  vi/if->ga4gh-bundle))
+       tap>)
+
   (time
    (let [db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]
      (with-open [is (->{:type :file
@@ -920,9 +943,9 @@
             (filter is-cnv?)
             (map :variation-id)
             set))))
-  (+ 1 1)
-
+  (count clinvar-cnv-variation-ids)
   (spit "/Users/tristan/data/clinvar-variation-ids.edn" clinvar-cnv-variation-ids)
+
   (time
    (def date-counts
      (let [db @(get-in genegraph.user/api-test-app [:storage :object-db :instance])]

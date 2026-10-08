@@ -16,6 +16,7 @@
             [genegraph.api.graphql.response-cache :as response-cache]
             [genegraph.api.graphql.schema.conflicts :as conflicts]
             [genegraph.api.clingen-gene-validity :as cgv]
+            [genegraph.api.frontend.pages.home :as home]
             [portal.api :as portal]
             [clojure.data.json :as json]
             [clojure.data.csv :as csv]
@@ -162,7 +163,8 @@
                 :import-dosage-curations api/import-dosage-curations
                 :read-api-log read-api-log
                 :read-clinvar-curations read-clinvar-curations
-                :import-gpm-people api/import-gpm-people}
+                :import-gpm-people api/import-gpm-people
+                :home-processor home/home-processor}
    :http-servers api/http-server})
 
 (comment
@@ -4997,4 +4999,6 @@ filter not exists { ?gdvstatement :prov/wasInvalidatedBy ?x } }
 (comment
   (pedestal-resource/resource-routes {:resource-root "public"
                                       :prefix "/"})
+
   )
+

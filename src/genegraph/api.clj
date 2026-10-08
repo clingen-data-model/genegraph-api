@@ -18,6 +18,7 @@
             [genegraph.api.auth :as auth]
             #_[genegraph.api.workos :as workos]
             [genegraph.api.gpm :as gpm]
+            [genegraph.api.frontend.pages.home :as home]
             [com.walmartlabs.lacinia.pedestal2 :as lacinia-pedestal]
             [com.walmartlabs.lacinia.pedestal.internal :as internal]
             [io.pedestal.interceptor :as interceptor]
@@ -25,6 +26,8 @@
             [io.pedestal.http.cors :as http-cors]
             [io.pedestal.http :as http]
             [io.pedestal.http.ring-middlewares :as http-middleware]
+            [io.pedestal.service.resources :as pedestal-resources]
+            [io.pedestal.service.interceptors :as pedestal-service-interceptors]
             [clojure.java.io :as io]
             [clojure.set :as set])
   (:import [org.apache.jena.sparql.core Transactional]
@@ -631,21 +634,27 @@ select ?id where {
     :endpoints [{:path "/api"
                  :processor :graphql-api
                  :method :post}
-                {:path "/ready"
+                #_{:path "/ready"
                  :processor :graphql-ready
+                 :method :get}
+                {:path "/kb"
+                 :processor :home-processor
                  :method :get}]
     ::http/allowed-origins ["http://localhost:8080"]
+    :interceptors [pedestal-service-interceptors/log-request
+                   pedestal-service-interceptors/not-found
+                   (http-middleware/content-type)]
     :routes
     (conj
      (lacinia-pedestal/graphiql-asset-routes "/assets/graphiql")
      ["/ide" :get (lacinia-pedestal/graphiql-ide-handler {})
       :route-name ::lacinia-pedestal/graphql-ide]
-     #_["/ready"
-      :get (fn [_] {:status 200 :body "server is ready"})
-      :route-name ::readiness]
      ["/live"
       :get (fn [_] {:status 200 :body "server is live"})
-      :route-name ::liveness])}})
+      :route-name ::liveness])
+    :route-fragments (pedestal-resources/resource-routes
+                      {:resource-root "public"
+                       :prefix "/assets"})}})
 
 (def ready-server
   {:gene-validity-server
@@ -705,7 +714,8 @@ select ?id where {
                 :graphql-ready graphql-ready
                 :import-dosage-curations import-dosage-curations
                 :read-clinvar-curations read-clinvar-curations
-                :import-gv-curations import-gv-curations}
+                :import-gv-curations import-gv-curations
+                :home-processor home/home-processor}
    :http-servers http-server})
 
 (def genegraph-function

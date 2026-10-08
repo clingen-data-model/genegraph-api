@@ -16,6 +16,7 @@ pom.xml.asc
 .cpcache/
 .clerk/
 .dir-locals.el
+node_modules/
 
 # Temp Files
 *.orig

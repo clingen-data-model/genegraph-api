@@ -40,7 +40,7 @@
  {ch.qos.logback/logback-classic                    {:mvn/version "1.5.0"}
   org.clojure/clojure                               {:mvn/version "1.12.4"}
   io.github.clingen-data-model/genegraph-framework
-  {:git/sha "373bfc7f97abad877a693a542c3b35b4f6af33fd"} ;;
+  {:git/sha "cb0cf6c0f8c86f8be1e0b2e93cbef66cac096f47"}
   cheshire/cheshire {:mvn/version "6.1.0"} ;; required for lacinia-pedestal
   io.pedestal/pedestal.servlet                      {:mvn/version "0.8.1"} ; satisfy legacy deps in lacinia-pedestal
   com.walmartlabs/lacinia-pedestal                  {:mvn/version "1.3.1"}
@@ -74,6 +74,8 @@
   ;; Clerk authentication
   ;;  ;;implementation 'com.clerk:backend-api:4.1.5'
   com.clerk/backend-api {:mvn/version "4.1.5"}
+
+  hiccup/hiccup {:mvn/version "2.0.0"}
   
   }
  }

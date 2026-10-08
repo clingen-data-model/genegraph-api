@@ -1,0 +1,484 @@
+#+TITLE: Database Writes in Genegraph API
+#+SUBTITLE: Structure of every write to api-tdb (Jena), object-db (RocksDB), and text-index (Lucene)
+
+* Scope
+
+This document catalogs every place the application writes to a persistent
+store, and describes the structure of what gets written. It covers the
+storage instances declared in =src/genegraph/api.clj= plus the auxiliary
+=log-monitor= app.
+
+Read paths are described only where they constrain the shape of a write
+(e.g. the RocksDB range-scan indexes).
+
+* The storage instances
+
+Declared in =src/genegraph/api.clj=:
+
+| instance             | type    | path                     | snapshot handle          |
+|----------------------+---------+--------------------------+--------------------------|
+| =:api-tdb=           | rdf     | =<data>/api-tdb=         | =api-tdb-v3.nq.gz=       |
+| =:object-db=         | rocksdb | =<data>/object-db=       | =object-db-v3.lz4=       |
+| =:text-index=        | lucene  | =<data>/object-db=       | (none)                   |
+| =:sequence-feature-db= | rocksdb | =<data>/sequence-feature-db= | =sequence-feature-db.lz4= |
+| =:response-cache-db= | rocksdb | =<data>/response-cache-db= | (none)                   |
+
+Two caveats worth knowing before reading the rest of this document:
+
+- =graphql-endpoint-def= (the deployed app) registers only =:api-tdb=,
+  =:object-db=, and =:response-cache-db=. *=:text-index= is not registered
+  in the deployed app*; it is only present in =api-test-app-def= in
+  =src/genegraph/user.clj=. Every =(event/store e :text-index ...)= call
+  described below therefore resolves its instance to =nil= in production and
+  is a no-op there (the effect is dropped when the deferred effect runs).
+  The same is true of =:sequence-feature-db=, which is commented out even in
+  the test app.
+- =:text-index= shares the =object-db= directory path. The Lucene index and
+  the RocksDB database live in the same directory.
+
+* How writes happen: deferred effects
+
+Application code almost never writes to a store directly. Instead it appends
+a *deferred effect* to the event map, and the framework's
+=local-effects-interceptor= runs the effects on the =:leave= side, after the
+whole interceptor chain has succeeded.
+
+#+begin_src clojure
+;; genegraph.framework.event
+(defn store [event instance k v]
+  (let [commit-promise (promise)]
+    (update event ::event/effects conj
+            {:store instance
+             :command storage/write
+             :args [(get-in event [::storage/storage instance]) k v commit-promise]
+             :commit-promise commit-promise})))
+
+(defn delete [event instance k] ...)   ; same shape, :command storage/delete
+#+end_src
+
+So the canonical write is:
+
+#+begin_src clojure
+(event/store event <storage-instance-keyword> <key> <value>)
+(event/delete event <storage-instance-keyword> <key>)
+#+end_src
+
+Implications:
+
+- Writes are *transactional with respect to the event*: if any interceptor
+  throws, nothing is written.
+- Multiple stores are written from a single event with no cross-store
+  atomicity. A dosage event writes to =:api-tdb=, =:object-db= (twice or
+  more), =:text-index=, and =:response-cache-db=; each lands independently.
+- Order of effects is the order they were =conj='d, which — because
+  =::event/effects= is a list built with =conj= — is *reverse* of the order
+  the interceptors added them. Nothing currently depends on the ordering.
+
+Direct =storage/write= calls (bypassing the effect queue) are used in the
+bulk base-file loaders (=gff.clj=, =clinvar.clj=) and in =log-monitor=,
+where the per-event effect list would be unreasonably large.
+
+* Store-by-store write semantics
+
+** api-tdb — Apache Jena TDB2
+
+The unit of write is a *whole named graph*. There is no triple-level
+insert/delete API exposed to the application.
+
+#+begin_src clojure
+;; genegraph.framework.storage.rdf.instance/PersistentDataset
+(write  [this k v commit-promise] (.put queue {:command :replace :model-name k :model v ...}))
+(delete [this k   commit-promise] (.put queue {:command :remove  :model-name k        ...}))
+#+end_src
+
+- =k= is the *graph name*: an IRI string (or a Jena =Resource=).
+- =v= is a Jena =Model=.
+- =:replace= executes =.replaceNamedModel=, i.e. the previous contents of
+  that graph are discarded wholesale. Writes are *not* additive. To add
+  triples to an existing graph you must read it, union, and write the whole
+  thing back (see =dosage/add-gene-overlaps-fn=, which unions the overlap
+  model into =::model= *before* the store interceptor runs).
+- Writes are *asynchronous*. They are placed on an =ArrayBlockingQueue=
+  (=:queue-size= 100) drained by a dedicated write loop that batches up to
+  =queue-size= commands into one =ReadWrite/WRITE= transaction, commits, then
+  delivers each command's =commit-promise=. A failure inside =execute=
+  delivers the exception map to the promise rather than throwing.
+- Reads go through the =rdf/tx= macro, which opens a =ReadWrite/READ=
+  transaction (and is re-entrant per thread).
+
+*** Named graph naming conventions in api-tdb
+
+| producer                                  | graph name                                                    |
+|-------------------------------------------+---------------------------------------------------------------|
+| base files (default handler)              | the =:name= from =resources/base.edn= (an ontology/source URI) |
+| HGNC genes                                | ="https://www.genenames.org/"=                                 |
+| affiliations                              | the =:name= from base.edn (="https://affils.clinicalgenome.org/"=) |
+| gene validity curations                   | the assertion's =:dc/isVersionOf= IRI (the stable record IRI)  |
+| gene validity, minimized prior version    | the *prior* assertion's IRI                                    |
+| dosage curations                          | ="https://genegraph.clinicalgenome.org/r/<jira-key>"=          |
+| ClinVar CNVs                              | the canonical variant's IRI                                    |
+| assertion annotations                     | the annotation's =:iri= from the Kafka message                 |
+| GPM people                                | ="https://genegraph.clinicalgenome.org/agent/<id>"=            |
+| consumer offsets (framework)              | ="http://genegraph/topic/<topic-name>"=                        |
+
+** object-db / response-cache-db / log-store — RocksDB
+
+*** Key encoding
+
+=genegraph.framework.storage.rocksdb/k->bytes= is a protocol with five
+cases, and this encoding is what makes the range-scan indexes work:
+
+| key type       | encoding                                             |
+|----------------+------------------------------------------------------|
+| =byte[]=       | passed through unchanged                             |
+| =String=       | XX3-128 hash → 16 bytes (*not order preserving*)     |
+| =Long=         | =Longs/toByteArray= → 8 bytes, big-endian (*ordered*) |
+| =Keyword=      | as its =str=, i.e. hashed like a String              |
+| =Sequential=   | concatenation of =k->bytes= of each element          |
+
+So a vector key is a fixed-width composite key: hashed 16-byte segments for
+strings/keywords, ordered 8-byte segments for longs. Range scans
+(=storage/scan=, =rocksdb/range-get=) rely on a shared byte prefix and on the
+final varying segment being a =Long=; =prefix-range-end= increments the last
+8 bytes of the prefix to compute the exclusive upper bound.
+
+*** Value encoding
+
+Values are serialized with =taoensso.nippy/fast-freeze= and read back with
+=fast-thaw=. Any nippy-serializable Clojure value is legal. A miss returns
+the sentinel =:genegraph.framework.storage/miss= (never =nil=), which callers
+must check explicitly.
+
+Writes are synchronous single-key =.put= calls. There is no batching and no
+multi-key atomicity. =storage/delete= is a single-key =.delete=;
+=storage/range-delete= issues =.deleteRange=.
+
+*** Key namespaces in object-db
+
+Every object-db key is a vector whose first element is a namespace keyword.
+
+**** =[:objects <iri-string>]=
+
+The primary EDN object store backing the "hybrid resource" pattern
+(=src/genegraph/api/hybrid_resource.clj=). Value is a map with at least
+=:iri= and =:type=. Written by:
+
+- =base/gff.clj= — sequence features from the GRCh38/GRCh37 GFFs:
+  #+begin_src clojure
+  {:type :so/Gene                                   ; or :so/Exon, :so/CDS
+   :iri "https://identifiers.org/ncbigene:1234"
+   :ga4gh/location #{{:type :ga4gh/SequenceLocation
+                      :ga4gh/start 17369
+                      :ga4gh/end 17436
+                      :ga4gh/sequenceReference "https://identifiers.org/refseq:NC_000001.11"
+                      :iri "<content-addressed iri>"}}}
+  #+end_src
+  Note that this is the one *read-modify-write* path in the codebase:
+  =write-object-and-indexes= reads the existing record and =conj='s the new
+  location into the =:ga4gh/location= set, so that the GRCh37 and GRCh38
+  loads accumulate into one object rather than clobbering each other. Because
+  the two GFF loads are separate Kafka events processed by the same
+  single-threaded processor this is safe, but it is not atomic.
+
+- =base/clinvar.clj= — each member of a variant "bundle" is written under its
+  own IRI: the =:cg/CanonicalVariant=, its
+  =:cg/VariantPathogenicityProposition=, and one
+  =:cg/EvidenceStrengthAssertion= per ClinVar SCV classification.
+
+- =dosage.clj= — the =:cg/DosageRegion= object for ISCA region curations:
+  #+begin_src clojure
+  {:type :cg/DosageRegion
+   :iri "https://genegraph.clinicalgenome.org/r/region-ISCA-46295"
+   :rdfs/label "..."
+   :ga4gh/location [{:type :ga4gh/SequenceLocation ...} ...]}   ; one per build
+  #+end_src
+
+**** =[:sequences <feature-type> <sequence-ref> <coordinate> <iri>]=
+
+The genomic coordinate index, documented in
+=src/genegraph/api/sequence_index.clj=. This is the reason for the Long key
+segment: =<coordinate>= is a =Long= and sorts correctly in RocksDB, so a
+scan between =[:sequences :so/Gene <ref> <start>]= and
+=[:sequences :so/Gene <ref> <end>]= returns every feature with an endpoint in
+that window.
+
+- =<feature-type>= is =:so/Gene= or =:cg/DosageRegion= (a keyword, hashed).
+- =<sequence-ref>= is a RefSeq IRI string, e.g.
+  ="https://identifiers.org/refseq:NC_000001.11"= (hashed).
+- =<coordinate>= is a =Long= — *both* the start and the end of each location
+  get their own entry (=idx/location->index-entries=), so a feature appears
+  at least twice per build.
+- =<iri>= is the feature IRI, present purely so that two features sharing a
+  coordinate do not overwrite one another.
+- Value is the minimal ={:iri ...}= map; the full object is fetched from
+  =[:objects iri]=.
+
+Entries are produced by the =idx/sequence-feature->sequence-index=
+multimethod, dispatched on =:type=, with implementations for =:so/Gene= (in
+=base/gff.clj=) and =:cg/DosageRegion= (in =dosage.clj=).
+
+Because a scan can only find features whose *endpoints* fall in the window,
+=idx/min-search-width= pads the query range (500kb for genes, 12Mb for dosage
+regions) so that a feature entirely spanning the query region is still found.
+
+**** =[:models <iri-string>]=
+
+Serialized Jena =Model= objects, written only by
+=src/genegraph/api/clingen_gene_validity.clj= (used by the REPL test app, not
+by the deployed =graphql-endpoint-def=, which uses the simpler
+=api/store-curation=). Two keys are written per curation: the assertion IRI
+and the main record IRI. The stored model is later read back to construct a
+"minimized" version of the prior assertion when a new version arrives.
+
+**** =[:clinvar-if <variation-id>]=
+
+The intermediate parsed form of a ClinVar VCV, keyed by variation id string.
+Only written from a =comment= block in =base/clinvar.clj= (a REPL workflow for
+re-processing ClinVar without re-parsing the XML); read by
+=cvc_submission.clj=.
+
+*** response-cache-db keys
+
+| key                              | value                                          |
+|----------------------------------+------------------------------------------------|
+| =[:cached-result <request-body>]= | ={:response <lacinia response> :calculated-at <ms>}= |
+| =:last-update=                   | =System/currentTimeMillis= at last ingest       |
+
+=response-cache/invalidate-cache= writes =:last-update= on *every* event in
+the base, gene-validity, and dosage import processors; a cached result is
+considered stale if its =:calculated-at= predates =:last-update=. Note the
+cache read/write interceptor (=response-cache/response-cache=) is currently
+commented out of the =graphql-api= interceptor chain, so only the
+invalidation half is live.
+
+*** log-store keys (log-monitor app)
+
+=src/genegraph/log_monitor.clj= is a separate app that consumes the
+=ggapi-apilog= topic into its own RocksDB:
+
+- =[:log-record <start-time-ms-string>]= → the API log map published by
+  =api/publish-result-fn= (=:start-time :end-time :query :remote-addr
+  :response-size :status :handled-by :error-message :user-email=).
+- =[:event <offset>]= → a log record augmented with a replayed response
+  and/or a =:diff=. REPL-driven comparison tooling only.
+
+** text-index — Apache Lucene
+
+=src/genegraph/api/lucene.clj= implements =storage/IndexedWrite= over a
+Lucene =IndexWriter=.
+
+#+begin_src clojure
+(storage/write [this k v]
+  (.updateDocument writer (Term. "iri" k)
+                   (->lucene-document (add-text-embedding-vectors nil google-ai-client v)))
+  (.offer needs-commit-q k))
+#+end_src
+
+- =k= is the document IRI string; =.updateDocument= on the =iri= term means a
+  write is an *upsert keyed on iri*.
+- =v= is a plain map, converted to a Lucene =Document= by =->lucene-document=:
+
+  | map key             | Lucene field  | field type          | cardinality |
+  |---------------------+---------------+---------------------+-------------|
+  | =:iri=              | =iri=         | KeywordField, stored | required   |
+  | =:source=           | =source=      | KeywordField, stored | optional   |
+  | =:symbols=          | =symbol=      | KeywordField, stored | many       |
+  | =:types=            | =type=        | KeywordField, stored | many       |
+  | =:labels=           | =label=       | TextField, stored    | many       |
+  | =:descriptions=     | =description= | TextField, stored    | many       |
+  | =:embedding-vectors= | =embeddings= | KnnFloatVectorField (DOT_PRODUCT) | many |
+
+- =:embeddings= (a list of strings) is *not* stored directly. On every write,
+  =add-text-embedding-vectors= calls the Vertex AI =text-embedding-005= model
+  once per string and puts the resulting float arrays into
+  =:embedding-vectors=. This is a synchronous network call inside the write
+  path. If no Google AI client is configured (=:project= / =:location=
+  absent), the client is =nil= and this throws for any document with
+  =:embeddings=.
+- Commits are deferred: the writer offers the key onto a 2-element
+  =needs-commit-q=; a virtual thread polls it once a second and, when
+  something is queued, calls =.commit= on the writer and =.maybeRefresh= on
+  the =SearcherManager=. So a document becomes searchable roughly a second
+  after it is written, and the queue is deliberately tiny (it is a
+  "something changed" signal, not a work queue).
+- There is no delete and no snapshot support. The index is rebuilt from
+  scratch by replaying Kafka. On startup a dummy =lucenetestdoc= document is
+  written and committed so that =SearcherManager= has a non-empty index to
+  open.
+
+*** Documents written to text-index
+
+| producer                     | document shape                                        |
+|------------------------------+-------------------------------------------------------|
+| =base/gene.clj=              | ={:iri :source :symbols :labels :types}= — one per HGNC gene, symbols include =prev_symbol= and =alias_symbol=, labels include =prev_name= |
+| =base/affils_json.clj=       | =rdf-conversion/map->text-index= → ={:iri :labels :types :source}= |
+| =dosage.clj=                 | =region->index-doc= → ={:iri :source :symbols :labels :types}=, symbol is the =ISCA-\d+= id extracted from the IRI |
+| =clingen_gene_validity.clj=  | =curation->text-index= → ={:iri :source :types :descriptions :embeddings}= — the only producer that requests embeddings (and it is not wired into the deployed app) |
+
+* Catalog of write sites
+
+** Kafka processors (deployed app)
+
+*** =import-base-file= (topic =gg-base=)
+
+Dispatches on =::event/data :action= via the =ap/process-base-event=
+multimethod.
+
+| =:action=      | writes                                                                 |
+|----------------+------------------------------------------------------------------------|
+| (default)      | =:api-tdb= ← one named graph per =:name=, model parsed by =rdf/as-model= |
+| =load-genes=   | =:api-tdb= ← =https://www.genenames.org/=; =:text-index= ← one doc per gene |
+| =load-affils=  | =:api-tdb= ← the source =:name=; =:text-index= ← one doc per affiliation |
+| =load-gff=     | =:object-db= (direct =storage/write=) ← =[:objects ...]= + =[:sequences ...]= per feature |
+| =load-clinvar= | =:object-db= (direct) ← =[:objects ...]= per bundle member; =:api-tdb= (direct) ← one graph per canonical variant |
+
+Plus =response-cache/invalidate-cache= → =:response-cache-db= =:last-update=.
+
+Note that the two GFF/ClinVar loaders write directly rather than through
+=event/store=, so their writes are *not* rolled back if the event later
+fails, and they are not batched into the Jena write queue as a unit.
+
+*** =import-gv-curations= (topic =gene-validity-sepio=)
+
+Interceptor chain: =await-genes= → =replace-hgnc-with-ncbi-gene= →
+=store-curation= → =invalidate-cache=.
+
+- =replace-hgnc-with-ncbi-gene= *mutates the in-memory Jena model in place*
+  (documented in the source with a 😱), swapping the HGNC gene resource on
+  the proposition for the NCBI gene found via =:owl/sameAs= in the tdb. This
+  happens before any store effect is queued.
+- =store-curation-fn=: if the model contains a =:cg/Submitted= activity, store
+  the whole event model into =:api-tdb= under the =:dc/isVersionOf= IRI;
+  otherwise =event/delete= that graph. Unpublishing is modeled as a graph
+  removal.
+
+*** =import-dosage-curations= (topic =gene_dosage_raw=)
+
+Interceptor chain, in order, and what each contributes:
+
+1. =add-dosage-model= — conforms =::fields= against the spec; on success
+   builds =::model= from =gene-dosage-report= (report, contribution, two
+   assertions for dosage 1 and 3, and location triples). On spec failure sets
+   =::spec/invalid= and *no model*, which makes every downstream write a
+   no-op.
+2. =add-dosage-region= — region curations only: stores the region map to
+   =:object-db= =[:objects iri]= and a doc to =:text-index=.
+3. =add-dosage-indexes= — region curations only: stores one
+   =[:sequences :cg/DosageRegion <ref> <coord> <iri>]= entry per location
+   endpoint to =:object-db=.
+4. =add-gene-overlaps= — scans the sequence index for overlapping genes,
+   filters to protein-coding, and *unions* =[region <overlap-predicate> gene]=
+   triples into =::model=. This is why the tdb write must come last.
+5. =write-dosage-model-to-db= — stores =::model= into =:api-tdb= under
+   ="https://genegraph.clinicalgenome.org/r/<jira-key>"=.
+6. =invalidate-cache=.
+
+*** =read-clinvar-curations= (topic =ggapi-clinvar-curation=)
+
+=assertion-annotation/process-annotation-fn= converts the JSON annotation to
+a model (=:cg/AssertionAnnotation= plus a contribution node, rewriting legacy
+=dataexchange.clinicalgenome.org= IRIs to =genegraph.clinicalgenome.org=) and
+stores it to =:api-tdb= under the annotation's own =:iri=.
+
+*** =import-gpm-people= (topic =gpm-person-events=; test app only)
+
+Renames GPM person fields to schema.org terms and stores a small
+=:schema/Person= model to =:api-tdb= under
+="https://genegraph.clinicalgenome.org/agent/<id>"=. Only =created= /
+=updated= / =person_created= / =person_updated= events are stored; other
+event types pass through with no write.
+
+** GraphQL mutations
+
+There is exactly one mutation with a persistent effect:
+=createAssertionAnnotation= (=graphql/schema/conflicts.clj=). It does *not*
+write to a store. It mints a random IRI and =event/publish=es the annotation
+to the =:clinvar-curation= Kafka topic via the =:effects= atom placed on the
+Lacinia context by =graphql-mutation-effects-interceptor=. The write happens
+later, when =read-clinvar-curations= consumes that message.
+
+This is the only write path that originates from a user request, and it is
+deliberately round-tripped through Kafka so that the mutation and the ingest
+share one code path.
+
+The GraphQL read path opens a =ReadWrite/READ= transaction in
+=jena-transaction-interceptor= and closes it on =:leave= / =:error=; nothing
+in that chain writes to the tdb.
+
+** Framework-managed writes
+
+*** Consumer offsets
+
+Each processor declaring =:backing-store= records its topic offset alongside
+the data it writes, in the same store.
+
+- =:backing-store :api-tdb= (all four ingest processors): the offset is
+  written as a one-triple named graph.
+  #+begin_src
+  graph  <http://genegraph/topic/<topic-name>>
+    <http://genegraph/topic/...>  <http://genegraph/mostRecentOffset>  <offset>^^xsd:long
+  #+end_src
+- =:backing-store :log-store= (log-monitor): =rocks-write!= of the offset
+  under the topic keyword as key.
+
+*** Snapshots
+
+=api/store-snapshots!= runs every 6 hours (with jitter) over every storage
+instance that has a =:snapshot-handle=, so in the deployed app: =:api-tdb=
+and =:object-db=.
+
+- RDF: =DatabaseMgr/backup= produces a gzipped N-Quads dump, copied to the
+  GCS handle (=api-tdb-v3.nq.gz=). Restore reads N-Quads back inside a single
+  WRITE transaction.
+- RocksDB: a =Checkpoint= is taken into a sibling directory, tarred and
+  LZ4-framed to the handle (=object-db-v3.lz4=), then the checkpoint is
+  deleted.
+- Snapshots are restored on =start= only when =:load-snapshot true= *and* the
+  local path does not already exist.
+- Neither =:text-index= nor =:response-cache-db= has a snapshot handle;
+  both are rebuilt from replay / recomputed.
+
+* Cross-cutting observations
+
+1. *No partial updates to the triplestore.* Everything is whole-named-graph
+   replacement. The granularity of a graph is therefore the granularity of
+   an update, and it is chosen to match the granularity of a Kafka message
+   (one curation, one variant, one ontology file).
+
+2. *Retraction is graph removal.* Both =api/store-curation-fn= and
+   =clingen_gene_validity/store-curation-fn= delete the graph when a curation
+   is not in a published state. There is no tombstone or "retracted" flag in
+   the data.
+
+3. *Two write disciplines coexist.* Event-driven writes go through
+   =event/store= (deferred, all-or-nothing per event, promise-tracked). Bulk
+   loaders (GFF, ClinVar) call =storage/write= directly inside a =run!= over
+   a lazy sequence. The bulk path is not restartable mid-file: a failure
+   partway through leaves a partially loaded store and the offset unadvanced,
+   so the next attempt re-writes everything from the top. That is idempotent
+   for =[:objects ...]= keyed by IRI and for =[:sequences ...]= entries, and
+   idempotent for the tdb (replace semantics) — but *not* for the
+   read-modify-write in =gff/write-object-and-indexes=, where re-running a
+   load =conj='s locations into a set (safe, since it's a set) but a
+   *changed* coordinate would accumulate rather than replace.
+
+4. *The one read-modify-write.* =gff/write-object-and-indexes= is the only
+   place that reads a store to compute what to write. Everything else derives
+   the value entirely from the event payload, or from a query whose result is
+   merged in memory before a single write.
+
+5. *Object-db and tdb hold overlapping data by design.* The hybrid resource
+   pattern (=hybrid_resource.clj=) reads =[:objects iri]= and, on a hit,
+   attaches the Jena =Resource= to the EDN map so a resolver can traverse
+   either representation. Writers that participate in this pattern (ClinVar,
+   dosage regions, GFF features) must keep the two in sync themselves; there
+   is no mechanism enforcing it.
+
+6. *Text-index writes are effectively dead in production* until
+   =:text-index= is added to =graphql-endpoint-def='s =:storage= map. They
+   are exercised only through =api-test-app-def=.
+
+7. *Lucene writes make a network call.* Every =storage/write= to the text
+   index that carries =:embeddings= synchronously calls Vertex AI. This puts
+   an external dependency inside the Kafka consume loop for the gene-validity
+   processor in the test app.

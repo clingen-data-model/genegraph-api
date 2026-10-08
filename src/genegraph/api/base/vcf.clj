@@ -132,9 +132,10 @@
     (->> (charred/read-csv r :separator \tab)
          (remove #(re-find #"^#" (first %)))
          (take 5)
-         (mapv (fn [v] (-> v
+         #_(mapv (fn [v] (-> v
                            vcf-row->map
                            ->ga4gh-variant)))
+         (into [])
          tap>))
 
   (with-open [r (-> gnomad-cnv-path

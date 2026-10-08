@@ -1,0 +1,306 @@
+* Purpose of API/Frontend
+
+Going to be the focus of all my user interaction efforts going forward.
+
+May be a publicly available resource, or at least a resource internal to ClinGen.
+
+Worth getting it right. The schema and data model are critical because they'll be hard to change later. Have spent considerable effort designing the architecture for this. At this point, why would I half-ass one of the most critical pieces?
+
+Let's consider a ground-up revision of the schema now, build the API around it, and go forward from there.
+
+* Observations
+
+Changing the query model is deeply unpleasant. The model winds up being an architectural decision. Since this is reaches across domains (code, queries), there aren't really good tools to help with this.
+
+The current VA/SEPIO models are suboptimal for querying in many respects, however they're still okay-ish for graph models (if all I care about are entities referenced by a proposition, I care more about the proposition type (which I can change easily), but less about the entities (which I can't)
+
+* working
+
+** Text search
+
+Selecting entities for text searching and making them available seems to be working great.
+
+* broken
+
+* yet to be done
+
+** Vector-based text searching
+
+Probably necessary for finding diseases; searching through summaries or text based data in curations.
+
+** Range-based genomic feature search
+
+This is intended through RocksDB, since range searches are fast and efficient here.
+Reasonable performance expected through the ref/deref option (rather than lazy sequences), though should configure optional limits, even given the reference types.
+
+* New GKS schema in API
+
+Adopting this is going to be a pain. I don't *think* the right answer is automatically going to be to switch to the new schema entries in GKS, although I'd rather do it when necessary, rather than maintain a translation layer indefinitely.
+
+** Subjects of propositions / statements
+
+The new attribute names suck. Querying is going to work best by just translating everything to a :cg/subject. May be best to attach it to the Statement, although the type of Proposition a Statement is attached to seems to matter.
+
+There is the is-about property that could be helpful here. May conflict less with the existing terms.
+
+Think on it.
+
+** Contributions
+
+Attributes have changed; they are probably stable at this point. Best to adopt the new standard.
+
+** Score/Strength
+
+Statement and EvidenceLine now have different attributes for functionally the same thing. I don't think this is worth adopting in the new model. Transform this to the old.
+
+** Evidence
+
+Same as score/strength. No reason for two different attributes
+
+** GeneValidityProposition -> GeneDiseaseValidityProposition
+
+Either accept as is, or migrate to a generic proposition type away from existing schema.
+
+** EvidenceStrengthAssertion -> Statement
+
+Seems fine, generally approve of moving towards more generic types.
+
+* Query optimized generic schema
+One option.
+
+Am not sure whether I want to deal with this for Gene Validity curations, though seems like I might want to consider it for ClinVar variants
+** Resource
+
+*** Implement subjectOf / isAbout generically
+May be resource dependent, but should just be a question of picking one (probably isAbout)
+
+** Statement
+* Unified schema
+Supports validation; translates into GraphQL schema (to an extent)
+
+Possibly saves me from having to rewrite server-side schema.
+
+In some respects, the current server-side schema are a bit obsolescent anyway...
+
+* Pipeline
+
+CONSTRUCT SPARQL statements for transforming GV Curations into target query schema
+
+* Discussion
+
+Once we're into the API/view layer, we are at the projection rather than the standard data exchange layer.
+
+The more I can strip down the graph representation to the essentials needed for querying, the better.
+
+It's okay to be somewhat more generous with the EDN representation in RocksDB.
+
+Data models: graph, (rich) row, possibility for a column store (DuckDB).
+
+Probably shouldn't need more than creative use of Rocks. Main use case of Rocks will still be rendering a (discrete) set of values. 
+
+* External data connections
+
+Persistent text embeddings (maybe through data exchange?). Seems like we'd want to not have to regenerate these often.
+
+Pubmed stuff. Fetch once via API for everything referenced in ClinGen, only do it again for updated stuff.
+
+I have working code. Even if I wind up replacing a lot of it, migrating from a working state seems like it's going to be easier than trying to start from scratch, especially if the architecture is good.
+
+* Goals
+
+What would I want out of a query-optimized data model
+
+It feels on some level like I've reinvented the property graph model--so it goes.
+
+** Entry point
+
+*** Text search
+
+Keyword vs embeddings
+
+Finding a gene by symbol works great for keyword search; I think the rest is going to be better supported by vector search and embeddings.
+
+We want to turn around search results fast. We also want to do things cheaply.
+
+I think that the main use case for embeddings is going to be searching MONDO disease terms.
+
+*** Graph queries
+
+This is going to be performing a search based on graph pattern matching
+
+Entities of a specific type, belonging to a group, approved by users, having other such properties.
+
+Will also be needed for walking up the tree from a GraphQL query; some data is intrinsically graph structured.
+
+The sense is that I should be specific about what type of entities are included in the graph, and filter for them. Probably they are just the relationships in relational structures.
+
+Really don't care about text labels at this level, though storing Gene Validity data could be a thing. Stripping text and unused relationships could significantly reduce the size of the graph.
+
+Facets in graph queries vs facets in text search. Sense is that facets don't enter in to embeddings based search. Embeddings is going to be more of a 'top 20, top 100' situation anyway, which is already at the scale where graph queries can be reasonable. May need to group embeddings into a few broad sets (do we need more than disease here?)
+
+*** Genomic range queries
+
+Supported by range scans in RocksDB. Working-ish. May need additional specification.
+
+*** ClinVar
+
+Behemoth XML. Kinda want to split it out so I can process in parallel
+
+** Entity facts
+
+*** RocksDB
+
+Enable bloom filter!
+
+According to the robots, Rocks will happily scale to tens of billions of keys. Yay, though there is some additional advice about tuning.
+
+RocksDB is going to be the main goto for this. Favoring flat objects generally for operational simplicity, with the caveat that deserializing and materializing a ton of data to get at one field (OLAP, column oriented workflows), will be kind of miserable. That said, I don't have a use case for these, and I can probably handle them separately from the general object store in RocksDB.
+
+Do I want to leverage RocksDB for navigating tree structured data? How much nesting do I allow in objects? Do I want to examine the hybrid db code to make it a bit easier to use? It's not bad, but maybe I want RDF queries to return hybrid nodes automatically, or at least dereferenceable hybrid nodes? (via RocksRef). Something to ponder.
+
+* Architecture
+
+Largely the same; some changes
+
+Rather than the general pattern be 'read archive, import graph into Jena' the new pattern is 'read data, generate set of events to write to target archive.
+
+Can live with stale/inaccessible data on RocksDB (sort of), it'll seldom be a direct entry point.
+
+When will I ever delete data?
+
+When a curation is unpublished -- do not want text searches to be visible. (remove from text search--maybe remove related artifacts from RocksDB.
+
+One of the promises of this approach is to make evidence items searchable--do I care about making the text from these searchable or no?
+
+I don't think a concept will ever be removed from an ontology or gene database--though they may be obsoleted. Still need to leave them searchable, since there will be terms curated against obsolete entities.
+
+What I can do is leave a trace in the database for each record imported, something in RocksDB that can track the actions to take when: record is unpublished or a major bulk data source is updated (ClinVar/MONDO/GenCC/HGNC..others). Possibly this is a query against Jena--may not need a special trace/undo. Feels like we need some defined procedures for events that can be destructive of data.
+
+Most of these can be handled one at a time in memory; ClinVar is the exception.
+
+
+** Classes
+
+*** Contribution
+(-) special
+
+Anonymous; bound to information entity, may ommit from Knowledge graph (in favor of promoting evaluation attributes to the top level),
+
+*** EvidenceLine
+(+)
+
+Identified and named. First class entity, possibly with indexed text, tied to curation entity it's created with and should be deleted with same. Revisit and build out.
+
+*** Statement
+(+)
+
+Similar to EvidenceLine, but with more potential fields.
+
+*** StudyResult / Finding
+(+)
+
+Am not entirely certain what Matt B is hung up on with this, but this will be a primary sort of evidence.
+
+The more I look at these, there's not a lot binding them together, other than that they get used as evidence (which isn't exclusive to these classes--just about anything can be)
+
+**** Case-Control
+(+)
+
+Kinda gets used in the same breath; has some statistical significance fields that may translate across resources.
+
+Not super common in our dataset; probably not worth a tremendous amount of time to model.
+
+**** Segregation
+(+)
+
+More common, has its own sort of fields. Another first class entity.
+
+**** VariantEvidence
+
+More like the observation of a variant in an individual. Has potentially a bunch of different attributes.
+
+*** Agent
+(+)
+
+Will generally come in via bulk download.
+
+*** Cohort/StudyGroup
+(+)
+
+Rare in GV Data, but first class and present in some datasets. Will be a significant part of gnomAD data, if I want to go there.
+
+*** Annotation
+(+)
+
+Have been using this to manage the ClinVar Curation project.
+
+*** Family
+(+)
+
+*** Proband
+(+)
+
+*** Proposition
+(+)
+
+Primary linking class, value object. Arguably its attributes could bubble up to Statements, but helps to link Statements that discuss the same concept.
+
+*** SequenceFeature
+(+)
+
+Genes, regions, lots of stuff in here. Absolutely critical and worth getting right. Will enter via several different mechanisms.
+
+*** SequenceLocation
+(-)
+
+At the moment a subordinate feature of other VRS classes.
+
+*** ValueSet
+(?)
+
+Maybe first class? Kind of a schema description concept.
+
+*** Class
+(+)
+
+Need to decide how deep to go down the metamodel rabbit hole, but since MONDO diseases 
+
+*** Allele
+(+)
+
+Almost always likely to be a subject of a Statement, still seems like an important first-class concept
+
+That said, may not have any typical GA4GH alleles in Genegraph yet. Likely will change.
+
+*** CanonicalVariant
+(+)
+
+Another first class concept. Should examine the schema in CatVRS, but not feel bound by it.
+
+*** CopyNumberVariant/Change
+(+)
+
+This will be our main type of variant. Super important to get this right, though I think the GA4GH modeling does a good job on this one.
+
+* Ideas
+** Data packages
+
+RocksDB offers the possibility of importing and exporting column families (or entire databases)
+
+The ease of exporting RocksDB, restoring snapshots, and the general compression employed by RocksDB, makes it a pretty good candidate for storing packages of data. Combined with significantly reducing the size of the RDF store in Jena, (RocksDB packages could hold the graph needed to index things too), this offers the possibility of modular data sets moved between applications.
+
+An idea to consider, more for packages of data from larger sources: ClinVar, Allele Registry, Pubmed, maybe text embeddings, Could have data packages for gene validity, dosage, GenCC.
+
+Variant Effect Predictor--output on variants/linked data hub?
+
+Neat concept, not sure I need it right now, but could be handy later. May be useful for something like VRS-in-a-box.
+
+** GraphQL vs REST
+
+I've been using GraphQL for a while. It originally emerged partially as a spite choice (I really didn't want to have to jump whenever Scott wanted a new page), but also there were existing high-quality Clojure libraries available to support it, especially on Pedestal, which became a critical part of our infrastructure.
+
+Since then, Scott is gone, Phil is quite happy to move on from GraphQL, and for my own purposes I'm content to move on myself, There are some conveniences, but the operational complexity is high, and it constrains some design choices. It does allow some substantial changes to the frontend without requiring similar backend changes.
+
+At the same time, GraphQL allows for inverse paths, and query parameters to be declared on properties. Removing it might have a higher cost than sustaining it at this point. Am inclined to keep GraphQL
+
+Keep GraphQL. There are real benefits, and at this point I've paid the price of entry.

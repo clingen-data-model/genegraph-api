@@ -1,0 +1,27 @@
+* Background (erin's slides)
+
+Scores (Appendix table 1)
+Algorithm
+
+A few examples
+
+* Evaluation data sets
+
+* gnomadCNV
+
+* ClinVar
+
+Inheritance information
+
+** Previously computed statistics, age, distribution
+
+** Inheritance information
+* Genebayes analysis and comparison
+Analysis by gene count
+
+* Next steps
+** Import gnomadCNV to genegraph proper
+Compute overlaps (especially partial overlaps
+** Adding partial (disabling) overlaps
+Should be able to do this interactively using existing, pre-parsed data.
+** UI
