@@ -1,11 +1,28 @@
 (ns genegraph.api.frontend.render
   (:require [hiccup2.core :as h]))
 
+(def app-path "/kb")
+
+;; Clerk redirects to "/" after sign-in and sign-out unless told
+;; otherwise; the app is served from app-path, so send users back there.
 (def clerk-script
   (h/raw
-   "<script>
- window.addEventListener('load', async function () {\n    await Clerk.load({\n      ui: { ClerkUI: window.__internal_ClerkUICtor },\n    })\n\n    if (Clerk.isSignedIn) {\n      document.getElementById('app').innerHTML = `\n        <div id=\"user-button\"></div>\n      `\n\n      const userButtonDiv = document.getElementById('user-button')\n\n      Clerk.mountUserButton(userButtonDiv)\n    } else {\n      document.getElementById('app').innerHTML = `\n        <div id=\"sign-in\"></div>\n      `\n\n      const signInDiv = document.getElementById('sign-in')\n\n      Clerk.mountSignIn(signInDiv)\n    }\n  })
-</script>"))
+   (str "<script>
+  window.addEventListener('load', async function () {
+    await Clerk.load({
+      ui: { ClerkUI: window.__internal_ClerkUICtor },
+      signInFallbackRedirectUrl: '" app-path "',
+      signUpFallbackRedirectUrl: '" app-path "',
+      afterSignOutUrl: '" app-path "',
+    })
+
+    if (Clerk.isSignedIn) {
+      Clerk.mountUserButton(document.getElementById('user-button'))
+    } else {
+      Clerk.mountSignIn(document.getElementById('sign-in'))
+    }
+  })
+</script>")))
 
 (def el-dialog
   [:el-dialog
@@ -430,8 +447,7 @@
       {:aria-hidden "true",
        :class
        "hidden lg:block lg:h-6 lg:w-px lg:bg-gray-900/10 dark:lg:bg-white/10"}]
-     [:UserButton]
-     #_[:div {:id "user-button"}]
+     [:div {:id "user-button"}]
      #_profile-dropdown]]])
 
 (defn shell [content]
@@ -445,7 +461,8 @@
      {:class "xl:pl-96"}
      [:div
       {:class "px-4 py-10 sm:px-6 lg:px-8 lg:py-6" :id "app"}
-      (comment "Main area")]]]
+      [:div {:id "sign-in"}]
+      content]]]
    [:aside
     {:class
      "fixed top-16 bottom-0 left-20 hidden w-96 overflow-y-auto border-r border-gray-200 px-4 py-6 sm:px-6 lg:px-8 xl:block dark:border-white/10"}
